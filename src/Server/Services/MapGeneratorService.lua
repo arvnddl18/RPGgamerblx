@@ -20,7 +20,7 @@ natureFolder.Name = "Nature"
 
 local GRID_SIZE = 220 
 local SCALE = 16
-local SEED = math.random(1, 100000)
+local SEED = 42069 -- Static seed so the map does not change permanently
 local WATER_LEVEL = 18
 local VILLAGE_RADIUS = 700 
 

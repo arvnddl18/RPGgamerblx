@@ -17,15 +17,45 @@ EnemyService._inventoryService = nil
 EnemyService._enemies = {}
 EnemyService._attackCooldowns = {}
 
+-- All spawn positions are OUTSIDE the village walls (village radius ~600, wilderness starts at 800+).
+-- Spread across north/south/east/west forest and mountain areas.
 local SPAWN_POSITIONS = {
-	Vector3.new(0, 3, 40),
-	Vector3.new(20, 3, 45),
-	Vector3.new(-20, 3, 45),
-	Vector3.new(10, 3, 60),
-	Vector3.new(-10, 3, 60),
-	Vector3.new(30, 3, 50),
-	Vector3.new(-30, 3, 50),
-	Vector3.new(0, 3, 70),
+	-- North forest (Z negative = north)
+	Vector3.new(0,   3, -900),
+	Vector3.new(200, 3, -950),
+	Vector3.new(-200, 3, -950),
+	Vector3.new(100, 3, -1100),
+	Vector3.new(-100, 3, -1100),
+
+	-- South forest
+	Vector3.new(0,   3,  900),
+	Vector3.new(200, 3,  950),
+	Vector3.new(-200, 3,  950),
+
+	-- East mountains
+	Vector3.new(900,  3,  0),
+	Vector3.new(1000, 3,  200),
+	Vector3.new(1000, 3, -200),
+	Vector3.new(1100, 3,  0),
+
+	-- West mountains
+	Vector3.new(-900,  3,  0),
+	Vector3.new(-1000, 3,  200),
+	Vector3.new(-1000, 3, -200),
+
+	-- Northeast wilderness
+	Vector3.new(700,  3, -700),
+	Vector3.new(850,  3, -850),
+
+	-- Northwest wilderness
+	Vector3.new(-700, 3, -700),
+	Vector3.new(-850, 3, -850),
+
+	-- Southeast wilderness
+	Vector3.new(700,  3,  700),
+
+	-- Southwest wilderness
+	Vector3.new(-700, 3,  700),
 }
 
 -- Increased aggro range so enemies actively hunt nearby players
