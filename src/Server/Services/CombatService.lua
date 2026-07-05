@@ -20,8 +20,12 @@ function CombatService:Init()
 	self._remotes = Framework:GetRemotesFolder()
 end
 
-function CombatService:CreateSwordTool(weaponId)
-	local weapon = Items[weaponId] or Items.WoodenSword
+function CombatService:CreateWeaponTool(weaponId)
+	local weapon = Items[weaponId]
+	if not weapon then
+		return nil
+	end
+
 	local tool = Instance.new("Tool")
 	tool.Name = weapon.name
 	tool.RequiresHandle = true
@@ -30,7 +34,20 @@ function CombatService:CreateSwordTool(weaponId)
 
 	local handle = Instance.new("Part")
 	handle.Name = "Handle"
-	handle.Size = Vector3.new(0.4, 0.4, 3.5)
+
+	local weaponType = weapon.type
+	if weaponType == "weapon" and weapon.id:find("Staff") then
+		handle.Size = Vector3.new(0.35, 0.35, 4.5)
+	elseif weaponType == "weapon" and weapon.id:find("Bow") then
+		handle.Size = Vector3.new(0.3, 2.5, 0.3)
+	elseif weaponType == "weapon" and weapon.id:find("Spear") then
+		handle.Size = Vector3.new(0.35, 0.35, 5.0)
+	elseif weaponType == "weapon" and weapon.id:find("Mace") then
+		handle.Size = Vector3.new(0.6, 0.6, 2.5)
+	else
+		handle.Size = Vector3.new(0.4, 0.4, 3.5)
+	end
+
 	handle.Color = weapon.color
 	handle.Material = Enum.Material.Metal
 	handle.Parent = tool
@@ -38,13 +55,16 @@ function CombatService:CreateSwordTool(weaponId)
 	return tool
 end
 
-function CombatService:GiveSword(player, weaponId)
+function CombatService:GiveWeapon(player, weaponId)
 	local data = self._playerData:GetData(player)
-	if not data then
+	if not data or not data.hasSelectedClass then
 		return
 	end
 
-	weaponId = weaponId or data.equippedWeapon or "WoodenSword"
+	weaponId = weaponId or data.equippedWeapon
+	if not weaponId then
+		return
+	end
 
 	local character = player.Character
 	if not character then
@@ -56,7 +76,6 @@ function CombatService:GiveSword(player, weaponId)
 		return
 	end
 
-	-- Remove any existing weapon tools from character and backpack
 	local backpack = player:FindFirstChildOfClass("Backpack")
 	if backpack then
 		for _, child in backpack:GetChildren() do
@@ -72,10 +91,10 @@ function CombatService:GiveSword(player, weaponId)
 		end
 	end
 
-	-- Create the weapon and parent it directly to the character
-	-- This forces the humanoid to equip it immediately, bypassing the disabled Backpack UI
-	local tool = self:CreateSwordTool(weaponId)
-	tool.Parent = character
+	local tool = self:CreateWeaponTool(weaponId)
+	if tool then
+		tool.Parent = character
+	end
 end
 
 function CombatService:FindAttackTargets(character)
@@ -108,6 +127,10 @@ function CombatService:FindAttackTargets(character)
 end
 
 function CombatService:HandleAttack(player)
+	if not self._playerData:HasSelectedClass(player) then
+		return
+	end
+
 	local now = tick()
 	if self._cooldowns[player] and now - self._cooldowns[player] < ATTACK_COOLDOWN then
 		return
@@ -137,24 +160,22 @@ function CombatService:Start()
 		self:HandleAttack(player)
 	end)
 
-	-- Give weapon on character spawn
 	Players.PlayerAdded:Connect(function(player)
 		player.CharacterAdded:Connect(function()
-			task.wait(0.5) -- Let EquipmentService finish first
-			self:GiveSword(player)
+			task.wait(0.5)
+			self:GiveWeapon(player)
 		end)
 	end)
 
-	-- Handle players already in the game
 	for _, player in Players:GetPlayers() do
 		if player.Character then
 			task.delay(0.5, function()
-				self:GiveSword(player)
+				self:GiveWeapon(player)
 			end)
 		end
 		player.CharacterAdded:Connect(function()
 			task.wait(0.5)
-			self:GiveSword(player)
+			self:GiveWeapon(player)
 		end)
 	end
 end

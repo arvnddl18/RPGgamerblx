@@ -1,0 +1,211 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Skills = require(Shared.Config.Skills)
+local Items = require(Shared.Config.Items)
+
+local SkillBarUI = {}
+SkillBarUI.__index = SkillBarUI
+
+local SLOT_LABELS = { "1", "2", "3", "4", "5", "6", "7" }
+local POTION_NAMES = { [6] = "HP Pot", [7] = "MP Pot" }
+
+function SkillBarUI.new(playerGui)
+	local self = setmetatable({}, SkillBarUI)
+	self._slots = {}
+	self._cooldownEnds = {}
+	self._mana = 0
+	self._hasSelectedClass = false
+
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "SkillBarUI"
+	screenGui.ResetOnSpawn = false
+	screenGui.Parent = playerGui
+	self._screenGui = screenGui
+
+	local actionBar = Instance.new("Frame")
+	actionBar.Name = "ActionBar"
+	actionBar.Size = UDim2.new(0, 400, 0, 60)
+	actionBar.Position = UDim2.new(0.5, -200, 1, -70)
+	actionBar.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+	actionBar.BackgroundTransparency = 0.5
+	actionBar.BorderSizePixel = 0
+	actionBar.Visible = false
+	actionBar.Parent = screenGui
+	self._actionBar = actionBar
+
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.Padding = UDim.new(0, 8)
+	layout.Parent = actionBar
+
+	for i = 1, 7 do
+		local slotFrame = Instance.new("Frame")
+		slotFrame.Name = "Slot" .. i
+		slotFrame.Size = UDim2.new(0, 46, 0, 46)
+		slotFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+		slotFrame.BorderSizePixel = 0
+		slotFrame.Parent = actionBar
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 6)
+		corner.Parent = slotFrame
+
+		local icon = Instance.new("Frame")
+		icon.Name = "Icon"
+		icon.Size = UDim2.new(1, -6, 1, -6)
+		icon.Position = UDim2.new(0, 3, 0, 3)
+		icon.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+		icon.BorderSizePixel = 0
+		icon.Parent = slotFrame
+
+		local iconCorner = Instance.new("UICorner")
+		iconCorner.CornerRadius = UDim.new(0, 4)
+		iconCorner.Parent = icon
+
+		local keyLabel = Instance.new("TextLabel")
+		keyLabel.Size = UDim2.new(0, 16, 0, 16)
+		keyLabel.Position = UDim2.new(0, 2, 0, 2)
+		keyLabel.BackgroundTransparency = 1
+		keyLabel.Text = SLOT_LABELS[i]
+		keyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+		keyLabel.Font = Enum.Font.GothamBold
+		keyLabel.TextSize = 10
+		keyLabel.TextXAlignment = Enum.TextXAlignment.Left
+		keyLabel.Parent = slotFrame
+
+		local nameLabel = Instance.new("TextLabel")
+		nameLabel.Size = UDim2.new(1, 0, 0, 14)
+		nameLabel.Position = UDim2.new(0, 0, 1, -14)
+		nameLabel.BackgroundTransparency = 1
+		nameLabel.Text = POTION_NAMES[i] or ("Skill " .. i)
+		nameLabel.TextColor3 = Color3.new(1, 1, 1)
+		nameLabel.Font = Enum.Font.GothamBold
+		nameLabel.TextSize = 8
+		nameLabel.Parent = slotFrame
+
+		local cooldownOverlay = Instance.new("Frame")
+		cooldownOverlay.Name = "Cooldown"
+		cooldownOverlay.Size = UDim2.new(1, 0, 1, 0)
+		cooldownOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		cooldownOverlay.BackgroundTransparency = 0.45
+		cooldownOverlay.BorderSizePixel = 0
+		cooldownOverlay.Visible = false
+		cooldownOverlay.ZIndex = 2
+		cooldownOverlay.Parent = slotFrame
+
+		local cdCorner = Instance.new("UICorner")
+		cdCorner.CornerRadius = UDim.new(0, 6)
+		cdCorner.Parent = cooldownOverlay
+
+		local cdLabel = Instance.new("TextLabel")
+		cdLabel.Size = UDim2.new(1, 0, 1, 0)
+		cdLabel.BackgroundTransparency = 1
+		cdLabel.Text = ""
+		cdLabel.TextColor3 = Color3.new(1, 1, 1)
+		cdLabel.Font = Enum.Font.GothamBold
+		cdLabel.TextSize = 14
+		cdLabel.ZIndex = 3
+		cdLabel.Parent = cooldownOverlay
+
+		local grayOverlay = Instance.new("Frame")
+		grayOverlay.Name = "Unavailable"
+		grayOverlay.Size = UDim2.new(1, 0, 1, 0)
+		grayOverlay.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+		grayOverlay.BackgroundTransparency = 0.5
+		grayOverlay.BorderSizePixel = 0
+		grayOverlay.Visible = false
+		grayOverlay.ZIndex = 1
+		grayOverlay.Parent = slotFrame
+
+		self._slots[i] = {
+			frame = slotFrame,
+			icon = icon,
+			nameLabel = nameLabel,
+			cooldownOverlay = cooldownOverlay,
+			cdLabel = cdLabel,
+			grayOverlay = grayOverlay,
+			skillId = nil,
+			manaCost = 0,
+		}
+	end
+
+	return self
+end
+
+function SkillBarUI:GetSkillMeta(skillId)
+	if skillId == "HealthPotion" then
+		local item = Items.HealthPotion
+		return item.name, item.color, 0
+	end
+	if skillId == "ManaPotion" then
+		local item = Items.ManaPotion
+		return item.name, item.color, 0
+	end
+	local skill = Skills[skillId]
+	if skill then
+		return skill.name, Color3.fromRGB(90, 120, 180), skill.manaCost or 0
+	end
+	return "?", Color3.fromRGB(60, 60, 60), 0
+end
+
+function SkillBarUI:UpdateLoadout(skillLoadout)
+	for i = 1, 7 do
+		local slot = self._slots[i]
+		local skillId = skillLoadout and skillLoadout[i]
+		slot.skillId = skillId
+		if skillId then
+			local name, color, manaCost = self:GetSkillMeta(skillId)
+			slot.nameLabel.Text = name
+			slot.icon.BackgroundColor3 = color
+			slot.manaCost = manaCost
+		end
+	end
+	self:RefreshAvailability()
+end
+
+function SkillBarUI:SetMana(mana)
+	self._mana = mana
+	self:RefreshAvailability()
+end
+
+function SkillBarUI:SetVisible(hasSelectedClass)
+	self._hasSelectedClass = hasSelectedClass
+	self._actionBar.Visible = hasSelectedClass
+end
+
+function SkillBarUI:RefreshAvailability()
+	for i = 1, 7 do
+		local slot = self._slots[i]
+		local onCooldown = slot.skillId and self._cooldownEnds[slot.skillId] and tick() < self._cooldownEnds[slot.skillId]
+		local notEnoughMana = slot.manaCost > 0 and self._mana < slot.manaCost
+		slot.grayOverlay.Visible = not onCooldown and notEnoughMana and self._hasSelectedClass
+	end
+end
+
+function SkillBarUI:StartCooldown(skillId, duration)
+	for i, slot in self._slots do
+		if slot.skillId == skillId then
+			self._cooldownEnds[skillId] = tick() + duration
+			slot.cooldownOverlay.Visible = true
+			slot.cdLabel.Text = tostring(math.ceil(duration))
+
+			task.spawn(function()
+				while slot.skillId == skillId and self._cooldownEnds[skillId] and tick() < self._cooldownEnds[skillId] do
+					local remaining = self._cooldownEnds[skillId] - tick()
+					slot.cdLabel.Text = tostring(math.max(0, math.ceil(remaining)))
+					task.wait(0.1)
+				end
+				slot.cooldownOverlay.Visible = false
+				slot.cdLabel.Text = ""
+				self._cooldownEnds[skillId] = nil
+				self:RefreshAvailability()
+			end)
+			break
+		end
+	end
+end
+
+return SkillBarUI

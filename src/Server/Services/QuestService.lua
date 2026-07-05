@@ -12,6 +12,7 @@ function QuestService:Init()
 	self._playerData = Framework:GetService("PlayerDataService")
 	self._remotes = Framework:GetRemotesFolder()
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
+	Framework:GetRemote("OpenQuestLog")
 end
 
 function QuestService:CreateNPC(cframe)
@@ -276,23 +277,75 @@ function QuestService:CreateNPC(cframe)
 			accepted = data.quest.accepted,
 			completed = data.quest.completed,
 			progress = data.quest.progress,
-			required = config.requiredKills,
+			required = Quests.GetRequired(config),
 		})
 	end)
 
 	return model
 end
 
+function QuestService:GetQuestConfig(data)
+	if not data or not data.quest.id then
+		return nil
+	end
+	return Quests[data.quest.id]
+end
+
+function QuestService:CompleteQuest(player, config)
+	local data = self._playerData:GetData(player)
+	if not data then
+		return
+	end
+
+	data.quest.completed = true
+	self._playerData:AddXP(player, config.xpReward or 0)
+	self._playerData:AddCoins(player, config.coinReward or 0)
+
+	if config.itemRewards then
+		for _, reward in config.itemRewards do
+			self._playerData:AddItem(player, reward.itemId, reward.count or 1)
+		end
+	end
+
+	self._remotes.Notification:FireClient(player, "Quest complete: " .. config.name)
+	self:FireQuestUpdated(player)
+	self._playerData:FireStatsUpdated(player)
+end
+
+function QuestService:AdvanceQuestProgress(player, amount)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quest.accepted or data.quest.completed then
+		return
+	end
+
+	local config = self:GetQuestConfig(data)
+	if not config then
+		return
+	end
+
+	data.quest.progress += amount or 1
+	self:FireQuestUpdated(player)
+
+	if data.quest.progress >= Quests.GetRequired(config) then
+		self:CompleteQuest(player, config)
+	end
+end
+
 function QuestService:AcceptQuest(player, questId)
 	local config = Quests[questId]
 	local data = self._playerData:GetData(player)
-	if not config or not data or data.quest.completed then
+	if not config or not data then
+		return false
+	end
+
+	if data.quest.id == questId and data.quest.completed then
 		return false
 	end
 
 	data.quest.id = questId
 	data.quest.accepted = true
-	data.quest.progress = data.quest.progress or 0
+	data.quest.completed = false
+	data.quest.progress = 0
 	self._playerData:FireStatsUpdated(player)
 	self:FireQuestUpdated(player)
 	return true
@@ -304,21 +357,54 @@ function QuestService:OnEnemyKilled(player, enemyType)
 		return
 	end
 
-	local config = Quests[data.quest.id]
-	if not config or config.targetEnemy ~= enemyType then
+	local config = self:GetQuestConfig(data)
+	if not config or config.objectiveType ~= "kill" or config.targetEnemy ~= enemyType then
 		return
 	end
 
-	data.quest.progress += 1
-	self:FireQuestUpdated(player)
+	self:AdvanceQuestProgress(player, 1)
+end
 
-	if data.quest.progress >= config.requiredKills then
-		data.quest.completed = true
-		self._playerData:AddXP(player, config.xpReward)
-		self._playerData:AddCoins(player, config.coinReward)
-		self._remotes.Notification:FireClient(player, "Quest complete: " .. config.name)
-		self._playerData:FireStatsUpdated(player)
+function QuestService:OnItemCollected(player, itemId, count)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quest.accepted or data.quest.completed then
+		return
 	end
+
+	local config = self:GetQuestConfig(data)
+	if not config or config.objectiveType ~= "collect" or config.targetItem ~= itemId then
+		return
+	end
+
+	self:AdvanceQuestProgress(player, count or 1)
+end
+
+function QuestService:OnTalkToNPC(player, npcName)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quest.accepted or data.quest.completed then
+		return
+	end
+
+	local config = self:GetQuestConfig(data)
+	if not config or config.objectiveType ~= "talk" or config.targetNpc ~= npcName then
+		return
+	end
+
+	self:AdvanceQuestProgress(player, 1)
+end
+
+function QuestService:OnReachZone(player, zoneId)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quest.accepted or data.quest.completed then
+		return
+	end
+
+	local config = self:GetQuestConfig(data)
+	if not config or config.objectiveType ~= "reach" or config.targetZone ~= zoneId then
+		return
+	end
+
+	self:AdvanceQuestProgress(player, 1)
 end
 
 function QuestService:FireQuestUpdated(player)
@@ -335,17 +421,150 @@ function QuestService:FireQuestUpdated(player)
 	self._remotes.QuestUpdated:FireClient(player, {
 		id = data.quest.id,
 		name = config.name,
+		description = config.description,
+		objectiveType = config.objectiveType,
 		accepted = data.quest.accepted,
 		completed = data.quest.completed,
 		progress = data.quest.progress,
-		required = config.requiredKills,
+		required = Quests.GetRequired(config),
 	})
+end
+
+function QuestService:CreateSimpleNPC(name, cframe, promptText)
+	local model = Instance.new("Model")
+	model.Name = name
+
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(2, 3, 1.5)
+	root.CFrame = typeof(cframe) == "CFrame" and cframe or CFrame.new(cframe)
+	root.Anchored = true
+	root.CanCollide = true
+	root.Color = Color3.fromRGB(100, 120, 180)
+	root.Parent = model
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 140, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 4, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = root
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = name
+	label.TextColor3 = Color3.fromRGB(255, 220, 100)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 16
+	label.Parent = billboard
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = promptText or "Talk"
+	prompt.ObjectText = name
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.Parent = root
+
+	model.PrimaryPart = root
+	local npcsFolder = workspace:FindFirstChild("NPCs") or Instance.new("Folder")
+	npcsFolder.Name = "NPCs"
+	npcsFolder.Parent = workspace
+	model.Parent = npcsFolder
+	return model, prompt
+end
+
+function QuestService:CreateReachZone(zoneId, position, size)
+	local zone = Instance.new("Part")
+	zone.Name = zoneId
+	zone.Size = size or Vector3.new(20, 8, 20)
+	zone.Position = position
+	zone.Anchored = true
+	zone.CanCollide = false
+	zone.Transparency = 0.85
+	zone.Color = Color3.fromRGB(100, 200, 255)
+	zone:SetAttribute("ZoneId", zoneId)
+
+	local folder = workspace:FindFirstChild("QuestZones") or Instance.new("Folder")
+	folder.Name = "QuestZones"
+	folder.Parent = workspace
+	zone.Parent = folder
+
+	zone.Touched:Connect(function(hit)
+		local character = hit.Parent
+		local player = character and game:GetService("Players"):GetPlayerFromCharacter(character)
+		if player then
+			self:OnReachZone(player, zoneId)
+		end
+	end)
+
+	return zone
 end
 
 function QuestService:Start()
 	local pos = Vector3.new(50, 0, 237)
 	local y = self._mapGenerator:GetGroundHeight(pos.X, pos.Z)
 	self:CreateNPC(CFrame.new(pos.X, y + 2, pos.Z) * CFrame.Angles(0, math.pi, 0))
+
+	local herbPos = Vector3.new(80, 0, 200)
+	local herbY = self._mapGenerator:GetGroundHeight(herbPos.X, herbPos.Z)
+	local _, herbPrompt = self:CreateSimpleNPC("Herb Master", CFrame.new(herbPos.X, herbY + 2, herbPos.Z), "Quest")
+	herbPrompt.Triggered:Connect(function(player)
+		local data = self._playerData:GetData(player)
+		if not data then return end
+		self._remotes.OpenQuest:FireClient(player, {
+			id = Quests.CollectHerbs.id,
+			name = Quests.CollectHerbs.name,
+			description = Quests.CollectHerbs.description,
+			accepted = data.quest.accepted and data.quest.id == Quests.CollectHerbs.id,
+			completed = data.quest.completed and data.quest.id == Quests.CollectHerbs.id,
+			progress = data.quest.progress,
+			required = Quests.GetRequired(Quests.CollectHerbs),
+		})
+	end)
+
+	local elderPos = Vector3.new(-40, 0, 220)
+	local elderY = self._mapGenerator:GetGroundHeight(elderPos.X, elderPos.Z)
+	local _, elderPrompt = self:CreateSimpleNPC("Village Elder", CFrame.new(elderPos.X, elderY + 2, elderPos.Z), "Talk")
+	elderPrompt.Triggered:Connect(function(player)
+		self:OnTalkToNPC(player, "Village Elder")
+		local data = self._playerData:GetData(player)
+		if data and not data.quest.accepted then
+			self._remotes.OpenQuest:FireClient(player, {
+				id = Quests.TalkToElder.id,
+				name = Quests.TalkToElder.name,
+				description = Quests.TalkToElder.description,
+				accepted = false,
+				completed = data.quest.completed and data.quest.id == Quests.TalkToElder.id,
+				progress = data.quest.progress,
+				required = Quests.GetRequired(Quests.TalkToElder),
+			})
+		end
+	end)
+
+	local monumentPos = Vector3.new(0, 0, 300)
+	local monumentY = self._mapGenerator:GetGroundHeight(monumentPos.X, monumentPos.Z)
+	self:CreateReachZone("QuestMonumentZone", Vector3.new(monumentPos.X, monumentY + 4, monumentPos.Z), Vector3.new(24, 10, 24))
+
+	local _, scoutPrompt = self:CreateSimpleNPC(
+		"Scout",
+		CFrame.new(monumentPos.X - 8, monumentY + 2, monumentPos.Z),
+		"Quest"
+	)
+	scoutPrompt.Triggered:Connect(function(player)
+		local data = self._playerData:GetData(player)
+		if not data then
+			return
+		end
+		self._remotes.OpenQuest:FireClient(player, {
+			id = Quests.ReachMonument.id,
+			name = Quests.ReachMonument.name,
+			description = Quests.ReachMonument.description,
+			accepted = data.quest.accepted and data.quest.id == Quests.ReachMonument.id,
+			completed = data.quest.completed and data.quest.id == Quests.ReachMonument.id,
+			progress = data.quest.progress,
+			required = Quests.GetRequired(Quests.ReachMonument),
+		})
+	end)
 
 	self._remotes.AcceptQuest.OnServerEvent:Connect(function(player, questId)
 		if self:AcceptQuest(player, questId) then

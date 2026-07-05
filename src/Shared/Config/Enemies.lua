@@ -3,7 +3,9 @@ local Enemies = {
 		id = "Goblin",
 		name = "Slime",
 		maxHealth = 50,
-		damage = 0.5,
+		damage = 8,
+		defense = 3,
+		movementSpeed = 4,
 		attackCooldown = 3,
 		aggroRange = 40,
 		attackRange = 6,
@@ -11,6 +13,7 @@ local Enemies = {
 		coinReward = 20,
 		dropChance = 0.35,
 		dropItem = "Herb",
+		lootTableId = "GoblinDrops",
 		color = Color3.fromRGB(60, 140, 60),
 	},
 }

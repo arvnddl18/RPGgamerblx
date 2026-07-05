@@ -15,6 +15,26 @@ function ShopService:Init()
 	self._combatService = Framework:GetService("CombatService")
 	self._remotes = Framework:GetRemotesFolder()
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
+
+	Framework:GetRemote("SellItem")
+end
+
+function ShopService:BuildShopPayload()
+	local shopItems = {}
+	for _, entry in Shop.items do
+		local item = Items[entry.itemId]
+		if item then
+			table.insert(shopItems, {
+				itemId = entry.itemId,
+				name = item.name,
+				description = item.description,
+				price = entry.price,
+				sellPrice = Shop.GetSellPrice(entry.price),
+				category = entry.category or item.category or "materials",
+			})
+		end
+	end
+	return shopItems
 end
 
 function ShopService:CreateNPC(cframe)
@@ -310,18 +330,7 @@ function ShopService:CreateNPC(cframe)
 	end
 	model.Parent = npcsFolder
 
-	local shopItems = {}
-	for _, entry in Shop.items do
-		local item = Items[entry.itemId]
-		if item then
-			table.insert(shopItems, {
-				itemId = entry.itemId,
-				name = item.name,
-				description = item.description,
-				price = entry.price,
-			})
-		end
-	end
+	local shopItems = self:BuildShopPayload()
 
 	prompt.Triggered:Connect(function(player)
 		self._remotes.OpenShop:FireClient(player, shopItems)
@@ -354,13 +363,43 @@ function ShopService:Purchase(player, itemId)
 
 	if item.type == "weapon" then
 		self._playerData:SetEquippedWeapon(player, itemId)
-		self._combatService:GiveSword(player, itemId)
+		self._combatService:GiveWeapon(player, itemId)
 		self._remotes.Notification:FireClient(player, "Purchased " .. item.name)
 	elseif item.type == "consumable" or item.type == "material" then
 		self._playerData:AddItem(player, itemId, 1)
 		self._remotes.Notification:FireClient(player, "Purchased " .. item.name)
 	end
 
+	return true
+end
+
+function ShopService:Sell(player, itemId, count)
+	count = count or 1
+	if count < 1 then
+		return false, "Invalid amount"
+	end
+
+	local shopEntry = Shop.FindEntry(itemId)
+	if not shopEntry then
+		return false, "Shop won't buy that item"
+	end
+
+	local item = Items[itemId]
+	if not item then
+		return false, "Invalid item"
+	end
+
+	if not self._playerData:HasItem(player, itemId, count) then
+		return false, "You don't have enough of that item"
+	end
+
+	if not self._playerData:RemoveItem(player, itemId, count) then
+		return false, "Could not remove item"
+	end
+
+	local sellPrice = Shop.GetSellPrice(shopEntry.price) * count
+	self._playerData:AddCoins(player, sellPrice)
+	self._remotes.Notification:FireClient(player, "Sold " .. count .. "x " .. item.name .. " for " .. sellPrice .. " gold")
 	return true
 end
 
@@ -371,6 +410,13 @@ function ShopService:Start()
 
 	self._remotes.PurchaseItem.OnServerEvent:Connect(function(player, itemId)
 		local success, message = self:Purchase(player, itemId)
+		if not success and message then
+			self._remotes.Notification:FireClient(player, message)
+		end
+	end)
+
+	self._remotes.SellItem.OnServerEvent:Connect(function(player, itemId, count)
+		local success, message = self:Sell(player, itemId, count)
 		if not success and message then
 			self._remotes.Notification:FireClient(player, message)
 		end

@@ -1504,3 +1504,28 @@ for i = 1, 3500 do
 end
 
 print("Map Generation 100% Complete! The Castle, Paths, and Fixed Trees are ready.")
+
+local MapGeneratorService = {
+	_generated = true,
+}
+
+function MapGeneratorService:Generate()
+	-- Map generates at module load time; this method exists for GameServer compatibility.
+end
+
+function MapGeneratorService:GetGroundHeight(x, z)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	local mapFolder = workspace:FindFirstChild("RPG_World")
+	if mapFolder then
+		rayParams.FilterDescendantsInstances = { mapFolder }
+	end
+
+	local ray = workspace:Raycast(Vector3.new(x, 500, z), Vector3.new(0, -1000, 0), rayParams)
+	if ray then
+		return ray.Position.Y
+	end
+	return 22
+end
+
+return MapGeneratorService

@@ -112,6 +112,17 @@ end
 
 setupWorld()
 
+local coreRemotes = {
+	"Attack", "CastSkill", "SkillCooldownUpdated", "RequestDash", "DashCooldownUpdated",
+	"StatsUpdated", "InventoryUpdated", "RequestInventory", "UseItem",
+	"SelectClass", "ClassSelected", "EquipItem", "UnequipItem",
+	"OpenQuest", "AcceptQuest", "QuestUpdated", "OpenQuestLog",
+	"OpenShop", "PurchaseItem", "SellItem", "Notification", "LevelUp",
+}
+for _, remoteName in coreRemotes do
+	Framework:GetRemote(remoteName)
+end
+
 -- 1. Register all services
 for _, module in Services:GetChildren() do
 	if module:IsA("ModuleScript") then

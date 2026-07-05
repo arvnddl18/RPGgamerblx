@@ -5,6 +5,10 @@ local CollectionService = game:GetService("CollectionService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Enemies = require(Shared.Config.Enemies)
 local Items = require(Shared.Config.Items)
+local LootTables = require(Shared.Config.LootTables)
+
+local Server = game:GetService("ServerScriptService"):WaitForChild("Server")
+local EnemyStateMachine = require(Server.AI.EnemyStateMachine)
 
 local EnemyService = {}
 EnemyService._playerData = nil
@@ -328,9 +332,13 @@ function EnemyService:CreateGoblin(position)
 	model:SetAttribute("EnemyType", config.id)
 	model:SetAttribute("Health", config.maxHealth)
 	model:SetAttribute("MaxHealth", config.maxHealth)
+	model:SetAttribute("Defense", config.defense or 0)
+	model:SetAttribute("Attack", config.damage or 5)
 
 	CollectionService:AddTag(model, "Enemy")
 	self:CreateHealthBar(model, config.maxHealth)
+
+	EnemyStateMachine.InitEnemy(model, position, config)
 
 	model.Parent = workspace:FindFirstChild("Enemies") or workspace
 	table.insert(self._enemies, model)
@@ -438,7 +446,14 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 	end
 
 	if math.random() < config.dropChance and root then
-		self:CreatePickup(deathPosition, config.dropItem)
+		local lootItem = nil
+		if config.lootTableId then
+			lootItem = LootTables.Roll(config.lootTableId)
+		end
+		lootItem = lootItem or config.dropItem
+		if lootItem then
+			self:CreatePickup(deathPosition, lootItem)
+		end
 	end
 
 	-- Find the closest original spawn point to respawn at
@@ -470,67 +485,30 @@ end
 
 function EnemyService:RunAI()
 	local config = Enemies.Goblin
+	local context = {
+		getPlayerByUserId = function(userId)
+			return Players:GetPlayerByUserId(userId)
+		end,
+		getNearestPlayer = function(position, range)
+			return self:GetNearestPlayer(position, range)
+		end,
+		tryAttack = function(enemy, targetPlayer, enemyConfig)
+			local now = tick()
+			local key = enemy
+			if not self._attackCooldowns[key] or now - self._attackCooldowns[key] >= enemyConfig.attackCooldown then
+				self._attackCooldowns[key] = now
+				local attack = enemy:GetAttribute("Attack") or enemyConfig.damage
+				self._playerData:Damage(targetPlayer, attack)
+			end
+		end,
+	}
 
 	for _, enemy in self._enemies do
 		if enemy.Parent and enemy:GetAttribute("Health") > 0 then
 			local root = enemy.PrimaryPart
 			local humanoid = enemy:FindFirstChildOfClass("Humanoid")
 			if root and humanoid then
-				-- First check if we have an aggro target from being attacked
-				local aggroTarget = enemy:GetAttribute("AggroTarget")
-				local targetPlayer = nil
-
-				if aggroTarget then
-					targetPlayer = Players:GetPlayerByUserId(aggroTarget)
-					-- Validate the aggro target is still alive and in range
-					if targetPlayer and targetPlayer.Character then
-						local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-						local targetHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-						if targetRoot and targetHumanoid and targetHumanoid.Health > 0 then
-							local distance = (root.Position - targetRoot.Position).Magnitude
-							if distance > ACTIVE_AGGRO_RANGE then
-								-- Target is too far, clear aggro
-								enemy:SetAttribute("AggroTarget", nil)
-								targetPlayer = nil
-							end
-						else
-							-- Target is dead or missing root, clear aggro
-							enemy:SetAttribute("AggroTarget", nil)
-							targetPlayer = nil
-						end
-					else
-						-- Player left or character missing, clear aggro
-						enemy:SetAttribute("AggroTarget", nil)
-						targetPlayer = nil
-					end
-				end
-
-				-- If no aggro target, actively search for the nearest player
-				if not targetPlayer then
-					local nearestPlayer, nearestDist = self:GetNearestPlayer(root.Position, ACTIVE_AGGRO_RANGE)
-					if nearestPlayer then
-						targetPlayer = nearestPlayer
-						enemy:SetAttribute("AggroTarget", nearestPlayer.UserId)
-					end
-				end
-
-				-- Chase and attack the target
-				if targetPlayer and targetPlayer.Character then
-					local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-					if targetRoot then
-						local distance = (root.Position - targetRoot.Position).Magnitude
-						humanoid:MoveTo(targetRoot.Position)
-
-						if distance <= config.attackRange then
-							local now = tick()
-							local key = enemy
-							if not self._attackCooldowns[key] or now - self._attackCooldowns[key] >= config.attackCooldown then
-								self._attackCooldowns[key] = now
-								self._playerData:Damage(targetPlayer, config.damage)
-							end
-						end
-					end
-				end
+				EnemyStateMachine.Tick(enemy, humanoid, root, config, context)
 			end
 		end
 	end

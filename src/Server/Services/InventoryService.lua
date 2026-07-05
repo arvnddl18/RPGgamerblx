@@ -11,6 +11,7 @@ function InventoryService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
 	self._playerData = Framework:GetService("PlayerDataService")
 	self._combatService = Framework:GetService("CombatService")
+	self._questService = Framework:GetService("QuestService")
 	self._remotes = Framework:GetRemotesFolder()
 end
 
@@ -27,6 +28,9 @@ function InventoryService:SetupPickup(part)
 		end
 
 		if self._playerData:AddItem(player, itemId, 1) then
+			if self._questService then
+				self._questService:OnItemCollected(player, itemId, 1)
+			end
 			part:Destroy()
 		end
 	end)
@@ -72,6 +76,15 @@ function InventoryService:UseItem(player, itemId)
 		end
 		self._playerData:Heal(player, item.healAmount)
 		self._remotes.Notification:FireClient(player, "Used " .. item.name .. " (+" .. item.healAmount .. " HP)")
+		return true
+	end
+
+	if item.type == "consumable" and item.manaAmount then
+		if not self._playerData:RemoveItem(player, itemId, 1) then
+			return false
+		end
+		self._playerData:RestoreMana(player, item.manaAmount)
+		self._remotes.Notification:FireClient(player, "Used " .. item.name .. " (+" .. item.manaAmount .. " Mana)")
 		return true
 	end
 
