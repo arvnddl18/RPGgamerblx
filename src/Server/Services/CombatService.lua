@@ -9,11 +9,9 @@ local CombatService = {}
 CombatService._playerData = nil
 CombatService._enemyService = nil
 CombatService._cooldowns = {}
-CombatService._dashCooldowns = {}
 
 local ATTACK_COOLDOWN = 0.6
 local ATTACK_RANGE = 10
-local DASH_COOLDOWN = 5
 
 function CombatService:Init(playerDataService, enemyService, remotes)
 	self._playerData = playerDataService
@@ -133,32 +131,9 @@ function CombatService:HandleAttack(player)
 	end
 end
 
-function CombatService:HandleDash(player)
-	local now = tick()
-	if self._dashCooldowns[player] and now - self._dashCooldowns[player] < DASH_COOLDOWN then
-		return -- Still on cooldown, reject
-	end
-
-	local character = player.Character
-	if not character then
-		return
-	end
-
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then
-		return
-	end
-
-	self._dashCooldowns[player] = now
-end
-
 function CombatService:Start()
 	self._remotes.Attack.OnServerEvent:Connect(function(player)
 		self:HandleAttack(player)
-	end)
-
-	self._remotes.Dash.OnServerEvent:Connect(function(player)
-		self:HandleDash(player)
 	end)
 
 	-- Give weapon on character spawn
