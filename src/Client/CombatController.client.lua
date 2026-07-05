@@ -2,12 +2,19 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local lastAttack = 0
 local ATTACK_COOLDOWN = 0.7
+
+local lastDash = 0
+local DASH_COOLDOWN = 5
+local DASH_SPEED = 100
+local DASH_DURATION = 0.2
+local isDashing = false
 
 local comboStep = 1
 
@@ -131,6 +138,84 @@ local function attack()
 	remotes.Attack:FireServer()
 end
 
+local function performDash()
+	local now = tick()
+	if isDashing then return end
+	if now - lastDash < DASH_COOLDOWN then return end
+
+	local character = player.Character
+	if not character then return end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not humanoid or not rootPart or humanoid.Health <= 0 then return end
+
+	isDashing = true
+	lastDash = now
+
+	-- Store cooldown info as attributes so the UI can read them
+	character:SetAttribute("DashCooldownStart", now)
+	character:SetAttribute("DashCooldown", DASH_COOLDOWN)
+
+	-- Determine dash direction: use movement direction if moving, otherwise face forward
+	local moveDir = humanoid.MoveDirection
+	if moveDir.Magnitude < 0.1 then
+		moveDir = rootPart.CFrame.LookVector
+	end
+	moveDir = moveDir.Unit
+
+	-- Create BodyVelocity for the dash impulse
+	local bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(1e5, 0, 1e5)
+	bodyVelocity.Velocity = moveDir * DASH_SPEED
+	bodyVelocity.P = 1e5
+	bodyVelocity.Parent = rootPart
+
+	-- Ghost transparency effect on character parts
+	local originalTransparencies = {}
+	for _, part in character:GetDescendants() do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			originalTransparencies[part] = part.Transparency
+			part.Transparency = math.max(part.Transparency, 0.6)
+		end
+	end
+
+	-- Trail / afterimage effect: spawn fading clones behind the character
+	local trailPart = Instance.new("Part")
+	trailPart.Name = "DashTrail"
+	trailPart.Size = Vector3.new(3, 5, 1)
+	trailPart.Anchored = true
+	trailPart.CanCollide = false
+	trailPart.Material = Enum.Material.Neon
+	trailPart.Color = Color3.fromRGB(100, 180, 255)
+	trailPart.CFrame = rootPart.CFrame
+	trailPart.Transparency = 0.4
+	trailPart.Parent = workspace
+
+	local trailTween = TweenService:Create(trailPart, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Transparency = 1,
+		Size = Vector3.new(5, 7, 0.2),
+	})
+	trailTween:Play()
+	trailTween.Completed:Connect(function()
+		trailPart:Destroy()
+	end)
+
+	-- End the dash after DASH_DURATION
+	task.delay(DASH_DURATION, function()
+		bodyVelocity:Destroy()
+
+		-- Restore original transparency
+		for part, orig in originalTransparencies do
+			if part and part.Parent then
+				TweenService:Create(part, TweenInfo.new(0.2), {Transparency = orig}):Play()
+			end
+		end
+
+		isDashing = false
+	end)
+end
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	
@@ -154,5 +239,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		remotes.UseItem:FireServer("HealthPotion")
 	elseif input.KeyCode == Enum.KeyCode.Seven then
 		remotes.UseItem:FireServer("ManaPotion")
+	elseif input.KeyCode == Enum.KeyCode.LeftShift then
+		performDash()
 	end
 end)
