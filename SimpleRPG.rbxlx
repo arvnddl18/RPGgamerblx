@@ -17,14 +17,14 @@
             <string name="Source"><![CDATA[local Enemies = {
 	Goblin = {
 		id = "Goblin",
-		name = "Goblin",
+		name = "Slime",
 		maxHealth = 50,
-		damage = 8,
-		attackCooldown = 1.5,
+		damage = 0.5,
+		attackCooldown = 3,
 		aggroRange = 40,
-		attackRange = 4,
+		attackRange = 6,
 		xpReward = 20,
-		coinReward = 10,
+		coinReward = 20,
 		dropChance = 0.35,
 		dropItem = "Herb",
 		color = Color3.fromRGB(60, 140, 60),
@@ -55,6 +55,15 @@ return Enemies
 		usable = true,
 		healAmount = 30,
 		color = Color3.fromRGB(220, 50, 80),
+	},
+	ManaPotion = {
+		id = "ManaPotion",
+		name = "Mana Potion",
+		description = "Restores 30 Mana.",
+		type = "consumable",
+		usable = true,
+		manaAmount = 30,
+		color = Color3.fromRGB(50, 100, 220),
 	},
 	IronSword = {
 		id = "IronSword",
@@ -188,6 +197,8 @@ local EnemyService = require(Services.EnemyService)
 local InventoryService = require(Services.InventoryService)
 local QuestService = require(Services.QuestService)
 local ShopService = require(Services.ShopService)
+local MapGeneratorService = require(Services.MapGeneratorService)
+local EquipmentService = require(Services.EquipmentService)
 
 local REMOTE_NAMES = {
 	"Attack",
@@ -223,47 +234,103 @@ local function createRemotes()
 end
 
 local function setupWorld()
-	if workspace:FindFirstChild("RPGWorld") then
-		return
+	-- Run massive map generator
+	MapGeneratorService:Generate()
+
+	local world = workspace:FindFirstChild("RPGWorld")
+	if not world then
+		world = Instance.new("Folder")
+		world.Name = "RPGWorld"
+		world.Parent = workspace
 	end
 
-	local world = Instance.new("Folder")
-	world.Name = "RPGWorld"
-	world.Parent = workspace
+	-- Setup Amazing RPG Lighting
+	local Lighting = game:GetService("Lighting")
+	Lighting.ClockTime = 15.5
+	Lighting.Brightness = 2
+	Lighting.GlobalShadows = true
+	Lighting.Ambient = Color3.fromRGB(70, 70, 90)
+	Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 150)
+	Lighting.ColorShift_Bottom = Color3.fromRGB(40, 40, 60)
+	Lighting.ColorShift_Top = Color3.fromRGB(255, 245, 230)
+	Lighting.EnvironmentDiffuseScale = 1
+	Lighting.EnvironmentSpecularScale = 1
 
-	local baseplate = Instance.new("Part")
-	baseplate.Name = "Baseplate"
-	baseplate.Size = Vector3.new(256, 1, 256)
-	baseplate.Position = Vector3.new(0, 0, 0)
-	baseplate.Anchored = true
-	baseplate.Color = Color3.fromRGB(60, 120, 60)
-	baseplate.Material = Enum.Material.Grass
-	baseplate.Parent = world
+	-- Atmosphere for depth and fog
+	if not Lighting:FindFirstChildOfClass("Atmosphere") then
+		local atmosphere = Instance.new("Atmosphere")
+		atmosphere.Density = 0.3
+		atmosphere.Offset = 0.25
+		atmosphere.Color = Color3.fromRGB(199, 170, 107)
+		atmosphere.Decay = Color3.fromRGB(92, 60, 104)
+		atmosphere.Glare = 0.4
+		atmosphere.Haze = 1.5
+		atmosphere.Parent = Lighting
+	end
 
+	-- ColorCorrection for cinematic RPG look
+	if not Lighting:FindFirstChildOfClass("ColorCorrectionEffect") then
+		local cc = Instance.new("ColorCorrectionEffect")
+		cc.Contrast = 0.15
+		cc.Saturation = 0.2
+		cc.TintColor = Color3.fromRGB(255, 250, 240)
+		cc.Parent = Lighting
+	end
+
+	-- Bloom
+	if not Lighting:FindFirstChildOfClass("BloomEffect") then
+		local bloom = Instance.new("BloomEffect")
+		bloom.Intensity = 0.3
+		bloom.Size = 24
+		bloom.Threshold = 2
+		bloom.Parent = Lighting
+	end
+
+	-- SunRays
+	if not Lighting:FindFirstChildOfClass("SunRaysEffect") then
+		local rays = Instance.new("SunRaysEffect")
+		rays.Intensity = 0.05
+		rays.Spread = 0.8
+		rays.Parent = Lighting
+	end
+
+	local spawnZ = 135
+	local spawnY = MapGeneratorService:GetGroundHeight(0, spawnZ)
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "SpawnLocation"
 	spawn.Size = Vector3.new(6, 1, 6)
-	spawn.Position = Vector3.new(0, 1, 0)
+	-- PERFECT HEIGHT ADJUSTMENT
+	spawn.Position = Vector3.new(0, spawnY + 1.5, spawnZ)
 	spawn.Anchored = true
 	spawn.Neutral = true
-	spawn.Color = Color3.fromRGB(100, 100, 220)
+	spawn.Transparency = 1 -- Make it invisible so it looks seamless
+	spawn.CanCollide = false
 	spawn.Parent = world
 
-	local enemiesFolder = Instance.new("Folder")
-	enemiesFolder.Name = "Enemies"
-	enemiesFolder.Parent = workspace
+	local enemiesFolder = workspace:FindFirstChild("Enemies")
+	if not enemiesFolder then
+		enemiesFolder = Instance.new("Folder")
+		enemiesFolder.Name = "Enemies"
+		enemiesFolder.Parent = workspace
+	end
 
-	local npcsFolder = Instance.new("Folder")
-	npcsFolder.Name = "NPCs"
-	npcsFolder.Parent = workspace
+	local npcsFolder = workspace:FindFirstChild("NPCs")
+	if not npcsFolder then
+		npcsFolder = Instance.new("Folder")
+		npcsFolder.Name = "NPCs"
+		npcsFolder.Parent = workspace
+	end
 
-	local pickupsFolder = Instance.new("Folder")
-	pickupsFolder.Name = "Pickups"
-	pickupsFolder.Parent = workspace
+	local pickupsFolder = workspace:FindFirstChild("Pickups")
+	if not pickupsFolder then
+		pickupsFolder = Instance.new("Folder")
+		pickupsFolder.Name = "Pickups"
+		pickupsFolder.Parent = workspace
+	end
 
 	-- Remove default baseplate if present
 	local defaultBaseplate = workspace:FindFirstChild("Baseplate")
-	if defaultBaseplate and defaultBaseplate ~= baseplate then
+	if defaultBaseplate then
 		defaultBaseplate:Destroy()
 	end
 end
@@ -273,10 +340,11 @@ setupWorld()
 
 PlayerDataService:Init(remotes)
 CombatService:Init(PlayerDataService, EnemyService, remotes)
-EnemyService:Init(PlayerDataService, QuestService, InventoryService)
+EnemyService:Init(PlayerDataService, QuestService, InventoryService, MapGeneratorService)
 InventoryService:Init(PlayerDataService, CombatService, remotes)
-QuestService:Init(PlayerDataService, remotes)
-ShopService:Init(PlayerDataService, CombatService, remotes)
+QuestService:Init(PlayerDataService, remotes, MapGeneratorService)
+ShopService:Init(PlayerDataService, CombatService, remotes, MapGeneratorService)
+EquipmentService:Init()
 
 PlayerDataService:Start()
 CombatService:Start()
@@ -284,8 +352,14 @@ EnemyService:Start()
 InventoryService:Start()
 QuestService:Start()
 ShopService:Start()
+EquipmentService:Start()
 
 print("[SimpleRPG] Server started successfully.")
+
+-- Fix for players spawning in the void before the map finishes generating
+for _, player in game:GetService("Players"):GetPlayers() do
+	player:LoadCharacter()
+end
 ]]></string>
         </Properties>
       </Item>
@@ -298,6 +372,7 @@ print("[SimpleRPG] Server started successfully.")
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Items = require(Shared.Config.Items)
@@ -308,7 +383,7 @@ CombatService._enemyService = nil
 CombatService._cooldowns = {}
 
 local ATTACK_COOLDOWN = 0.6
-local ATTACK_RANGE = 7
+local ATTACK_RANGE = 10
 
 function CombatService:Init(playerDataService, enemyService, remotes)
 	self._playerData = playerDataService
@@ -342,28 +417,36 @@ function CombatService:GiveSword(player, weaponId)
 
 	weaponId = weaponId or data.equippedWeapon or "WoodenSword"
 
-	local backpack = player:FindFirstChildOfClass("Backpack")
 	local character = player.Character
-	if not backpack then
+	if not character then
 		return
 	end
 
-	for _, child in backpack:GetChildren() do
-		if child:IsA("Tool") and child:GetAttribute("WeaponId") then
-			child:Destroy()
-		end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
 	end
 
-	if character then
-		for _, child in character:GetChildren() do
+	-- Remove any existing weapon tools from character and backpack
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if backpack then
+		for _, child in backpack:GetChildren() do
 			if child:IsA("Tool") and child:GetAttribute("WeaponId") then
 				child:Destroy()
 			end
 		end
 	end
 
+	for _, child in character:GetChildren() do
+		if child:IsA("Tool") and child:GetAttribute("WeaponId") then
+			child:Destroy()
+		end
+	end
+
+	-- Create the weapon and parent it directly to the character
+	-- This forces the humanoid to equip it immediately, bypassing the disabled Backpack UI
 	local tool = self:CreateSwordTool(weaponId)
-	tool.Parent = backpack
+	tool.Parent = character
 end
 
 function CombatService:FindAttackTargets(character)
@@ -425,17 +508,25 @@ function CombatService:Start()
 		self:HandleAttack(player)
 	end)
 
-	game:GetService("Players").PlayerAdded:Connect(function(player)
+	-- Give weapon on character spawn
+	Players.PlayerAdded:Connect(function(player)
 		player.CharacterAdded:Connect(function()
-			task.wait(0.2)
+			task.wait(0.5) -- Let EquipmentService finish first
 			self:GiveSword(player)
 		end)
 	end)
 
-	for _, player in game:GetService("Players"):GetPlayers() do
+	-- Handle players already in the game
+	for _, player in Players:GetPlayers() do
 		if player.Character then
-			self:GiveSword(player)
+			task.delay(0.5, function()
+				self:GiveSword(player)
+			end)
 		end
+		player.CharacterAdded:Connect(function()
+			task.wait(0.5)
+			self:GiveSword(player)
+		end)
 	end
 end
 
@@ -462,20 +553,24 @@ EnemyService._enemies = {}
 EnemyService._attackCooldowns = {}
 
 local SPAWN_POSITIONS = {
-	Vector3.new(20, 3, 0),
-	Vector3.new(-20, 3, 0),
-	Vector3.new(0, 3, 20),
-	Vector3.new(0, 3, -20),
-	Vector3.new(15, 3, 15),
-	Vector3.new(-15, 3, 15),
-	Vector3.new(15, 3, -15),
-	Vector3.new(-15, 3, -15),
+	Vector3.new(0, 3, 40),
+	Vector3.new(20, 3, 45),
+	Vector3.new(-20, 3, 45),
+	Vector3.new(10, 3, 60),
+	Vector3.new(-10, 3, 60),
+	Vector3.new(30, 3, 50),
+	Vector3.new(-30, 3, 50),
+	Vector3.new(0, 3, 70),
 }
 
-function EnemyService:Init(playerDataService, questService, inventoryService)
+-- Increased aggro range so enemies actively hunt nearby players
+local ACTIVE_AGGRO_RANGE = 40
+
+function EnemyService:Init(playerDataService, questService, inventoryService, mapGeneratorService)
 	self._playerData = playerDataService
 	self._questService = questService
 	self._inventoryService = inventoryService
+	self._mapGenerator = mapGeneratorService
 end
 
 function EnemyService:CreateHealthBar(enemy, maxHealth)
@@ -526,24 +621,248 @@ function EnemyService:CreateGoblin(position)
 	local model = Instance.new("Model")
 	model.Name = config.name
 
-	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(2, 3, 2)
-	root.Position = position
-	root.Anchored = false
-	root.CanCollide = true
-	root.Color = config.color
-	root.Material = Enum.Material.SmoothPlastic
-	root.Parent = model
+	local skinColor = Color3.fromRGB(80, 160, 60)
+	local darkSkin = Color3.fromRGB(60, 130, 45)
+	local mat = Enum.Material.SmoothPlastic
 
+	-- Torso (main body)
+	local torso = Instance.new("Part")
+	torso.Name = "HumanoidRootPart"
+	torso.Size = Vector3.new(2, 2.2, 1.2)
+	torso.Position = position
+	torso.Anchored = false
+	torso.CanCollide = true
+	torso.Color = skinColor
+	torso.Material = mat
+	torso.Parent = model
+
+	-- Head
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Shape = Enum.PartType.Ball
+	head.Size = Vector3.new(2.2, 2.2, 2.2)
+	head.Color = skinColor
+	head.Material = mat
+	head.Anchored = false
+	head.CanCollide = false
+	head.CFrame = torso.CFrame * CFrame.new(0, 2.1, 0)
+	head.Parent = model
+
+	local headWeld = Instance.new("WeldConstraint")
+	headWeld.Part0 = torso
+	headWeld.Part1 = head
+	headWeld.Parent = head
+
+	-- Left Eye
+	local leftEye = Instance.new("Part")
+	leftEye.Name = "LeftEye"
+	leftEye.Shape = Enum.PartType.Ball
+	leftEye.Size = Vector3.new(0.5, 0.55, 0.3)
+	leftEye.Color = Color3.fromRGB(255, 50, 30)
+	leftEye.Material = Enum.Material.Neon
+	leftEye.Anchored = false
+	leftEye.CanCollide = false
+	leftEye.CFrame = head.CFrame * CFrame.new(-0.4, 0.15, -0.85)
+	leftEye.Parent = model
+	local leWeld = Instance.new("WeldConstraint")
+	leWeld.Part0 = head
+	leWeld.Part1 = leftEye
+	leWeld.Parent = leftEye
+
+	-- Right Eye
+	local rightEye = Instance.new("Part")
+	rightEye.Name = "RightEye"
+	rightEye.Shape = Enum.PartType.Ball
+	rightEye.Size = Vector3.new(0.5, 0.55, 0.3)
+	rightEye.Color = Color3.fromRGB(255, 50, 30)
+	rightEye.Material = Enum.Material.Neon
+	rightEye.Anchored = false
+	rightEye.CanCollide = false
+	rightEye.CFrame = head.CFrame * CFrame.new(0.4, 0.15, -0.85)
+	rightEye.Parent = model
+	local reWeld = Instance.new("WeldConstraint")
+	reWeld.Part0 = head
+	reWeld.Part1 = rightEye
+	reWeld.Parent = rightEye
+
+	-- Pupils
+	for _, eyePart in {leftEye, rightEye} do
+		local pupil = Instance.new("Part")
+		pupil.Name = "Pupil"
+		pupil.Shape = Enum.PartType.Ball
+		pupil.Size = Vector3.new(0.2, 0.25, 0.15)
+		pupil.Color = Color3.fromRGB(20, 20, 20)
+		pupil.Material = mat
+		pupil.Anchored = false
+		pupil.CanCollide = false
+		pupil.CFrame = eyePart.CFrame * CFrame.new(0, 0, -0.1)
+		pupil.Parent = model
+		local pWeld = Instance.new("WeldConstraint")
+		pWeld.Part0 = eyePart
+		pWeld.Part1 = pupil
+		pWeld.Parent = pupil
+	end
+
+	-- Mouth (wide grin)
+	local mouth = Instance.new("Part")
+	mouth.Name = "Mouth"
+	mouth.Size = Vector3.new(0.9, 0.2, 0.15)
+	mouth.Color = Color3.fromRGB(30, 30, 30)
+	mouth.Material = mat
+	mouth.Anchored = false
+	mouth.CanCollide = false
+	mouth.CFrame = head.CFrame * CFrame.new(0, -0.4, -0.95)
+	mouth.Parent = model
+	local mWeld = Instance.new("WeldConstraint")
+	mWeld.Part0 = head
+	mWeld.Part1 = mouth
+	mWeld.Parent = mouth
+
+	-- Left Ear (pointy)
+	local leftEar = Instance.new("WedgePart")
+	leftEar.Name = "LeftEar"
+	leftEar.Size = Vector3.new(0.3, 0.8, 1.2)
+	leftEar.Color = darkSkin
+	leftEar.Material = mat
+	leftEar.Anchored = false
+	leftEar.CanCollide = false
+	leftEar.CFrame = head.CFrame * CFrame.new(-1.2, 0.2, 0) * CFrame.Angles(0, 0, math.rad(-30))
+	leftEar.Parent = model
+	local learWeld = Instance.new("WeldConstraint")
+	learWeld.Part0 = head
+	learWeld.Part1 = leftEar
+	learWeld.Parent = leftEar
+
+	-- Right Ear (pointy)
+	local rightEar = Instance.new("WedgePart")
+	rightEar.Name = "RightEar"
+	rightEar.Size = Vector3.new(0.3, 0.8, 1.2)
+	rightEar.Color = darkSkin
+	rightEar.Material = mat
+	rightEar.Anchored = false
+	rightEar.CanCollide = false
+	rightEar.CFrame = head.CFrame * CFrame.new(1.2, 0.2, 0) * CFrame.Angles(0, 0, math.rad(30))
+	rightEar.Parent = model
+	local rearWeld = Instance.new("WeldConstraint")
+	rearWeld.Part0 = head
+	rearWeld.Part1 = rightEar
+	rearWeld.Parent = rightEar
+
+	-- Left Arm
+	local leftArm = Instance.new("Part")
+	leftArm.Name = "LeftArm"
+	leftArm.Size = Vector3.new(0.8, 1.8, 0.8)
+	leftArm.Color = skinColor
+	leftArm.Material = mat
+	leftArm.Anchored = false
+	leftArm.CanCollide = false
+	leftArm.CFrame = torso.CFrame * CFrame.new(-1.4, -0.2, 0)
+	leftArm.Parent = model
+	local laWeld = Instance.new("WeldConstraint")
+	laWeld.Part0 = torso
+	laWeld.Part1 = leftArm
+	laWeld.Parent = leftArm
+
+	-- Right Arm
+	local rightArm = Instance.new("Part")
+	rightArm.Name = "RightArm"
+	rightArm.Size = Vector3.new(0.8, 1.8, 0.8)
+	rightArm.Color = skinColor
+	rightArm.Material = mat
+	rightArm.Anchored = false
+	rightArm.CanCollide = false
+	rightArm.CFrame = torso.CFrame * CFrame.new(1.4, -0.2, 0)
+	rightArm.Parent = model
+	local raWeld = Instance.new("WeldConstraint")
+	raWeld.Part0 = torso
+	raWeld.Part1 = rightArm
+	raWeld.Parent = rightArm
+
+	-- Club weapon in right hand
+	local club = Instance.new("Part")
+	club.Name = "Club"
+	club.Size = Vector3.new(0.5, 2.5, 0.5)
+	club.Color = Color3.fromRGB(100, 70, 40)
+	club.Material = Enum.Material.Wood
+	club.Anchored = false
+	club.CanCollide = false
+	club.CFrame = rightArm.CFrame * CFrame.new(0, -1.5, 0)
+	club.Parent = model
+	local clubWeld = Instance.new("WeldConstraint")
+	clubWeld.Part0 = rightArm
+	clubWeld.Part1 = club
+	clubWeld.Parent = club
+
+	-- Club head (bulge at end)
+	local clubHead = Instance.new("Part")
+	clubHead.Name = "ClubHead"
+	clubHead.Shape = Enum.PartType.Ball
+	clubHead.Size = Vector3.new(1, 1, 1)
+	clubHead.Color = Color3.fromRGB(80, 55, 30)
+	clubHead.Material = Enum.Material.Wood
+	clubHead.Anchored = false
+	clubHead.CanCollide = false
+	clubHead.CFrame = club.CFrame * CFrame.new(0, -1.3, 0)
+	clubHead.Parent = model
+	local chWeld = Instance.new("WeldConstraint")
+	chWeld.Part0 = club
+	chWeld.Part1 = clubHead
+	chWeld.Parent = clubHead
+
+	-- Left Leg
+	local leftLeg = Instance.new("Part")
+	leftLeg.Name = "LeftLeg"
+	leftLeg.Size = Vector3.new(0.9, 1.4, 0.9)
+	leftLeg.Color = darkSkin
+	leftLeg.Material = mat
+	leftLeg.Anchored = false
+	leftLeg.CanCollide = false
+	leftLeg.CFrame = torso.CFrame * CFrame.new(-0.55, -1.8, 0)
+	leftLeg.Parent = model
+	local llWeld = Instance.new("WeldConstraint")
+	llWeld.Part0 = torso
+	llWeld.Part1 = leftLeg
+	llWeld.Parent = leftLeg
+
+	-- Right Leg
+	local rightLeg = Instance.new("Part")
+	rightLeg.Name = "RightLeg"
+	rightLeg.Size = Vector3.new(0.9, 1.4, 0.9)
+	rightLeg.Color = darkSkin
+	rightLeg.Material = mat
+	rightLeg.Anchored = false
+	rightLeg.CanCollide = false
+	rightLeg.CFrame = torso.CFrame * CFrame.new(0.55, -1.8, 0)
+	rightLeg.Parent = model
+	local rlWeld = Instance.new("WeldConstraint")
+	rlWeld.Part0 = torso
+	rlWeld.Part1 = rightLeg
+	rlWeld.Parent = rightLeg
+
+	-- Loincloth / Belt
+	local belt = Instance.new("Part")
+	belt.Name = "Belt"
+	belt.Size = Vector3.new(2.2, 0.4, 1.4)
+	belt.Color = Color3.fromRGB(120, 80, 40)
+	belt.Material = Enum.Material.Leather
+	belt.Anchored = false
+	belt.CanCollide = false
+	belt.CFrame = torso.CFrame * CFrame.new(0, -1.0, 0)
+	belt.Parent = model
+	local beltWeld = Instance.new("WeldConstraint")
+	beltWeld.Part0 = torso
+	beltWeld.Part1 = belt
+	beltWeld.Parent = belt
+
+	-- Humanoid
 	local humanoid = Instance.new("Humanoid")
 	humanoid.MaxHealth = config.maxHealth
 	humanoid.Health = config.maxHealth
-	humanoid.WalkSpeed = 14
+	humanoid.WalkSpeed = 4
 	humanoid.HipHeight = 1.5
 	humanoid.Parent = model
 
-	model.PrimaryPart = root
+	model.PrimaryPart = torso
 	model:SetAttribute("EnemyType", config.id)
 	model:SetAttribute("Health", config.maxHealth)
 	model:SetAttribute("MaxHealth", config.maxHealth)
@@ -565,7 +884,8 @@ function EnemyService:SpawnEnemies()
 	end
 
 	for _, position in SPAWN_POSITIONS do
-		self:CreateGoblin(position)
+		local y = self._mapGenerator:GetGroundHeight(position.X, position.Z)
+		self:CreateGoblin(Vector3.new(position.X, y + 3, position.Z))
 	end
 end
 
@@ -597,6 +917,11 @@ function EnemyService:DamageEnemy(enemy, amount, attacker)
 	local health = enemy:GetAttribute("Health") or 0
 	health = math.max(0, health - amount)
 	enemy:SetAttribute("Health", health)
+
+	if attacker and attacker:IsA("Player") then
+		enemy:SetAttribute("AggroTarget", attacker.UserId)
+	end
+
 	self:UpdateHealthBar(enemy)
 
 	if health <= 0 then
@@ -640,7 +965,7 @@ end
 function EnemyService:OnEnemyKilled(enemy, killer)
 	local config = Enemies.Goblin
 	local root = enemy.PrimaryPart
-	local position = root and root.Position or Vector3.new()
+	local deathPosition = root and root.Position or Vector3.new()
 
 	if killer then
 		self._playerData:AddXP(killer, config.xpReward)
@@ -651,7 +976,18 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 	end
 
 	if math.random() < config.dropChance and root then
-		self:CreatePickup(position, config.dropItem)
+		self:CreatePickup(deathPosition, config.dropItem)
+	end
+
+	-- Find the closest original spawn point to respawn at
+	local closestSpawn = SPAWN_POSITIONS[1]
+	local closestDist = math.huge
+	for _, spawnPos in SPAWN_POSITIONS do
+		local dist = (Vector3.new(spawnPos.X, 0, spawnPos.Z) - Vector3.new(deathPosition.X, 0, deathPosition.Z)).Magnitude
+		if dist < closestDist then
+			closestDist = dist
+			closestSpawn = spawnPos
+		end
 	end
 
 	for i, e in self._enemies do
@@ -663,8 +999,10 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 
 	enemy:Destroy()
 
+	-- Respawn at the closest original spawn point after a delay
 	task.delay(5, function()
-		self:CreateGoblin(position)
+		local y = self._mapGenerator:GetGroundHeight(closestSpawn.X, closestSpawn.Z)
+		self:CreateGoblin(Vector3.new(closestSpawn.X, y + 3, closestSpawn.Z))
 	end)
 end
 
@@ -676,11 +1014,49 @@ function EnemyService:RunAI()
 			local root = enemy.PrimaryPart
 			local humanoid = enemy:FindFirstChildOfClass("Humanoid")
 			if root and humanoid then
-				local targetPlayer, distance = self:GetNearestPlayer(root.Position, config.aggroRange)
-				if targetPlayer then
-					local targetChar = targetPlayer.Character
-					local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+				-- First check if we have an aggro target from being attacked
+				local aggroTarget = enemy:GetAttribute("AggroTarget")
+				local targetPlayer = nil
+
+				if aggroTarget then
+					targetPlayer = Players:GetPlayerByUserId(aggroTarget)
+					-- Validate the aggro target is still alive and in range
+					if targetPlayer and targetPlayer.Character then
+						local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+						local targetHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+						if targetRoot and targetHumanoid and targetHumanoid.Health > 0 then
+							local distance = (root.Position - targetRoot.Position).Magnitude
+							if distance > ACTIVE_AGGRO_RANGE then
+								-- Target is too far, clear aggro
+								enemy:SetAttribute("AggroTarget", nil)
+								targetPlayer = nil
+							end
+						else
+							-- Target is dead or missing root, clear aggro
+							enemy:SetAttribute("AggroTarget", nil)
+							targetPlayer = nil
+						end
+					else
+						-- Player left or character missing, clear aggro
+						enemy:SetAttribute("AggroTarget", nil)
+						targetPlayer = nil
+					end
+				end
+
+				-- If no aggro target, actively search for the nearest player
+				if not targetPlayer then
+					local nearestPlayer, nearestDist = self:GetNearestPlayer(root.Position, ACTIVE_AGGRO_RANGE)
+					if nearestPlayer then
+						targetPlayer = nearestPlayer
+						enemy:SetAttribute("AggroTarget", nearestPlayer.UserId)
+					end
+				end
+
+				-- Chase and attack the target
+				if targetPlayer and targetPlayer.Character then
+					local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
 					if targetRoot then
+						local distance = (root.Position - targetRoot.Position).Magnitude
 						humanoid:MoveTo(targetRoot.Position)
 
 						if distance <= config.attackRange then
@@ -714,6 +1090,122 @@ return EnemyService
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="15">
+          <Properties>
+            <string name="Name">EquipmentService</string>
+            <string name="Source"><![CDATA[local Players = game:GetService("Players")
+
+local EquipmentService = {}
+
+local function createEquipmentPart(name, size, color, parent)
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.Color = color
+	part.Material = Enum.Material.SmoothPlastic
+	part.CanCollide = false
+	part.Massless = true
+	part.Parent = parent
+	return part
+end
+
+local function weldTo(part, target, offset)
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = part
+	weld.Part1 = target
+	weld.Parent = part
+	part.CFrame = target.CFrame * offset
+end
+
+local function equipCharacter(character)
+	local humanoid = character:WaitForChild("Humanoid", 5)
+	if not humanoid then return end
+
+	local isR15 = humanoid.RigType == Enum.HumanoidRigType.R15
+
+	-- Wait a moment for body parts to spawn natively
+	task.wait(0.5)
+
+	-- Prevent double-equipping if this runs multiple times
+	if character:FindFirstChild("DefaultEquipment") then return end
+
+	local equipmentFolder = Instance.new("Folder")
+	equipmentFolder.Name = "DefaultEquipment"
+
+	local head = character:FindFirstChild("Head")
+	if head then
+		local helm = createEquipmentPart("Helm", Vector3.new(1.1, 1.1, 1.1), Color3.fromRGB(150, 150, 160), equipmentFolder)
+		weldTo(helm, head, CFrame.new(0, 0.1, 0))
+		local visor = createEquipmentPart("Visor", Vector3.new(0.9, 0.3, 0.2), Color3.fromRGB(200, 200, 50), equipmentFolder)
+		weldTo(visor, head, CFrame.new(0, 0.2, -0.5))
+	end
+
+	local torso = isR15 and character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+	if torso then
+		local armor = createEquipmentPart("Breastplate", Vector3.new(2.1, 2.1, 1.2), Color3.fromRGB(120, 120, 130), equipmentFolder)
+		weldTo(armor, torso, CFrame.new(0, 0, 0))
+
+		local leftPauldron = createEquipmentPart("LeftPauldron", Vector3.new(1.2, 0.8, 1.2), Color3.fromRGB(150, 150, 160), equipmentFolder)
+		weldTo(leftPauldron, torso, CFrame.new(-1.2, 0.8, 0))
+		local rightPauldron = createEquipmentPart("RightPauldron", Vector3.new(1.2, 0.8, 1.2), Color3.fromRGB(150, 150, 160), equipmentFolder)
+		weldTo(rightPauldron, torso, CFrame.new(1.2, 0.8, 0))
+		
+		local cape = createEquipmentPart("Cape", Vector3.new(1.8, 3, 0.1), Color3.fromRGB(180, 40, 40), equipmentFolder)
+		weldTo(cape, torso, CFrame.new(0, -0.2, 0.65) * CFrame.Angles(math.rad(10), 0, 0))
+	end
+
+	local leftLeg = isR15 and character:FindFirstChild("LeftLowerLeg") or character:FindFirstChild("Left Leg")
+	if leftLeg then
+		local leftBoot = createEquipmentPart("LeftBoot", Vector3.new(1.1, 0.8, 1.1), Color3.fromRGB(80, 80, 90), equipmentFolder)
+		weldTo(leftBoot, leftLeg, CFrame.new(0, -0.6, 0))
+	end
+
+	local rightLeg = isR15 and character:FindFirstChild("RightLowerLeg") or character:FindFirstChild("Right Leg")
+	if rightLeg then
+		local rightBoot = createEquipmentPart("RightBoot", Vector3.new(1.1, 0.8, 1.1), Color3.fromRGB(80, 80, 90), equipmentFolder)
+		weldTo(rightBoot, rightLeg, CFrame.new(0, -0.6, 0))
+	end
+
+	local leftArm = isR15 and character:FindFirstChild("LeftLowerArm") or character:FindFirstChild("Left Arm")
+	if leftArm then
+		local leftGauntlet = createEquipmentPart("LeftGauntlet", Vector3.new(1.1, 1.0, 1.1), Color3.fromRGB(100, 100, 110), equipmentFolder)
+		weldTo(leftGauntlet, leftArm, CFrame.new(0, -0.4, 0))
+	end
+
+	local rightArm = isR15 and character:FindFirstChild("RightLowerArm") or character:FindFirstChild("Right Arm")
+	if rightArm then
+		local rightGauntlet = createEquipmentPart("RightGauntlet", Vector3.new(1.1, 1.0, 1.1), Color3.fromRGB(100, 100, 110), equipmentFolder)
+		weldTo(rightGauntlet, rightArm, CFrame.new(0, -0.4, 0))
+	end
+
+	equipmentFolder.Parent = character
+end
+
+function EquipmentService:Init()
+end
+
+function EquipmentService:Start()
+	Players.PlayerAdded:Connect(function(player)
+		player.CharacterAdded:Connect(function(character)
+			equipCharacter(character)
+		end)
+	end)
+
+	-- Handle players already in the game
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			equipCharacter(player.Character)
+		end
+		player.CharacterAdded:Connect(function(character)
+			equipCharacter(character)
+		end)
+	end
+end
+
+return EquipmentService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="16">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -812,7 +1304,1518 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="16">
+        <Item class="ModuleScript" referent="17">
+          <Properties>
+            <string name="Name">MapGeneratorService</string>
+            <string name="Source">local Terrain = workspace.Terrain
+Terrain:Clear()
+
+if workspace:FindFirstChild("RPG_World") then
+	workspace.RPG_World:Destroy()
+end
+if workspace:FindFirstChild("Countryside_Province_Map") then
+	workspace.Countryside_Province_Map:Destroy()
+end
+if workspace:FindFirstChild("DefendedVillage") then
+	workspace.DefendedVillage:Destroy()
+end
+
+local mapFolder = Instance.new("Folder", workspace)
+mapFolder.Name = "RPG_World"
+local structuresFolder = Instance.new("Folder", mapFolder)
+structuresFolder.Name = "Structures"
+local natureFolder = Instance.new("Folder", mapFolder)
+natureFolder.Name = "Nature"
+
+local GRID_SIZE = 220 
+local SCALE = 16
+local SEED = math.random(1, 100000)
+local WATER_LEVEL = 18
+local VILLAGE_RADIUS = 700 
+
+local function createPart(name, parent, size, position, color, material)
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.Position = position
+	part.Color = color
+	part.Material = material or Enum.Material.SmoothPlastic
+	part.Anchored = true
+	part.CastShadow = true
+	part.Parent = parent
+	return part
+end
+
+print("1/4 Generating Terrain (With Smooth Gate Blending)...")
+for cx = -GRID_SIZE/2, GRID_SIZE/2 do
+	for cz = -GRID_SIZE/2, GRID_SIZE/2 do
+		local worldX = cx * SCALE
+		local worldZ = cz * SCALE
+		
+		local dist = math.sqrt(worldX^2 + worldZ^2)
+		local craterDist = math.sqrt((worldX - 800)^2 + (worldZ + 600)^2)
+		
+		-- Calculate Wilderness Height
+		local n1 = math.noise(worldX/500, worldZ/500, SEED) * 40
+		local n2 = math.noise(worldX/100, worldZ/100, SEED+1) * 10
+		local wildernessHeight = 20 + n1 + n2
+		if dist &gt; 1400 then wildernessHeight = wildernessHeight + (dist - 1400) * 0.3 end
+		
+		if craterDist &lt; 250 then
+			if craterDist &lt; 120 then
+				wildernessHeight = wildernessHeight - (120 - craterDist) * 0.5 
+			else
+				wildernessHeight = wildernessHeight + (250 - craterDist) * 0.2 
+			end
+		end
+		
+		local baseVillageHeight = 22
+		local height = 0
+		
+		-- Smooth gradient (lerp) at the gates to prevent humps
+		if dist &lt; 600 then
+			height = baseVillageHeight
+		elseif dist &gt; 800 then
+			height = wildernessHeight
+		else
+			-- Smoothstep interpolation between 600 and 800
+			local alpha = (dist - 600) / 200
+			alpha = alpha * alpha * (3 - 2 * alpha)
+			height = baseVillageHeight + (wildernessHeight - baseVillageHeight) * alpha
+		end
+		
+		local mat = Enum.Material.Grass
+		local isPath = false
+		local roadMat = nil
+		
+		-- Roman Road Grid connecting gates and organizing the village
+		if dist &lt; VILLAGE_RADIUS + 50 then
+			-- Main roads (Cardo Maximus and Decumanus Maximus)
+			if math.abs(worldX) &lt;= 16 or math.abs(worldZ) &lt;= 16 then
+				isPath = true
+				roadMat = Enum.Material.Pavement
+			-- Secondary grid roads (Insulae borders)
+			elseif math.abs(worldX) % 160 == 0 or math.abs(worldZ) % 160 == 0 then
+				isPath = true
+				roadMat = Enum.Material.Cobblestone
+			end
+		end
+		
+		if isPath and height &gt;= WATER_LEVEL then
+			mat = roadMat
+		elseif height &lt; WATER_LEVEL then
+			mat = Enum.Material.Sand
+		elseif craterDist &lt; 250 then
+			mat = Enum.Material.Basalt
+		elseif height &gt; 100 then
+			mat = Enum.Material.Rock
+			if height &gt; 160 then mat = Enum.Material.Snow end
+		end
+		
+		local columnHeight = height + 100
+		Terrain:FillBlock(CFrame.new(worldX, (height-100)/2, worldZ), Vector3.new(SCALE, columnHeight, SCALE), mat)
+		
+		if height &lt; WATER_LEVEL then
+			local wH = WATER_LEVEL - height
+			Terrain:FillBlock(CFrame.new(worldX, height + wH/2, worldZ), Vector3.new(SCALE, wH, SCALE), Enum.Material.Water)
+		end
+	end
+	if cx % 15 == 0 then task.wait() end
+end
+
+local function getGroundY(x, z)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	if mapFolder then
+		rayParams.FilterDescendantsInstances = {mapFolder}
+	end
+	
+	local ray = workspace:Raycast(Vector3.new(x, 500, z), Vector3.new(0, -1000, 0), rayParams)
+	if ray then return ray.Position.Y, ray.Material end
+	return 22, Enum.Material.Grass
+end
+
+print("2/4 Building Medieval Fortification Wall &amp; Central Castle...")
+
+-- ==========================================
+-- Medieval Stone Fortification Wall
+-- ==========================================
+local WALL_HEIGHT = 50          -- Taller imposing wall
+local WALL_THICKNESS = 10       -- Thick stone wall
+local RAMPART_WIDTH = 8         -- Walkway width on top
+local MERLON_HEIGHT = 8         -- Crenellation height
+local MERLON_WIDTH = 4          -- Crenellation width
+local MERLON_DEPTH = 3          -- Crenellation depth
+local MERLON_SPACING = 8        -- Gap between merlons
+local PARAPET_HEIGHT = 4        -- Inner railing height
+local BUTTRESS_SPACING = 60     -- Distance between buttresses
+local TORCH_SPACING = 40        -- Distance between torches
+local GATE_HALF_WIDTH = 18      -- Half-width of each gate opening
+local GATE_TOWER_RADIUS = 10    -- Radius of gate flanking towers
+local GATE_TOWER_HEIGHT = 65    -- Height of gate flanking towers
+
+-- Wall color palette
+local wallStoneMain  = Color3.fromRGB(160, 150, 130)  -- Main wall stone
+local wallStoneDark  = Color3.fromRGB(110, 100, 85)   -- Darker accent / base
+local wallStoneLight = Color3.fromRGB(185, 175, 155)  -- Lighter trim
+local wallRoofSlate  = Color3.fromRGB(55, 65, 80)     -- Gate tower roofs
+local wallTorchGlow  = Color3.fromRGB(255, 160, 40)   -- Torch fire color
+local wallTorchPole  = Color3.fromRGB(50, 35, 20)     -- Dark wood torch pole
+local wallBannerRed  = Color3.fromRGB(140, 30, 30)    -- Banner / flag color
+
+-- Gate angles (0 = East, pi/2 = North, pi = West, 3pi/2 = South)
+local gateAngles = {0, math.pi/2, math.pi, 3*math.pi/2}
+
+-- Helper: Check if an angle is within a gate opening
+local function isInGateOpening(angle)
+	for _, ga in ipairs(gateAngles) do
+		local diff = math.abs(angle - ga)
+		if diff &gt; math.pi then diff = 2 * math.pi - diff end
+		-- Gate angular width based on GATE_HALF_WIDTH at VILLAGE_RADIUS
+		local gateAngle = math.atan2(GATE_HALF_WIDTH, VILLAGE_RADIUS)
+		if diff &lt; gateAngle then
+			return true
+		end
+	end
+	return false
+end
+
+-- === MAIN WALL SEGMENTS (Stone blocks placed around circumference) ===
+local wallSegWidth = 8  -- Width of each wall segment
+local numSegments = math.floor((2 * math.pi * VILLAGE_RADIUS) / wallSegWidth)
+local segAngleStep = (2 * math.pi) / numSegments
+
+for i = 1, numSegments do
+	local angle = i * segAngleStep
+	
+	if not isInGateOpening(angle) then
+		local wx = math.cos(angle) * VILLAGE_RADIUS
+		local wz = math.sin(angle) * VILLAGE_RADIUS
+		local wy = getGroundY(wx, wz)
+		
+		-- Use CFrame for precise placement and rotation.
+		local wallCFrame = CFrame.new(wx, wy + WALL_HEIGHT/2 - 3, wz) * CFrame.Angles(0, -angle + math.pi/2, 0)
+		
+		-- Main wall body (thick stone). Width slightly increased to overlap perfectly without rendering gaps.
+		local wallSeg = createPart("WallSegment", structuresFolder,
+			Vector3.new(wallSegWidth + 0.5, WALL_HEIGHT, WALL_THICKNESS),
+			Vector3.new(0,0,0),
+			wallStoneMain, Enum.Material.Cobblestone)
+		wallSeg.CFrame = wallCFrame
+		
+		-- Stone base / foundation
+		local baseH = 8
+		local baseCFrame = CFrame.new(wx, wy + baseH/2 - 3, wz) * CFrame.Angles(0, -angle + math.pi/2, 0)
+		local baseSeg = createPart("WallBase", structuresFolder,
+			Vector3.new(wallSegWidth + 0.5, baseH, WALL_THICKNESS + 4),
+			Vector3.new(0,0,0),
+			wallStoneDark, Enum.Material.Brick)
+		baseSeg.CFrame = baseCFrame
+		
+		-- Rampart walkway
+		local rampartInnerOffset = VILLAGE_RADIUS - RAMPART_WIDTH/2 - 1
+		local rx = math.cos(angle) * rampartInnerOffset
+		local rz = math.sin(angle) * rampartInnerOffset
+		local rampartCFrame = CFrame.new(rx, wy + WALL_HEIGHT - 4, rz) * CFrame.Angles(0, -angle + math.pi/2, 0)
+		local rampart = createPart("Rampart", structuresFolder,
+			Vector3.new(wallSegWidth + 0.5, 2, RAMPART_WIDTH),
+			Vector3.new(0,0,0),
+			wallStoneLight, Enum.Material.Slate)
+		rampart.CFrame = rampartCFrame
+	end
+	if i % 80 == 0 then task.wait() end
+end
+
+-- === CRENELLATIONS (Merlons on top of the outer edge) ===
+-- Fix merlon spacing to make it continuous rather than leaving huge floating gaps
+local MERLON_ADJUSTED_SPACING = 5
+local merlonAngularStep = MERLON_ADJUSTED_SPACING / VILLAGE_RADIUS
+local merlonCount = math.floor((2 * math.pi) / merlonAngularStep)
+
+for i = 1, merlonCount do
+	local angle = i * merlonAngularStep
+	
+	if not isInGateOpening(angle) then
+		-- Skip every other for crenel gap
+		if i % 2 == 0 then
+			local mx = math.cos(angle) * (VILLAGE_RADIUS + 1)
+			local mz = math.sin(angle) * (VILLAGE_RADIUS + 1)
+			local my = getGroundY(math.cos(angle) * VILLAGE_RADIUS, math.sin(angle) * VILLAGE_RADIUS)
+			
+			local mCFrame = CFrame.new(mx, my + WALL_HEIGHT + MERLON_HEIGHT/2 - 4, mz) * CFrame.Angles(0, -angle + math.pi/2, 0)
+			local merlon = createPart("Merlon", structuresFolder,
+				Vector3.new(MERLON_WIDTH, MERLON_HEIGHT, MERLON_DEPTH),
+				Vector3.new(0,0,0),
+				wallStoneDark, Enum.Material.Cobblestone)
+			merlon.CFrame = mCFrame
+		end
+	end
+	if i % 80 == 0 then task.wait() end
+end
+
+-- === INNER PARAPET (low railing on the inside of the walkway) ===
+local paraAngleStep = (wallSegWidth * 2) / VILLAGE_RADIUS
+local paraCount = math.floor((2 * math.pi) / paraAngleStep)
+local paraInnerOffset = VILLAGE_RADIUS - RAMPART_WIDTH - 1
+
+for i = 1, paraCount do
+	local angle = i * paraAngleStep
+	if not isInGateOpening(angle) then
+		local px = math.cos(angle) * paraInnerOffset
+		local pz = math.sin(angle) * paraInnerOffset
+		local py = getGroundY(math.cos(angle) * VILLAGE_RADIUS, math.sin(angle) * VILLAGE_RADIUS)
+		
+		local pCFrame = CFrame.new(px, py + WALL_HEIGHT - 1, pz) * CFrame.Angles(0, -angle + math.pi/2, 0)
+		local parapet = createPart("Parapet", structuresFolder,
+			Vector3.new(wallSegWidth * 2 + 0.5, PARAPET_HEIGHT, 2),
+			Vector3.new(0,0,0),
+			wallStoneLight, Enum.Material.Cobblestone)
+		parapet.CFrame = pCFrame
+	end
+	if i % 50 == 0 then task.wait() end
+end
+
+-- === BUTTRESSES (structural supports on the outer face) ===
+local buttAngleStep = BUTTRESS_SPACING / VILLAGE_RADIUS
+local buttCount = math.floor((2 * math.pi) / buttAngleStep)
+
+for i = 1, buttCount do
+	local angle = i * buttAngleStep
+	if not isInGateOpening(angle) then
+		local bx = math.cos(angle) * (VILLAGE_RADIUS + WALL_THICKNESS/2 + 1)
+		local bz = math.sin(angle) * (VILLAGE_RADIUS + WALL_THICKNESS/2 + 1)
+		local by = getGroundY(math.cos(angle) * VILLAGE_RADIUS, math.sin(angle) * VILLAGE_RADIUS)
+		
+		local buttressH = WALL_HEIGHT * 0.7
+		local bCFrame = CFrame.new(bx, by + buttressH/2 - 3, bz) * CFrame.Angles(0, -angle + math.pi/2, 0)
+		local buttress = createPart("Buttress", structuresFolder,
+			Vector3.new(5, buttressH, 6),
+			Vector3.new(0,0,0),
+			wallStoneDark, Enum.Material.Brick)
+		buttress.CFrame = bCFrame
+		
+		local capX = math.cos(angle) * (VILLAGE_RADIUS + WALL_THICKNESS/2 + 1)
+		local capZ = math.sin(angle) * (VILLAGE_RADIUS + WALL_THICKNESS/2 + 1)
+		local cCFrame = CFrame.new(capX, by + buttressH - 1.5, capZ) * CFrame.Angles(0, -angle + math.pi/2, 0)
+		local buttressCap = createPart("ButtressCap", structuresFolder,
+			Vector3.new(7, 3, 8),
+			Vector3.new(0,0,0),
+			wallStoneLight, Enum.Material.Cobblestone)
+		buttressCap.CFrame = cCFrame
+	end
+end
+
+-- === WALL TORCHES (mounted on outer wall face with PointLights) ===
+local torchAngleStep = TORCH_SPACING / VILLAGE_RADIUS
+local torchCount = math.floor((2 * math.pi) / torchAngleStep)
+
+for i = 1, torchCount do
+	local angle = i * torchAngleStep
+	if not isInGateOpening(angle) then
+		local outerDist = VILLAGE_RADIUS + WALL_THICKNESS/2 + 1.5
+		local tx = math.cos(angle) * outerDist
+		local tz = math.sin(angle) * outerDist
+		local ty = getGroundY(math.cos(angle) * VILLAGE_RADIUS, math.sin(angle) * VILLAGE_RADIUS)
+		
+		-- Torch pole (vertical dark wood stick)
+		local torchPoleH = 8
+		local pole = createPart("TorchPole", structuresFolder,
+			Vector3.new(1, torchPoleH, 1),
+			Vector3.new(tx, ty + WALL_HEIGHT * 0.65, tz),
+			wallTorchPole, Enum.Material.Wood)
+		pole.Orientation = Vector3.new(0, math.deg(-angle), 0)
+		
+		-- Torch flame (glowing ball at the top)
+		local flame = createPart("TorchFlame", structuresFolder,
+			Vector3.new(2.5, 3, 2.5),
+			Vector3.new(tx, ty + WALL_HEIGHT * 0.65 + torchPoleH/2 + 1, tz),
+			wallTorchGlow, Enum.Material.Neon)
+		flame.Shape = Enum.PartType.Ball
+		
+		-- PointLight for warm ambient glow
+		local light = Instance.new("PointLight")
+		light.Color = wallTorchGlow
+		light.Brightness = 1.8
+		light.Range = 45
+		light.Parent = flame
+		
+		-- Fire particle effect
+		local fire = Instance.new("Fire")
+		fire.Size = 4
+		fire.Heat = 8
+		fire.Color = Color3.fromRGB(255, 180, 60)
+		fire.SecondaryColor = Color3.fromRGB(255, 80, 20)
+		fire.Parent = flame
+	end
+end
+
+-- === GATE TOWERS (Flanking each of the 4 gate openings) ===
+for _, ga in ipairs(gateAngles) do
+	local gateX = math.cos(ga) * VILLAGE_RADIUS
+	local gateZ = math.sin(ga) * VILLAGE_RADIUS
+	local gateY = getGroundY(gateX, gateZ)
+	
+	-- Perpendicular direction for tower placement (left and right of gate)
+	local perpAngle = ga + math.pi/2
+	
+	for side = -1, 1, 2 do
+		local towerX = gateX + math.cos(perpAngle) * (GATE_HALF_WIDTH + GATE_TOWER_RADIUS/2)  * side
+		local towerZ = gateZ + math.sin(perpAngle) * (GATE_HALF_WIDTH + GATE_TOWER_RADIUS/2) * side
+		local towerY = getGroundY(towerX, towerZ)
+		
+		-- Tower body (cylindrical stone tower)
+		local tower = createPart("GateTower", structuresFolder,
+			Vector3.new(GATE_TOWER_HEIGHT, GATE_TOWER_RADIUS * 2, GATE_TOWER_RADIUS * 2),
+			Vector3.new(towerX, towerY + GATE_TOWER_HEIGHT/2 - 3, towerZ),
+			wallStoneMain, Enum.Material.Cobblestone)
+		tower.Shape = Enum.PartType.Cylinder
+		tower.Orientation = Vector3.new(0, 0, 90)
+		
+		-- Tower rim (decorative ring at the top)
+		local rim = createPart("GateTowerRim", structuresFolder,
+			Vector3.new(4, GATE_TOWER_RADIUS * 2 + 4, GATE_TOWER_RADIUS * 2 + 4),
+			Vector3.new(towerX, towerY + GATE_TOWER_HEIGHT - 1, towerZ),
+			wallStoneDark, Enum.Material.Cobblestone)
+		rim.Shape = Enum.PartType.Cylinder
+		rim.Orientation = Vector3.new(0, 0, 90)
+		
+		-- Tower battlements (small merlons on top)
+		local towerMerlonCount = 8
+		for mi = 0, towerMerlonCount - 1, 2 do
+			local mAngle = mi / towerMerlonCount * math.pi * 2
+			local mDist = GATE_TOWER_RADIUS + 0.5
+			local mmx = towerX + math.cos(mAngle) * mDist
+			local mmz = towerZ + math.sin(mAngle) * mDist
+			createPart("TowerMerlon", structuresFolder,
+				Vector3.new(3, 5, 3),
+				Vector3.new(mmx, towerY + GATE_TOWER_HEIGHT + 3, mmz),
+				wallStoneDark, Enum.Material.Cobblestone)
+		end
+		
+		-- Conical roof on tower
+		local roofLayers = 8
+		local roofH = 20
+		local roofBaseR = GATE_TOWER_RADIUS + 2
+		for li = 0, roofLayers do
+			local frac = li / roofLayers
+			local layerR = roofBaseR * (1 - frac * 0.92)
+			local layerH = roofH / roofLayers
+			local layerY = towerY + GATE_TOWER_HEIGHT + 1 + li * layerH + layerH/2
+			local roofLayer = createPart("GateTowerRoofLayer", structuresFolder,
+				Vector3.new(layerH, layerR * 2, layerR * 2),
+				Vector3.new(towerX, layerY, towerZ),
+				wallRoofSlate, Enum.Material.Slate)
+			roofLayer.Shape = Enum.PartType.Cylinder
+			roofLayer.Orientation = Vector3.new(0, 0, 90)
+		end
+		
+		-- Arrow slits on the tower (3 levels)
+		for level = 1, 3 do
+			local slitY = towerY + level * (GATE_TOWER_HEIGHT / 4)
+			-- Facing outward
+			local outDir = Vector3.new(math.cos(ga), 0, math.sin(ga))
+			local slitX = towerX + outDir.X * (GATE_TOWER_RADIUS + 0.5)
+			local slitZ = towerZ + outDir.Z * (GATE_TOWER_RADIUS + 0.5)
+			createPart("ArrowSlit", structuresFolder,
+				Vector3.new(1.5, 5, 1),
+				Vector3.new(slitX, slitY, slitZ),
+				wallTorchGlow, Enum.Material.Neon)
+		end
+		
+		-- Torch on gate tower (one on the outside face)
+		local torchOutDist = GATE_TOWER_RADIUS + 2
+		local gtFlameX = towerX + math.cos(ga) * torchOutDist
+		local gtFlameZ = towerZ + math.sin(ga) * torchOutDist
+		local gtFlame = createPart("GateTowerTorch", structuresFolder,
+			Vector3.new(2.5, 3, 2.5),
+			Vector3.new(gtFlameX, towerY + GATE_TOWER_HEIGHT * 0.6, gtFlameZ),
+			wallTorchGlow, Enum.Material.Neon)
+		gtFlame.Shape = Enum.PartType.Ball
+		
+		local gtLight = Instance.new("PointLight")
+		gtLight.Color = wallTorchGlow
+		gtLight.Brightness = 2
+		gtLight.Range = 50
+		gtLight.Parent = gtFlame
+		
+		local gtFire = Instance.new("Fire")
+		gtFire.Size = 5
+		gtFire.Heat = 10
+		gtFire.Color = Color3.fromRGB(255, 180, 60)
+		gtFire.SecondaryColor = Color3.fromRGB(255, 80, 20)
+		gtFire.Parent = gtFlame
+	end
+	
+	-- === ENHANCED GATE ARCH &amp; INTERACTIVE DOORS ===
+	local gatehouseH = WALL_HEIGHT
+	local doorH = 24
+	local doorW = GATE_HALF_WIDTH -- 18 studs wide
+	local doorThick = 2
+	
+	-- The solid stone wall above the doors filling the gap
+	local archWallH = gatehouseH - doorH
+	local archCFrame = CFrame.new(gateX, gateY + doorH + archWallH/2, gateZ) * CFrame.Angles(0, -ga + math.pi/2, 0)
+	local archWall = createPart("GateArchWall", structuresFolder,
+		Vector3.new(GATE_HALF_WIDTH * 2, archWallH, WALL_THICKNESS),
+		Vector3.new(0,0,0),
+		wallStoneMain, Enum.Material.Cobblestone)
+	archWall.CFrame = archCFrame
+	
+	-- Decorative Lintel (trim above the doors)
+	local lintelCFrame = CFrame.new(gateX, gateY + doorH + 2, gateZ) * CFrame.Angles(0, -ga + math.pi/2, 0)
+	local lintel = createPart("GateLintel", structuresFolder,
+		Vector3.new(GATE_HALF_WIDTH * 2 + 2, 4, WALL_THICKNESS + 2),
+		Vector3.new(0,0,0),
+		wallStoneDark, Enum.Material.Cobblestone)
+	lintel.CFrame = lintelCFrame
+	
+	-- Interactive Wooden Doors (Enhanced double doors with details)
+	local doorPartsLeft = {}
+	local doorPartsRight = {}
+	
+	-- Calculate exact hinges (doorW = 18, so total opening is 36. Hinges are at -18 and +18)
+	local leftDoorPivot = CFrame.new(gateX, gateY + doorH/2, gateZ) * CFrame.Angles(0, -ga + math.pi/2, 0) * CFrame.new(-doorW, 0, 0)
+	local rightDoorPivot = CFrame.new(gateX, gateY + doorH/2, gateZ) * CFrame.Angles(0, -ga + math.pi/2, 0) * CFrame.new(doorW, 0, 0)
+	
+	-- Function to create door elements
+	local function addDoorPart(name, size, cframeOffset, pivot, color, mat, collection)
+		local part = createPart(name, structuresFolder, size, Vector3.new(), color, mat)
+		part.CFrame = pivot * cframeOffset
+		table.insert(collection, part)
+		return part
+	end
+	
+	local woodColor = Color3.fromRGB(65, 40, 20)
+	local metalColor = Color3.fromRGB(40, 40, 40)
+	
+	-- LEFT DOOR
+	local leftMain = addDoorPart("GateDoorLeft", Vector3.new(doorW, doorH, doorThick), CFrame.new(doorW/2, 0, 0), leftDoorPivot, woodColor, Enum.Material.WoodPlanks, doorPartsLeft)
+	addDoorPart("MetalBand", Vector3.new(doorW + 0.2, 3, doorThick + 0.2), CFrame.new(doorW/2, doorH/2 - 5, 0), leftDoorPivot, metalColor, Enum.Material.Metal, doorPartsLeft)
+	addDoorPart("MetalBand", Vector3.new(doorW + 0.2, 3, doorThick + 0.2), CFrame.new(doorW/2, -doorH/2 + 5, 0), leftDoorPivot, metalColor, Enum.Material.Metal, doorPartsLeft)
+	addDoorPart("CenterStrip", Vector3.new(1.5, doorH + 0.2, doorThick + 0.4), CFrame.new(doorW - 0.75, 0, 0), leftDoorPivot, metalColor, Enum.Material.Metal, doorPartsLeft)
+	
+	-- RIGHT DOOR
+	local rightMain = addDoorPart("GateDoorRight", Vector3.new(doorW, doorH, doorThick), CFrame.new(-doorW/2, 0, 0), rightDoorPivot, woodColor, Enum.Material.WoodPlanks, doorPartsRight)
+	addDoorPart("MetalBand", Vector3.new(doorW + 0.2, 3, doorThick + 0.2), CFrame.new(-doorW/2, doorH/2 - 5, 0), rightDoorPivot, metalColor, Enum.Material.Metal, doorPartsRight)
+	addDoorPart("MetalBand", Vector3.new(doorW + 0.2, 3, doorThick + 0.2), CFrame.new(-doorW/2, -doorH/2 + 5, 0), rightDoorPivot, metalColor, Enum.Material.Metal, doorPartsRight)
+	addDoorPart("CenterStrip", Vector3.new(1.5, doorH + 0.2, doorThick + 0.4), CFrame.new(-doorW + 0.75, 0, 0), rightDoorPivot, metalColor, Enum.Material.Metal, doorPartsRight)
+	
+	-- Add ProximityPrompt to the gate
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Open Gates"
+	prompt.ObjectText = "Castle Gate"
+	prompt.MaxActivationDistance = 25
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = leftMain
+	
+	-- Animate gates smoothly
+	local isOpen = false
+	local TweenService = game:GetService("TweenService")
+	local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	
+	-- Store initial relative CFrames
+	local leftOffsets = {}
+	for _, p in ipairs(doorPartsLeft) do leftOffsets[p] = leftDoorPivot:ToObjectSpace(p.CFrame) end
+	local rightOffsets = {}
+	for _, p in ipairs(doorPartsRight) do rightOffsets[p] = rightDoorPivot:ToObjectSpace(p.CFrame) end
+	
+	prompt.Triggered:Connect(function()
+		if prompt.ActionText == "Opening..." or prompt.ActionText == "Closing..." then return end
+		isOpen = not isOpen
+		prompt.ActionText = isOpen and "Closing..." or "Opening..."
+		
+		-- Swing doors 90 degrees inwards
+		local targetAngle = isOpen and math.pi/2 or 0
+		local newLeftPivot = leftDoorPivot * CFrame.Angles(0, targetAngle, 0)
+		local newRightPivot = rightDoorPivot * CFrame.Angles(0, -targetAngle, 0)
+		
+		for _, p in ipairs(doorPartsLeft) do
+			TweenService:Create(p, tweenInfo, { CFrame = newLeftPivot * leftOffsets[p] }):Play()
+		end
+		for _, p in ipairs(doorPartsRight) do
+			TweenService:Create(p, tweenInfo, { CFrame = newRightPivot * rightOffsets[p] }):Play()
+		end
+		
+		task.delay(1.5, function()
+			prompt.ActionText = isOpen and "Close Gates" or "Open Gates"
+		end)
+	end)
+	
+	-- Banner / flag at each gate
+	for side = -1, 1, 2 do
+		local bannerX = gateX + math.cos(perpAngle) * (GATE_HALF_WIDTH + GATE_TOWER_RADIUS/2) * side
+		local bannerZ = gateZ + math.sin(perpAngle) * (GATE_HALF_WIDTH + GATE_TOWER_RADIUS/2) * side
+		local bannerY = getGroundY(bannerX, bannerZ)
+		
+		-- Flag pole
+		createPart("FlagPole", structuresFolder,
+			Vector3.new(1, 15, 1),
+			Vector3.new(bannerX, bannerY + GATE_TOWER_HEIGHT + 10, bannerZ),
+			wallTorchPole, Enum.Material.Metal)
+		
+		-- Flag fabric
+		local flagW, flagD
+		if math.abs(math.cos(ga)) &gt; 0.5 then
+			flagW = 8; flagD = 1
+		else
+			flagW = 1; flagD = 8
+		end
+		createPart("GateFlag", structuresFolder,
+			Vector3.new(flagW, 6, flagD),
+			Vector3.new(bannerX, bannerY + GATE_TOWER_HEIGHT + 20, bannerZ),
+			wallBannerRed, Enum.Material.Fabric)
+	end
+end
+
+-- ==========================================
+-- Central Castle (Enhanced Medieval Fortress)
+-- ==========================================
+local function spawnCastle(x, z)
+	local y = getGroundY(x, z)
+	local castle = Instance.new("Model", structuresFolder)
+	castle.Name = "CentralCastle"
+
+	-- Color Palette
+	local stoneMain   = Color3.fromRGB(175, 155, 125)   -- Warm sandstone walls
+	local stoneDark   = Color3.fromRGB(120, 105, 85)     -- Darker accent stone
+	local stoneLight  = Color3.fromRGB(200, 185, 160)    -- Light trim stone
+	local roofSlate   = Color3.fromRGB(55, 65, 80)       -- Blue-grey slate roofs
+	local roofDark    = Color3.fromRGB(40, 48, 60)       -- Darker roof accent
+	local woodDark    = Color3.fromRGB(60, 40, 22)       -- Dark timber
+	local goldAccent  = Color3.fromRGB(210, 175, 55)     -- Gold decorative tips
+	local torchGlow   = Color3.fromRGB(255, 160, 40)     -- Warm torch light
+	local gateIron    = Color3.fromRGB(50, 50, 55)       -- Iron portcullis
+
+	local matStone    = Enum.Material.Cobblestone
+	local matBrick    = Enum.Material.Brick
+	local matSlate    = Enum.Material.Slate
+	local matWood     = Enum.Material.WoodPlanks
+
+	-- ===== RAISED STONE PLATFORM / FOUNDATION =====
+	createPart("CastlePlatform", castle, Vector3.new(250, 6, 250), Vector3.new(x, y + 3, z), stoneDark, matStone)
+	createPart("PlatformTrim", castle, Vector3.new(254, 2, 254), Vector3.new(x, y + 1, z), stoneLight, matBrick)
+
+	-- ===== OUTER CURTAIN WALLS =====
+	local wallH = 50
+	local wallThick = 8
+	local outerHalf = 110 -- Half-width of the outer wall square
+
+	-- Wall segments (leaving gaps for gatehouses)
+	-- Each wall side: two segments flanking the central gate opening (gate gap = 20 studs)
+	local gateGap = 10 -- half the gate opening
+	local segLen = outerHalf - gateGap -- length of each wall segment
+
+	-- North wall (+Z side) - two segments
+	createPart("WallN_L", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x - outerHalf + segLen/2, y + wallH/2 + 6, z + outerHalf), stoneMain, matBrick)
+	createPart("WallN_R", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x + outerHalf - segLen/2, y + wallH/2 + 6, z + outerHalf), stoneMain, matBrick)
+	-- South wall (-Z side)
+	createPart("WallS_L", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x - outerHalf + segLen/2, y + wallH/2 + 6, z - outerHalf), stoneMain, matBrick)
+	createPart("WallS_R", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x + outerHalf - segLen/2, y + wallH/2 + 6, z - outerHalf), stoneMain, matBrick)
+	-- East wall (+X side)
+	createPart("WallE_L", castle, Vector3.new(wallThick, wallH, segLen), Vector3.new(x + outerHalf, y + wallH/2 + 6, z - outerHalf + segLen/2), stoneMain, matBrick)
+	createPart("WallE_R", castle, Vector3.new(wallThick, wallH, segLen), Vector3.new(x + outerHalf, y + wallH/2 + 6, z + outerHalf - segLen/2), stoneMain, matBrick)
+	-- West wall (-X side)
+	createPart("WallW_L", castle, Vector3.new(wallThick, wallH, segLen), Vector3.new(x - outerHalf, y + wallH/2 + 6, z - outerHalf + segLen/2), stoneMain, matBrick)
+	createPart("WallW_R", castle, Vector3.new(wallThick, wallH, segLen), Vector3.new(x - outerHalf, y + wallH/2 + 6, z + outerHalf - segLen/2), stoneMain, matBrick)
+
+	-- ===== BATTLEMENTS / CRENELLATIONS on outer walls =====
+	local merlonW = 4
+	local merlonH = 6
+	local merlonD = wallThick + 1
+	local merlonSpacing = 8
+
+	-- Add crenellations along each wall segment
+	for side = 1, 4 do
+		for seg = 1, 2 do
+			local segStart, segEnd
+			if seg == 1 then
+				segStart = -outerHalf
+				segEnd = -gateGap
+			else
+				segStart = gateGap
+				segEnd = outerHalf
+			end
+
+			for pos = segStart + merlonW/2, segEnd - merlonW/2, merlonSpacing do
+				local mx, mz
+				if side == 1 then     -- North
+					mx = x + pos; mz = z + outerHalf
+				elseif side == 2 then -- South
+					mx = x + pos; mz = z - outerHalf
+				elseif side == 3 then -- East
+					mx = x + outerHalf; mz = z + pos
+				else                  -- West
+					mx = x - outerHalf; mz = z + pos
+				end
+				local mSize
+				if side &lt;= 2 then
+					mSize = Vector3.new(merlonW, merlonH, merlonD)
+				else
+					mSize = Vector3.new(merlonD, merlonH, merlonW)
+				end
+				createPart("Merlon", castle, mSize, Vector3.new(mx, y + wallH + 6 + merlonH/2, mz), stoneDark, matStone)
+			end
+		end
+	end
+
+	-- ===== CORNER TOWERS (4 large round towers) =====
+	local towerR = 12
+	local towerH = 60
+	local cornerPositions = {
+		{-1, -1}, {-1, 1}, {1, -1}, {1, 1}
+	}
+	for _, cp in ipairs(cornerPositions) do
+		local tx = x + cp[1] * outerHalf
+		local tz = z + cp[2] * outerHalf
+
+		-- Tower body (cylinder)
+		local tower = createPart("CornerTower", castle, Vector3.new(towerH, towerR * 2, towerR * 2), Vector3.new(tx, y + towerH/2 + 6, tz), stoneMain, matBrick)
+		tower.Shape = Enum.PartType.Cylinder
+		tower.Orientation = Vector3.new(0, 0, 90)
+
+		-- Tower top rim
+		local rim = createPart("TowerRim", castle, Vector3.new(4, towerR * 2 + 4, towerR * 2 + 4), Vector3.new(tx, y + towerH + 4, tz), stoneDark, matStone)
+		rim.Shape = Enum.PartType.Cylinder
+		rim.Orientation = Vector3.new(0, 0, 90)
+
+		-- Conical roof (cone made from stacked cylinders getting smaller)
+		local roofBaseR = towerR + 2
+		local roofH = 28
+		local roofLayers = 10
+		for li = 0, roofLayers do
+			local frac = li / roofLayers
+			local layerR = roofBaseR * (1 - frac * 0.92)
+			local layerH = roofH / roofLayers
+			local layerY = y + towerH + 6 + li * layerH + layerH/2
+			local roofLayer = createPart("TowerRoofLayer", castle, Vector3.new(layerH, layerR * 2, layerR * 2), Vector3.new(tx, layerY, tz), roofSlate, matSlate)
+			roofLayer.Shape = Enum.PartType.Cylinder
+			roofLayer.Orientation = Vector3.new(0, 0, 90)
+		end
+
+		-- Gold finial on top
+		local finial = createPart("Finial", castle, Vector3.new(2, 2, 2), Vector3.new(tx, y + towerH + 6 + roofH + 2, tz), goldAccent, Enum.Material.Neon)
+		finial.Shape = Enum.PartType.Ball
+
+		-- Tower windows (arrow slits) - 3 levels
+		for level = 1, 3 do
+			local winY = y + 6 + level * (towerH / 4)
+			-- Place a slit facing outward
+			local slitDir = Vector3.new(cp[1], 0, cp[2]).Unit
+			local slitX = tx + slitDir.X * (towerR + 0.5)
+			local slitZ = tz + slitDir.Z * (towerR + 0.5)
+			createPart("ArrowSlit", castle, Vector3.new(1.5, 5, 1), Vector3.new(slitX, winY, slitZ), torchGlow, Enum.Material.Neon)
+		end
+	end
+
+	-- ===== 4 GATEHOUSES (aligned to the 4 roads) =====
+	local gatePositions = {
+		{dir = "N", dx = 0,  dz = 1,  rotY = 0},
+		{dir = "S", dx = 0,  dz = -1, rotY = 0},
+		{dir = "E", dx = 1,  dz = 0,  rotY = 90},
+		{dir = "W", dx = -1, dz = 0,  rotY = 90},
+	}
+
+	for _, gp in ipairs(gatePositions) do
+		local gx = x + gp.dx * outerHalf
+		local gz = z + gp.dz * outerHalf
+
+		-- Gate arch top (lintel)
+		local lintelW, lintelH, lintelD
+		if gp.rotY == 0 then
+			lintelW = gateGap * 2 + 4
+			lintelH = 8
+			lintelD = wallThick + 4
+		else
+			lintelW = wallThick + 4
+			lintelH = 8
+			lintelD = gateGap * 2 + 4
+		end
+		createPart("GateLintel", castle, Vector3.new(lintelW, lintelH, lintelD), Vector3.new(gx, y + wallH + 2, gz), stoneDark, matStone)
+
+		-- Gate flanking pillars (two small towers beside each gate)
+		for side = -1, 1, 2 do
+			local px, pz
+			if gp.rotY == 0 then
+				px = gx + side * (gateGap + 3)
+				pz = gz
+			else
+				px = gx
+				pz = gz + side * (gateGap + 3)
+			end
+
+			local pillarH = 50
+			local pillarR = 5
+			local pillar = createPart("GatePillar", castle, Vector3.new(pillarH, pillarR * 2, pillarR * 2), Vector3.new(px, y + pillarH/2 + 6, pz), stoneMain, matBrick)
+			pillar.Shape = Enum.PartType.Cylinder
+			pillar.Orientation = Vector3.new(0, 0, 90)
+
+			-- Small conical roof on gate pillar
+			local pRoofLayers = 6
+			local pRoofH = 14
+			for li = 0, pRoofLayers do
+				local frac = li / pRoofLayers
+				local lr = (pillarR + 1) * (1 - frac * 0.9)
+				local lh = pRoofH / pRoofLayers
+				local ly = y + pillarH + 6 + li * lh + lh/2
+				local prl = createPart("GateRoofLayer", castle, Vector3.new(lh, lr * 2, lr * 2), Vector3.new(px, ly, pz), roofDark, matSlate)
+				prl.Shape = Enum.PartType.Cylinder
+				prl.Orientation = Vector3.new(0, 0, 90)
+			end
+		end
+
+		-- Iron portcullis (gate grid)
+		local portW, portH, portD
+		if gp.rotY == 0 then
+			portW = gateGap * 2 - 2
+			portH = wallH - 10
+			portD = 1.5
+		else
+			portW = 1.5
+			portH = wallH - 10
+			portD = gateGap * 2 - 2
+		end
+		createPart("Portcullis", castle, Vector3.new(portW, portH, portD), Vector3.new(gx, y + portH/2 + 6, gz), gateIron, Enum.Material.DiamondPlate)
+
+		-- Torch lights at each gate
+		for side = -1, 1, 2 do
+			local tlx, tlz
+			if gp.rotY == 0 then
+				tlx = gx + side * (gateGap - 1)
+				tlz = gz
+			else
+				tlx = gx
+				tlz = gz + side * (gateGap - 1)
+			end
+			local torch = createPart("GateTorch", castle, Vector3.new(2, 2, 2), Vector3.new(tlx, y + wallH - 4, tlz), torchGlow, Enum.Material.Neon)
+			torch.Shape = Enum.PartType.Ball
+
+			-- Add a PointLight for atmosphere
+			local light = Instance.new("PointLight")
+			light.Color = torchGlow
+			light.Brightness = 2
+			light.Range = 30
+			light.Parent = torch
+		end
+	end
+
+	-- ===== INNER BAILEY WALLS =====
+	local innerHalf = 60
+	local innerWallH = 35
+	local innerWallThick = 6
+
+	-- Inner walls (solid, no gaps - the keep courtyard)
+	createPart("InnerWallN", castle, Vector3.new(innerHalf * 2, innerWallH, innerWallThick), Vector3.new(x, y + innerWallH/2 + 6, z + innerHalf), stoneDark, matStone)
+	createPart("InnerWallS", castle, Vector3.new(innerHalf * 2, innerWallH, innerWallThick), Vector3.new(x, y + innerWallH/2 + 6, z - innerHalf), stoneDark, matStone)
+	createPart("InnerWallE", castle, Vector3.new(innerWallThick, innerWallH, innerHalf * 2), Vector3.new(x + innerHalf, y + innerWallH/2 + 6, z), stoneDark, matStone)
+	createPart("InnerWallW", castle, Vector3.new(innerWallThick, innerWallH, innerHalf * 2), Vector3.new(x - innerHalf, y + innerWallH/2 + 6, z), stoneDark, matStone)
+
+	-- Inner corner turrets (smaller)
+	for _, cp in ipairs(cornerPositions) do
+		local itx = x + cp[1] * innerHalf
+		local itz = z + cp[2] * innerHalf
+		local itH = 42
+		local itR = 5
+
+		local it = createPart("InnerTurret", castle, Vector3.new(itH, itR * 2, itR * 2), Vector3.new(itx, y + itH/2 + 6, itz), stoneDark, matStone)
+		it.Shape = Enum.PartType.Cylinder
+		it.Orientation = Vector3.new(0, 0, 90)
+
+		-- Tiny conical roof
+		for li = 0, 5 do
+			local frac = li / 5
+			local lr = (itR + 1) * (1 - frac * 0.9)
+			local lh = 10 / 5
+			local ly = y + itH + 6 + li * lh + lh/2
+			local trl = createPart("InnerTurretRoof", castle, Vector3.new(lh, lr * 2, lr * 2), Vector3.new(itx, ly, itz), roofSlate, matSlate)
+			trl.Shape = Enum.PartType.Cylinder
+			trl.Orientation = Vector3.new(0, 0, 90)
+		end
+	end
+
+	-- ===== GRAND CENTRAL KEEP (Multi-tiered) =====
+	-- Tier 1: Base (widest)
+	local keepW1 = 70
+	local keepH1 = 55
+	createPart("KeepBase", castle, Vector3.new(keepW1, keepH1, keepW1), Vector3.new(x, y + keepH1/2 + 6, z), stoneLight, matBrick)
+	-- Decorative band
+	createPart("KeepBand1", castle, Vector3.new(keepW1 + 2, 3, keepW1 + 2), Vector3.new(x, y + keepH1 + 6, z), stoneDark, matStone)
+
+	-- Tier 2: Middle
+	local keepW2 = 50
+	local keepH2 = 45
+	createPart("KeepMid", castle, Vector3.new(keepW2, keepH2, keepW2), Vector3.new(x, y + keepH1 + keepH2/2 + 6, z), stoneMain, matBrick)
+	createPart("KeepBand2", castle, Vector3.new(keepW2 + 2, 3, keepW2 + 2), Vector3.new(x, y + keepH1 + keepH2 + 6, z), stoneDark, matStone)
+
+	-- Tier 3: Upper
+	local keepW3 = 34
+	local keepH3 = 35
+	createPart("KeepUpper", castle, Vector3.new(keepW3, keepH3, keepW3), Vector3.new(x, y + keepH1 + keepH2 + keepH3/2 + 6, z), stoneLight, matBrick)
+	createPart("KeepBand3", castle, Vector3.new(keepW3 + 2, 3, keepW3 + 2), Vector3.new(x, y + keepH1 + keepH2 + keepH3 + 6, z), stoneDark, matStone)
+
+	-- Grand spire on top of keep (tall conical)
+	local spireBaseR = 10
+	local spireH = 40
+	local spireLayers = 14
+	for li = 0, spireLayers do
+		local frac = li / spireLayers
+		local lr = spireBaseR * (1 - frac * 0.95)
+		local lh = spireH / spireLayers
+		local ly = y + keepH1 + keepH2 + keepH3 + 6 + li * lh + lh/2
+		local sl = createPart("SpireLayer", castle, Vector3.new(lh, lr * 2, lr * 2), Vector3.new(x, ly, z), roofSlate, matSlate)
+		sl.Shape = Enum.PartType.Cylinder
+		sl.Orientation = Vector3.new(0, 0, 90)
+	end
+
+	-- Gold orb at the very top
+	local topY = y + keepH1 + keepH2 + keepH3 + spireH + 8
+	local orb = createPart("GoldOrb", castle, Vector3.new(4, 4, 4), Vector3.new(x, topY, z), goldAccent, Enum.Material.Neon)
+	orb.Shape = Enum.PartType.Ball
+
+	-- ===== KEEP CORNER SPIRES (4 mini towers on keep base) =====
+	local keepSpireDist = keepW1/2 - 2
+	for _, cp in ipairs(cornerPositions) do
+		local ksx = x + cp[1] * keepSpireDist
+		local ksz = z + cp[2] * keepSpireDist
+		local ksH = 55
+
+		local ks = createPart("KeepSpire", castle, Vector3.new(ksH, 8, 8), Vector3.new(ksx, y + ksH/2 + 6, ksz), stoneMain, matBrick)
+		ks.Shape = Enum.PartType.Cylinder
+		ks.Orientation = Vector3.new(0, 0, 90)
+
+		-- Mini conical roof
+		for li = 0, 5 do
+			local frac = li / 5
+			local lr = 5.5 * (1 - frac * 0.9)
+			local lh = 12 / 5
+			local ly = y + ksH + 6 + li * lh + lh/2
+			local krl = createPart("KeepSpireRoof", castle, Vector3.new(lh, lr * 2, lr * 2), Vector3.new(ksx, ly, ksz), roofDark, matSlate)
+			krl.Shape = Enum.PartType.Cylinder
+			krl.Orientation = Vector3.new(0, 0, 90)
+		end
+
+		-- Gold finial
+		createPart("KeepSpireFinial", castle, Vector3.new(1.5, 1.5, 1.5), Vector3.new(ksx, y + ksH + 6 + 13, ksz), goldAccent, Enum.Material.Neon)
+	end
+
+	-- ===== KEEP WINDOWS (Warm glowing) =====
+	-- Windows on each side of each tier
+	local tiers = {
+		{h = keepH1, w = keepW1, baseY = y + 6},
+		{h = keepH2, w = keepW2, baseY = y + keepH1 + 6},
+		{h = keepH3, w = keepW3, baseY = y + keepH1 + keepH2 + 6},
+	}
+	for _, tier in ipairs(tiers) do
+		local numWin = math.max(2, math.floor(tier.w / 12))
+		local winSpacing = tier.w / (numWin + 1)
+		for winIdx = 1, numWin do
+			local winOffset = -tier.w/2 + winIdx * winSpacing
+			local winY = tier.baseY + tier.h * 0.6
+			-- North and South facing windows
+			for _, faceZ in ipairs({1, -1}) do
+				createPart("KeepWindow", castle, Vector3.new(3, 5, 1), Vector3.new(x + winOffset, winY, z + faceZ * (tier.w/2 + 0.5)), torchGlow, Enum.Material.Neon)
+			end
+			-- East and West facing windows
+			for _, faceX in ipairs({1, -1}) do
+				createPart("KeepWindow", castle, Vector3.new(1, 5, 3), Vector3.new(x + faceX * (tier.w/2 + 0.5), winY, z + winOffset), torchGlow, Enum.Material.Neon)
+			end
+		end
+	end
+
+	-- ===== WALL-MOUNTED TORCHES =====
+	local torchPositions = {
+		-- Outer wall torches (midpoints of each wall segment)
+		{x - outerHalf/2, z + outerHalf},
+		{x + outerHalf/2, z + outerHalf},
+		{x - outerHalf/2, z - outerHalf},
+		{x + outerHalf/2, z - outerHalf},
+		{x + outerHalf, z - outerHalf/2},
+		{x + outerHalf, z + outerHalf/2},
+		{x - outerHalf, z - outerHalf/2},
+		{x - outerHalf, z + outerHalf/2},
+	}
+	for _, tp in ipairs(torchPositions) do
+		local torch = createPart("WallTorch", castle, Vector3.new(2, 2, 2), Vector3.new(tp[1], y + wallH + 4, tp[2]), torchGlow, Enum.Material.Neon)
+		torch.Shape = Enum.PartType.Ball
+
+		local light = Instance.new("PointLight")
+		light.Color = torchGlow
+		light.Brightness = 1.5
+		light.Range = 40
+		light.Parent = torch
+	end
+
+	-- ===== DECORATIVE BANNERS (colored blocks on walls) =====
+	local bannerCol = Color3.fromRGB(140, 30, 30) -- Deep crimson
+	for _, gp in ipairs(gatePositions) do
+		local bx = x + gp.dx * outerHalf
+		local bz = z + gp.dz * outerHalf
+		local bW, bH, bD
+		if gp.rotY == 0 then
+			bW = 5; bH = 12; bD = 0.5
+		else
+			bW = 0.5; bH = 12; bD = 5
+		end
+		-- Banner on each side of gate
+		for side = -1, 1, 2 do
+			local banX, banZ
+			if gp.rotY == 0 then
+				banX = bx + side * (gateGap + 10)
+				banZ = bz
+			else
+				banX = bx
+				banZ = bz + side * (gateGap + 10)
+			end
+			createPart("Banner", castle, Vector3.new(bW, bH, bD), Vector3.new(banX, y + wallH - 2, banZ), bannerCol, Enum.Material.Fabric)
+		end
+	end
+end
+spawnCastle(0, 0)
+
+print("3/4 Generating Procedural Houses (With Perfect Roofs &amp; Roman Layout)...")
+local function spawnHouse(hx, hz, rotationAngle)
+	local hy, hMat = getGroundY(hx, hz)
+	
+	-- Avoid roads and water
+	if hMat == Enum.Material.Pavement or hMat == Enum.Material.Cobblestone or hMat == Enum.Material.Mud or hy &lt;= WATER_LEVEL then return end
+	
+	local houseModel = Instance.new("Model", structuresFolder)
+	houseModel.Name = "House"
+	
+	local type = math.random(1, 3)
+	local colBase = Color3.fromRGB(math.random(140, 180), math.random(130, 170), math.random(120, 160))
+	local colRoof = Color3.fromRGB(math.random(80, 120), math.random(40, 60), math.random(30, 50))
+	local rot = CFrame.Angles(0, rotationAngle, 0)
+	
+	-- Roof generation helper (perfect A-frame using tilted blocks with Viking crosses)
+	local function createAFrameRoof(w, h, d, roofAngle)
+		local rW = (w/2) / math.cos(roofAngle) + 2
+		-- More overhang (d+4 instead of d+2)
+		local r1 = createPart("Roof1", houseModel, Vector3.new(rW, 2, d+4), Vector3.new(0,0,0), colRoof, Enum.Material.Wood)
+		local r2 = createPart("Roof2", houseModel, Vector3.new(rW, 2, d+4), Vector3.new(0,0,0), colRoof, Enum.Material.Wood)
+		
+		local yShift = (rW / 2) * math.sin(roofAngle)
+		local xShift = (w / 4) + 0.5
+		
+		local p1 = rot * Vector3.new(-xShift, h + yShift, 0)
+		local p2 = rot * Vector3.new(xShift, h + yShift, 0)
+		
+		r1.CFrame = CFrame.new(hx + p1.X, hy + p1.Y, hz + p1.Z) * rot * CFrame.Angles(0, 0, roofAngle)
+		r2.CFrame = CFrame.new(hx + p2.X, hy + p2.Y, hz + p2.Z) * rot * CFrame.Angles(0, 0, -roofAngle)
+		
+		-- Viking Roof Cross Beams at the gables (front and back)
+		local beamW = 1.2
+		local crossLength = rW + 6 -- Extend past the roof for the classic X shape
+		for _, zDir in ipairs({1, -1}) do
+			local beam1 = createPart("CrossBeam", houseModel, Vector3.new(beamW, crossLength, beamW), Vector3.new(0,0,0), Color3.fromRGB(50, 30, 15), Enum.Material.Wood)
+			local beam2 = createPart("CrossBeam", houseModel, Vector3.new(beamW, crossLength, beamW), Vector3.new(0,0,0), Color3.fromRGB(50, 30, 15), Enum.Material.Wood)
+			
+			local cZ = (d/2 + 1.8) * zDir
+			local bp1 = rot * Vector3.new(-xShift, h + yShift, cZ)
+			local bp2 = rot * Vector3.new(xShift, h + yShift, cZ)
+			
+			beam1.CFrame = CFrame.new(hx + bp1.X, hy + bp1.Y, hz + bp1.Z) * rot * CFrame.Angles(0, 0, roofAngle)
+			beam2.CFrame = CFrame.new(hx + bp2.X, hy + bp2.Y, hz + bp2.Z) * rot * CFrame.Angles(0, 0, -roofAngle)
+		end
+	end
+	
+	local function createVikingBase(w, h, d, baseMat)
+		-- 1. Main body (wooden planks)
+		local base = createPart("Base", houseModel, Vector3.new(w, h, d), Vector3.new(0,0,0), colBase, baseMat)
+		local bP = rot * Vector3.new(0, h/2, 0)
+		base.CFrame = CFrame.new(hx + bP.X, hy + bP.Y, hz + bP.Z) * rot
+		
+		-- 2. Foundation (wider stone base)
+		local foundH = 3
+		local foundation = createPart("Foundation", houseModel, Vector3.new(w+1, foundH, d+1), Vector3.new(0,0,0), Color3.fromRGB(90, 95, 100), Enum.Material.Cobblestone)
+		local fP = rot * Vector3.new(0, foundH/2, 0)
+		foundation.CFrame = CFrame.new(hx + fP.X, hy + fP.Y, hz + fP.Z) * rot
+		
+		-- 3. Timber Framing (Corner Pillars and Horizontal Beams)
+		local logCol = Color3.fromRGB(60, 40, 25)
+		local pW = 1.8
+		
+		-- Vertical corner pillars
+		for _, px in ipairs({1, -1}) do
+			for _, pz in ipairs({1, -1}) do
+				local pillar = createPart("Pillar", houseModel, Vector3.new(pW, h, pW), Vector3.new(0,0,0), logCol, Enum.Material.Wood)
+				local pPos = rot * Vector3.new((w/2 + 0.1) * px, h/2, (d/2 + 0.1) * pz)
+				pillar.CFrame = CFrame.new(hx + pPos.X, hy + pPos.Y, hz + pPos.Z) * rot
+			end
+		end
+		
+		-- Horizontal beams (top and bottom)
+		for _, hzY in ipairs({foundH + 0.5, h - 0.5}) do
+			-- Along X axis (front and back)
+			for _, pz in ipairs({1, -1}) do
+				local hBeamX = createPart("BeamX", houseModel, Vector3.new(w, pW, pW), Vector3.new(0,0,0), logCol, Enum.Material.Wood)
+				local bpX = rot * Vector3.new(0, hzY, (d/2 + 0.1) * pz)
+				hBeamX.CFrame = CFrame.new(hx + bpX.X, hy + bpX.Y, hz + bpX.Z) * rot
+			end
+			-- Along Z axis (sides)
+			for _, px in ipairs({1, -1}) do
+				local hBeamZ = createPart("BeamZ", houseModel, Vector3.new(pW, pW, d), Vector3.new(0,0,0), logCol, Enum.Material.Wood)
+				local bpZ = rot * Vector3.new((w/2 + 0.1) * px, hzY, 0)
+				hBeamZ.CFrame = CFrame.new(hx + bpZ.X, hy + bpZ.Y, hz + bpZ.Z) * rot
+			end
+		end
+		
+		-- 4. Door (Facing local +Z)
+		local doorW, doorH = 4.5, 7.5
+		local door = createPart("Door", houseModel, Vector3.new(doorW, doorH, 1), Vector3.new(0,0,0), Color3.fromRGB(45, 25, 10), Enum.Material.WoodPlanks)
+		local doorPos = rot * Vector3.new(0, foundH + doorH/2, d/2 + 0.6)
+		door.CFrame = CFrame.new(hx + doorPos.X, hy + doorPos.Y, hz + doorPos.Z) * rot
+		
+		-- 5. Windows (Glowing warm light)
+		local winW, winH = 2.5, 3
+		local winCol = Color3.fromRGB(255, 180, 50)
+		local winMat = Enum.Material.Neon
+		-- Front windows
+		for _, wx in ipairs({1, -1}) do
+			local win = createPart("Window", houseModel, Vector3.new(winW, winH, 1), Vector3.new(0,0,0), winCol, winMat)
+			local wPos = rot * Vector3.new((w/3.5) * wx, foundH + doorH/2 + 1, d/2 + 0.51)
+			win.CFrame = CFrame.new(hx + wPos.X, hy + wPos.Y, hz + wPos.Z) * rot
+		end
+	end
+	
+	if type == 1 then
+		-- Standard Square House
+		local w, h, d = 20, 16, 20
+		createVikingBase(w, h, d, Enum.Material.WoodPlanks)
+		createAFrameRoof(w, h, d, math.rad(42))
+		
+	elseif type == 2 then
+		-- Longhouse
+		local w, h, d = 20, 14, 34
+		createVikingBase(w, h, d, Enum.Material.WoodPlanks)
+		createAFrameRoof(w, h, d, math.rad(40))
+		
+	elseif type == 3 then
+		-- Two Story
+		local w, h, d = 24, 28, 24
+		createVikingBase(w, h, d, Enum.Material.WoodPlanks)
+		createAFrameRoof(w, h, d, math.rad(35))
+	end
+end
+
+local function spawnHouseLine(startX, startZ, endX, endZ, stepSize, rotationAngle)
+	if endX &lt; startX or endZ &lt; startZ then return end
+	
+	local cx, cz = startX, startZ
+	local dist = math.sqrt((endX - startX)^2 + (endZ - startZ)^2)
+	local steps = math.floor(dist / stepSize)
+	
+	local dx = (endX == startX) and 0 or (endX - startX) / dist * stepSize
+	local dz = (endZ == startZ) and 0 or (endZ - startZ) / dist * stepSize
+	
+	for i = 0, steps do
+		local hx = cx + i * dx
+		local hz = cz + i * dz
+		
+		local vDist = math.sqrt(hx^2 + hz^2)
+		-- Clear a larger 260 stud radius for the Expanded Central Castle
+		if vDist &gt; 260 and vDist &lt; VILLAGE_RADIUS - 60 then
+			if math.random() &lt; 0.9 then -- 90% chance to spawn to leave some organic gaps
+				local rx = hx + math.random(-1, 1)
+				local rz = hz + math.random(-1, 1)
+				spawnHouse(rx, rz, rotationAngle)
+			end
+		end
+	end
+end
+
+local function spawnRomanMarketplace(cx, cz)
+	local mSize = 140
+	local y, _ = getGroundY(cx, cz)
+	if y &lt;= WATER_LEVEL then return end
+	
+	local market = Instance.new("Model", structuresFolder)
+	market.Name = "RomanMarketplace"
+	
+	-- Plaza Floor (Marble/Smooth stone)
+	local floorCol = Color3.fromRGB(220, 220, 215)
+	local plaza = createPart("PlazaFloor", market, Vector3.new(mSize, 2, mSize), Vector3.new(cx, y + 1, cz), floorCol, Enum.Material.Marble)
+	
+	-- Colonnades (Perimeter columns)
+	local colH = 18
+	local colR = 1.5
+	local colSpacing = 16
+	for px = -mSize/2 + 5, mSize/2 - 5, colSpacing do
+		for pz = -mSize/2 + 5, mSize/2 - 5, colSpacing do
+			if px == -mSize/2 + 5 or px &gt;= mSize/2 - 10 or pz == -mSize/2 + 5 or pz &gt;= mSize/2 - 10 then
+				local col = createPart("Column", market, Vector3.new(colH, colR*2, colR*2), Vector3.new(cx + px, y + 2 + colH/2, cz + pz), Color3.fromRGB(230, 230, 225), Enum.Material.Marble)
+				col.Shape = Enum.PartType.Cylinder
+				col.Orientation = Vector3.new(0, 0, 90)
+				createPart("ColBase", market, Vector3.new(4, 2, 4), Vector3.new(cx + px, y + 3, cz + pz), Color3.fromRGB(200, 200, 195), Enum.Material.Marble)
+				createPart("ColCapital", market, Vector3.new(4.5, 2, 4.5), Vector3.new(cx + px, y + 2 + colH, cz + pz), Color3.fromRGB(200, 200, 195), Enum.Material.Marble)
+			end
+		end
+	end
+	
+	-- Roof over colonnade
+	local roofThick = 2
+	local roofDepth = 12
+	createPart("ColRoofN", market, Vector3.new(mSize, roofThick, roofDepth), Vector3.new(cx, y + 2 + colH + 1, cz - mSize/2 + 5), Color3.fromRGB(150, 70, 50), Enum.Material.Brick)
+	createPart("ColRoofS", market, Vector3.new(mSize, roofThick, roofDepth), Vector3.new(cx, y + 2 + colH + 1, cz + mSize/2 - 5), Color3.fromRGB(150, 70, 50), Enum.Material.Brick)
+	createPart("ColRoofW", market, Vector3.new(roofDepth, roofThick, mSize - roofDepth*2), Vector3.new(cx - mSize/2 + 5, y + 2 + colH + 1, cz), Color3.fromRGB(150, 70, 50), Enum.Material.Brick)
+	createPart("ColRoofE", market, Vector3.new(roofDepth, roofThick, mSize - roofDepth*2), Vector3.new(cx + mSize/2 - 5, y + 2 + colH + 1, cz), Color3.fromRGB(150, 70, 50), Enum.Material.Brick)
+
+	-- Central Fountain
+	local fR = 12
+	local fBase = createPart("FountainBase", market, Vector3.new(3, fR*2, fR*2), Vector3.new(cx, y + 3.5, cz), Color3.fromRGB(180, 180, 170), Enum.Material.Cobblestone)
+	fBase.Shape = Enum.PartType.Cylinder
+	fBase.Orientation = Vector3.new(0, 0, 90)
+	local fWater = createPart("FountainWater", market, Vector3.new(2.5, fR*2-2, fR*2-2), Vector3.new(cx, y + 4, cz), Color3.fromRGB(50, 150, 255), Enum.Material.Water)
+	fWater.Shape = Enum.PartType.Cylinder
+	fWater.Orientation = Vector3.new(0, 0, 90)
+	local fPedestal = createPart("FountainPedestal", market, Vector3.new(12, 4, 4), Vector3.new(cx, y + 8, cz), Color3.fromRGB(200, 200, 190), Enum.Material.Marble)
+	fPedestal.Shape = Enum.PartType.Cylinder
+	fPedestal.Orientation = Vector3.new(0, 0, 90)
+	local fTopWater = createPart("FountainTopWater", market, Vector3.new(1, 6, 6), Vector3.new(cx, y + 14, cz), Color3.fromRGB(50, 150, 255), Enum.Material.Water)
+	fTopWater.Shape = Enum.PartType.Cylinder
+	fTopWater.Orientation = Vector3.new(0, 0, 90)
+
+	-- Market Stalls
+	for _, sx in ipairs({-30, 30}) do
+		for _, sz in ipairs({-30, 0, 30}) do
+			local stallCol = Color3.fromRGB(math.random(100, 200), math.random(50, 150), math.random(50, 100))
+			createPart("StallTable", market, Vector3.new(10, 3, 6), Vector3.new(cx + sx, y + 3.5, cz + sz), Color3.fromRGB(120, 80, 50), Enum.Material.WoodPlanks)
+			local awning = createPart("StallAwning", market, Vector3.new(12, 1, 10), Vector3.new(cx + sx, y + 12, cz + sz + 2), stallCol, Enum.Material.Fabric)
+			awning.Orientation = Vector3.new(-15, 0, 0)
+			createPart("StallPole", market, Vector3.new(1, 10, 1), Vector3.new(cx + sx - 5, y + 7, cz + sz - 2), Color3.fromRGB(80, 50, 30), Enum.Material.Wood)
+			createPart("StallPole", market, Vector3.new(1, 10, 1), Vector3.new(cx + sx + 5, y + 7, cz + sz - 2), Color3.fromRGB(80, 50, 30), Enum.Material.Wood)
+		end
+	end
+end
+
+-- Organize village into Roman Insulae (City Blocks) based on the 160-stud grid
+for bx = -800, 800, 160 do
+	for bz = -800, 800, 160 do
+		
+		local function getPadding(val)
+			if val == 0 then return 32 end -- Main road is wider
+			return 16 -- Secondary road
+		end
+		
+		local minX = bx + getPadding(bx)
+		local maxX = bx + 160 - getPadding(bx + 160)
+		
+		local minZ = bz + getPadding(bz)
+		local maxZ = bz + 160 - getPadding(bz + 160)
+		
+		-- Only build in valid blocks
+		if maxX &gt; minX and maxZ &gt; minZ then
+			if (bx == -160 or bx == 0) and bz == 160 then
+				spawnRomanMarketplace(bx + 80, bz + 80)
+			else
+				local step = 32
+				-- South border of the block (Facing -Z / South)
+				spawnHouseLine(minX + 20, minZ + 20, maxX - 20, minZ + 20, step, math.pi)
+				-- North border of the block (Facing +Z / North)
+				spawnHouseLine(minX + 20, maxZ - 20, maxX - 20, maxZ - 20, step, 0)
+				-- West border of the block (Facing -X / West)
+				spawnHouseLine(minX + 20, minZ + 52, minX + 20, maxZ - 52, step, -math.pi/2)
+				-- East border of the block (Facing +X / East)
+				spawnHouseLine(maxX - 20, minZ + 52, maxX - 20, maxZ - 52, step, math.pi/2)
+			end
+		end
+	end
+	task.wait()
+end
+
+print("4/4 Growing Organized Forest (Oak, Birch, Apple, Pine)...")
+
+local function createPineTree(treeModel, tx, ty, tz)
+	local trunkH = math.random(25, 40)
+	local trunkBaseW = math.random(2.5, 4)
+	local trunkCol = Color3.fromRGB(45, 30, 20)
+	
+	-- Tapered 3D Trunk
+	local numSegments = 4
+	local segH = trunkH / numSegments
+	local currentY = ty
+	local lastW = trunkBaseW
+	
+	for i = 1, numSegments do
+		local nextW = trunkBaseW * (1 - (i/numSegments)*0.6)
+		local trunk = createPart("TrunkSeg", treeModel, Vector3.new(segH, (lastW+nextW)/2, (lastW+nextW)/2), Vector3.new(tx + math.random(-1,1)*0.2, currentY + segH/2, tz + math.random(-1,1)*0.2), trunkCol, Enum.Material.Wood)
+		trunk.Shape = Enum.PartType.Cylinder
+		trunk.Orientation = Vector3.new(0, 0, 90)
+		currentY = currentY + segH
+		lastW = nextW
+	end
+	
+	local leafColBase = Color3.fromRGB(35, 75, 45)
+	local leafMat = Enum.Material.LeafyGrass
+	local numLayers = 5
+	local layerH = trunkH * 0.6 / numLayers
+	local startY = ty + trunkH * 0.4
+	
+	for i = 1, numLayers do
+		local layerW = 24 - (i * 4)
+		-- Multiple intersecting blocks per layer for 3D needle effect
+		for j = 1, 3 do
+			local colOffset = math.random(-10, 10)
+			local lCol = Color3.fromRGB(math.clamp(35+colOffset,0,255), math.clamp(75+colOffset,0,255), math.clamp(45+colOffset,0,255))
+			local layer = createPart("Leaves", treeModel, Vector3.new(layerW, layerW*0.6, layerW), Vector3.new(tx, startY + (i-1)*layerH, tz), lCol, leafMat)
+			layer.Orientation = Vector3.new(math.random(-15,15), math.random(0,360), math.random(-15,15))
+			-- Add a slight neon core to simulate subsurface scattering / shaders
+			if j == 1 then
+				local core = createPart("LeafCore", treeModel, Vector3.new(layerW*0.5, layerW*0.3, layerW*0.5), Vector3.new(tx, startY + (i-1)*layerH, tz), lCol, Enum.Material.Neon)
+				core.Transparency = 0.5
+			end
+		end
+	end
+end
+
+local function createBirchTree(treeModel, tx, ty, tz)
+	local trunkH = math.random(20, 35)
+	local trunkW = math.random(1.5, 2.5)
+	local trunkCol = Color3.fromRGB(220, 225, 220) -- White bark
+	
+	local trunk = createPart("Trunk", treeModel, Vector3.new(trunkH, trunkW, trunkW), Vector3.new(tx, ty + trunkH/2, tz), trunkCol, Enum.Material.Wood)
+	trunk.Shape = Enum.PartType.Cylinder
+	trunk.Orientation = Vector3.new(math.random(-5,5), 0, 90 + math.random(-5,5))
+	
+	local leafMat = Enum.Material.LeafyGrass
+	
+	-- 3D canopy with shader-like falling leaves
+	for i = 1, 6 do
+		local colOffset = math.random(-15, 15)
+		local lCol = Color3.fromRGB(math.clamp(150+colOffset,0,255), math.clamp(180+colOffset,0,255), math.clamp(50+colOffset,0,255))
+		local lx = tx + math.random(-6, 6)
+		local lz = tz + math.random(-6, 6)
+		local ly = ty + trunkH - math.random(0, 10)
+		
+		local lPart = createPart("Leaves", treeModel, Vector3.new(12, 12, 12), Vector3.new(lx, ly, lz), lCol, leafMat)
+		lPart.Shape = Enum.PartType.Ball
+		lPart.Orientation = Vector3.new(math.random(0,360), math.random(0,360), math.random(0,360))
+		
+		if i == 1 then
+			local emitter = Instance.new("ParticleEmitter")
+			emitter.Color = ColorSequence.new(lCol)
+			emitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0.2)})
+			emitter.Rate = 2
+			emitter.Lifetime = NumberRange.new(4, 6)
+			emitter.Speed = NumberRange.new(2, 4)
+			emitter.VelocitySpread = 45
+			emitter.EmissionDirection = Enum.NormalId.Bottom
+			emitter.Parent = lPart
+		end
+	end
+end
+
+local function createOakTree(treeModel, tx, ty, tz)
+	local trunkH = math.random(15, 25)
+	local trunkBaseW = math.random(3.5, 5.5)
+	local trunkCol = Color3.fromRGB(70, 50, 30)
+	
+	-- Tapered 3D Trunk
+	local numSegments = 3
+	local segH = trunkH / numSegments
+	local currentY = ty
+	local lastW = trunkBaseW
+	
+	for i = 1, numSegments do
+		local nextW = trunkBaseW * (1 - (i/numSegments)*0.5)
+		local trunk = createPart("TrunkSeg", treeModel, Vector3.new(segH, (lastW+nextW)/2, (lastW+nextW)/2), Vector3.new(tx + math.random(-1,1)*0.5, currentY + segH/2, tz + math.random(-1,1)*0.5), trunkCol, Enum.Material.Wood)
+		trunk.Shape = Enum.PartType.Cylinder
+		trunk.Orientation = Vector3.new(math.random(-3,3), 0, 90 + math.random(-3,3))
+		currentY = currentY + segH
+		lastW = nextW
+	end
+	
+	local leafMat = Enum.Material.LeafyGrass
+	
+	-- Massive 3D overlapping canopy
+	for i = 1, 12 do
+		local colOffset = math.random(-20, 20)
+		local lCol = Color3.fromRGB(math.clamp(45+colOffset,0,255), math.clamp(105+colOffset,0,255), math.clamp(45+colOffset,0,255))
+		
+		local angle = math.random(0, 360)
+		local dist = math.random(0, 12)
+		local lx = tx + math.cos(math.rad(angle)) * dist
+		local lz = tz + math.sin(math.rad(angle)) * dist
+		local ly = ty + trunkH + math.random(-6, 6)
+		
+		local s = math.random(14, 22)
+		local lPart = createPart("Leaves", treeModel, Vector3.new(s, s*0.8, s), Vector3.new(lx, ly, lz), lCol, leafMat)
+		lPart.Shape = Enum.PartType.Ball
+		lPart.Orientation = Vector3.new(math.random(0,360), math.random(0,360), math.random(0,360))
+		
+		-- Fake subsurface scattering for rich realistic shading
+		local core = createPart("LeafCore", treeModel, Vector3.new(s*0.6, s*0.6, s*0.6), Vector3.new(lx, ly, lz), lCol, Enum.Material.Neon)
+		core.Shape = Enum.PartType.Ball
+		core.Transparency = 0.6
+	end
+end
+
+local function createAppleTree(treeModel, tx, ty, tz)
+	local trunkH = math.random(12, 18)
+	local trunkW = math.random(2, 3.5)
+	local trunkCol = Color3.fromRGB(80, 60, 40)
+	
+	local trunk = createPart("Trunk", treeModel, Vector3.new(trunkH, trunkW, trunkW), Vector3.new(tx, ty + trunkH/2, tz), trunkCol, Enum.Material.Wood)
+	trunk.Shape = Enum.PartType.Cylinder
+	trunk.Orientation = Vector3.new(math.random(-5,5), 0, 90 + math.random(-5,5))
+	
+	local leafMat = Enum.Material.LeafyGrass
+	
+	local leafClusters = {}
+	for i = 1, 5 do
+		local colOffset = math.random(-15, 15)
+		local lCol = Color3.fromRGB(math.clamp(55+colOffset,0,255), math.clamp(125+colOffset,0,255), math.clamp(55+colOffset,0,255))
+		local lx = tx + math.random(-5, 5)
+		local lz = tz + math.random(-5, 5)
+		local ly = ty + trunkH - math.random(0, 5)
+		
+		local s = math.random(12, 18)
+		local lPart = createPart("Leaves", treeModel, Vector3.new(s, s, s), Vector3.new(lx, ly, lz), lCol, leafMat)
+		lPart.Shape = Enum.PartType.Ball
+		table.insert(leafClusters, lPart)
+		
+		-- Add slight glowing core
+		local core = createPart("LeafCore", treeModel, Vector3.new(s*0.5, s*0.5, s*0.5), Vector3.new(lx, ly, lz), lCol, Enum.Material.Neon)
+		core.Shape = Enum.PartType.Ball
+		core.Transparency = 0.5
+	end
+	
+	local appleCol = Color3.fromRGB(200, 40, 40)
+	for i = 1, math.random(8, 15) do
+		local cluster = leafClusters[math.random(1, #leafClusters)]
+		local angle = math.random(0, 360)
+		local heightAngle = math.random(0, 180)
+		local dir = CFrame.Angles(math.rad(heightAngle), math.rad(angle), 0) * Vector3.new(0, 0, -cluster.Size.X/2.2)
+		local aPos = cluster.Position + dir
+		
+		local apple = createPart("Apple", treeModel, Vector3.new(1.8, 1.8, 1.8), aPos, appleCol, Enum.Material.SmoothPlastic)
+		apple.Shape = Enum.PartType.Ball
+		
+		-- Specular highlight for 3D shader look on apple
+		local hl = createPart("AppleHighlight", treeModel, Vector3.new(1.9, 1.9, 1.9), aPos, Color3.new(1,1,1), Enum.Material.Glass)
+		hl.Shape = Enum.PartType.Ball
+		hl.Transparency = 0.7
+	end
+end
+
+local ServerStorage = game:GetService("ServerStorage")
+
+local function spawnModelFromStorage(modelName, tx, ty, tz, parent)
+	local natureModels = ServerStorage:FindFirstChild("NatureModels")
+	if natureModels then
+		local possibleModels = {}
+		for _, child in ipairs(natureModels:GetChildren()) do
+			if string.find(string.lower(child.Name), string.lower(modelName)) then
+				table.insert(possibleModels, child)
+			end
+		end
+		
+		if #possibleModels &gt; 0 then
+			local template = possibleModels[math.random(1, #possibleModels)]
+			local clone = template:Clone()
+			clone.Parent = parent
+			
+			local randomRot = CFrame.Angles(0, math.rad(math.random(0, 360)), 0)
+			
+			if clone:IsA("Model") then
+				local cframe, size = clone:GetBoundingBox()
+				-- Heuristic: if pivot is in the center, creator didn't set it. Shift it up by half height.
+				local isDefaultPivot = math.abs(clone:GetPivot().Y - cframe.Y) &lt; 1
+				local yOffset = isDefaultPivot and (size.Y / 2) or 0
+				
+				clone:PivotTo(CFrame.new(tx, ty + yOffset, tz) * randomRot)
+				
+				-- Random scale (newer API)
+				local scale = math.random(80, 150) / 100
+				pcall(function() clone:ScaleTo(clone:GetScale() * scale) end)
+			elseif clone:IsA("BasePart") then
+				clone.CFrame = CFrame.new(tx, ty + clone.Size.Y/2, tz) * randomRot
+			end
+			return true
+		end
+	end
+	return false
+end
+
+local function spawnBush(tx, tz)
+	local ty, mat = getGroundY(tx, tz)
+	
+	if math.sqrt(tx^2 + tz^2) &lt;= VILLAGE_RADIUS + 30 then return end
+	if mat ~= Enum.Material.Grass and mat ~= Enum.Material.Mud then return end
+	
+	local loaded = spawnModelFromStorage("Bush", tx, ty, tz, natureFolder)
+	if loaded then return end
+	
+	-- Fallback procedural bush
+	local bush = Instance.new("Model", natureFolder)
+	bush.Name = "ProceduralBush"
+	local bSize = math.random(8, 14)
+	local bCol = Color3.fromRGB(math.random(40, 60), math.random(90, 120), math.random(30, 50))
+	local part = createPart("Leaves", bush, Vector3.new(bSize, bSize*0.7, bSize), Vector3.new(tx, ty + bSize*0.35, tz), bCol, Enum.Material.LeafyGrass)
+	part.Shape = Enum.PartType.Ball
+	part.Orientation = Vector3.new(math.random(0,360), math.random(0,360), math.random(0,360))
+end
+
+local function spawnTree(tx, tz)
+	local ty, mat = getGroundY(tx, tz)
+	
+	if math.sqrt(tx^2 + tz^2) &lt;= VILLAGE_RADIUS + 30 then return end
+	if mat ~= Enum.Material.Grass and mat ~= Enum.Material.Mud then return end
+	
+	-- Organize by biomes using Perlin Noise
+	local noiseVal = math.noise(tx/400, tz/400, SEED + 5)
+	
+	local treeName = "BirchTree"
+	if noiseVal &lt; -0.2 then
+		treeName = "PineTree"
+	elseif noiseVal &lt; 0.05 then
+		treeName = "OakTree"
+	elseif noiseVal &lt; 0.25 then
+		treeName = "AppleTree"
+	end
+	
+	-- Try to load from user's custom models first
+	local loaded = spawnModelFromStorage(treeName, tx, ty, tz, natureFolder)
+	if not loaded then
+		-- Fallback if they just put a generic "Tree" model
+		loaded = spawnModelFromStorage("Tree", tx, ty, tz, natureFolder)
+	end
+	
+	if loaded then return end
+	
+	-- Fallback to the generated 3D trees
+	local tree = Instance.new("Model", natureFolder)
+	tree.Name = treeName
+	
+	if treeName == "PineTree" then
+		createPineTree(tree, tx, ty, tz)
+	elseif treeName == "OakTree" then
+		createOakTree(tree, tx, ty, tz)
+	elseif treeName == "AppleTree" then
+		createAppleTree(tree, tx, ty, tz)
+	else
+		createBirchTree(tree, tx, ty, tz)
+	end
+end
+
+for i = 1, 3500 do
+	local tx = math.random(-1700, 1700)
+	local tz = math.random(-1700, 1700)
+	spawnTree(tx, tz)
+	
+	-- Spawn some bushes alongside trees
+	if i % 3 == 0 then
+		local bx = tx + math.random(-15, 15)
+		local bz = tz + math.random(-15, 15)
+		spawnBush(bx, bz)
+	end
+	
+	if i % 100 == 0 then task.wait() end
+end
+
+print("Map Generation 100% Complete! The Castle, Paths, and Fixed Trees are ready.")</string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="18">
           <Properties>
             <string name="Name">PlayerDataService</string>
             <string name="Source"><![CDATA[local Players = game:GetService("Players")
@@ -826,7 +2829,7 @@ PlayerDataService._data = {}
 PlayerDataService._remotes = nil
 
 local XP_PER_LEVEL = 100
-local BASE_MAX_HP = 100
+local BASE_MAX_HP = 10000 -- Max HP is 10000
 local HP_PER_LEVEL = 10
 
 local function getRemotes()
@@ -899,7 +2902,7 @@ function PlayerDataService:SetupPlayer(player)
 	coins.Parent = leaderstats
 
 	self._data[player] = {
-		hp = BASE_MAX_HP,
+		hp = 2000,
 		maxHp = BASE_MAX_HP,
 		level = 1,
 		xp = 0,
@@ -916,7 +2919,11 @@ function PlayerDataService:SetupPlayer(player)
 
 	player.CharacterAdded:Connect(function()
 		task.wait(0.1)
-		syncHumanoid(player, self._data[player])
+		local data = self._data[player]
+		if data and data.hp <= 0 then
+			data.hp = data.maxHp
+		end
+		syncHumanoid(player, data)
 		self:FireStatsUpdated(player)
 	end)
 
@@ -1128,7 +3135,7 @@ return PlayerDataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="17">
+        <Item class="ModuleScript" referent="19">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1140,38 +3147,232 @@ local QuestService = {}
 QuestService._playerData = nil
 QuestService._remotes = nil
 
-function QuestService:Init(playerDataService, remotes)
+function QuestService:Init(playerDataService, remotes, mapGeneratorService)
 	self._playerData = playerDataService
 	self._remotes = remotes
+	self._mapGenerator = mapGeneratorService
 end
 
-function QuestService:CreateNPC(position)
+function QuestService:CreateNPC(cframe)
 	local config = Quests.KillGoblins
 	local model = Instance.new("Model")
 	model.Name = config.npcName
 
+	local skinColor = Color3.fromRGB(220, 180, 140)
+	local robeColor = Color3.fromRGB(50, 60, 140)
+	local robeDark = Color3.fromRGB(35, 40, 100)
+	local mat = Enum.Material.SmoothPlastic
+
+	-- Torso / Robe Body
 	local root = Instance.new("Part")
 	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(2, 2, 1)
-	root.Position = position
+	root.Size = Vector3.new(2.2, 2.8, 1.4)
+	if typeof(cframe) == "CFrame" then
+		root.CFrame = cframe
+	else
+		root.Position = cframe
+	end
 	root.Anchored = true
 	root.CanCollide = true
-	root.Color = Color3.fromRGB(80, 120, 200)
-	root.Material = Enum.Material.SmoothPlastic
+	root.Color = robeColor
+	root.Material = Enum.Material.Fabric
 	root.Parent = model
 
+	-- Robe skirt (lower half)
+	local skirt = Instance.new("Part")
+	skirt.Name = "RobeSkirt"
+	skirt.Size = Vector3.new(2.6, 2.0, 1.6)
+	skirt.Color = robeDark
+	skirt.Material = Enum.Material.Fabric
+	skirt.Anchored = true
+	skirt.CanCollide = false
+	skirt.CFrame = root.CFrame * CFrame.new(0, -2.4, 0)
+	skirt.Parent = model
+
+	-- Head
 	local head = Instance.new("Part")
 	head.Name = "Head"
-	head.Size = Vector3.new(1.5, 1.5, 1.5)
-	head.Color = Color3.fromRGB(220, 180, 140)
+	head.Shape = Enum.PartType.Ball
+	head.Size = Vector3.new(2, 2, 2)
+	head.Color = skinColor
+	head.Material = mat
 	head.Anchored = true
 	head.CanCollide = false
-	head.CFrame = root.CFrame * CFrame.new(0, 1.75, 0)
+	head.CFrame = root.CFrame * CFrame.new(0, 2.2, 0)
 	head.Parent = model
 
+	-- Left Eye
+	local leftEye = Instance.new("Part")
+	leftEye.Name = "LeftEye"
+	leftEye.Shape = Enum.PartType.Ball
+	leftEye.Size = Vector3.new(0.3, 0.35, 0.15)
+	leftEye.Color = Color3.fromRGB(60, 100, 200)
+	leftEye.Material = Enum.Material.Neon
+	leftEye.Anchored = true
+	leftEye.CanCollide = false
+	leftEye.CFrame = head.CFrame * CFrame.new(-0.35, 0.1, -0.85)
+	leftEye.Parent = model
+
+	-- Right Eye
+	local rightEye = Instance.new("Part")
+	rightEye.Name = "RightEye"
+	rightEye.Shape = Enum.PartType.Ball
+	rightEye.Size = Vector3.new(0.3, 0.35, 0.15)
+	rightEye.Color = Color3.fromRGB(60, 100, 200)
+	rightEye.Material = Enum.Material.Neon
+	rightEye.Anchored = true
+	rightEye.CanCollide = false
+	rightEye.CFrame = head.CFrame * CFrame.new(0.35, 0.1, -0.85)
+	rightEye.Parent = model
+
+	-- Smile
+	local smile = Instance.new("Part")
+	smile.Name = "Smile"
+	smile.Size = Vector3.new(0.6, 0.12, 0.1)
+	smile.Color = Color3.fromRGB(160, 100, 80)
+	smile.Material = mat
+	smile.Anchored = true
+	smile.CanCollide = false
+	smile.CFrame = head.CFrame * CFrame.new(0, -0.35, -0.9)
+	smile.Parent = model
+
+	-- Beard
+	local beard = Instance.new("Part")
+	beard.Name = "Beard"
+	beard.Size = Vector3.new(1.2, 1.8, 0.6)
+	beard.Color = Color3.fromRGB(200, 200, 210)
+	beard.Material = Enum.Material.Fabric
+	beard.Anchored = true
+	beard.CanCollide = false
+	beard.CFrame = head.CFrame * CFrame.new(0, -1.3, -0.3)
+	beard.Parent = model
+
+	-- Wizard Hat (cone shape using 2 parts)
+	local hatBrim = Instance.new("Part")
+	hatBrim.Name = "HatBrim"
+	hatBrim.Shape = Enum.PartType.Cylinder
+	hatBrim.Size = Vector3.new(0.4, 3.2, 3.2)
+	hatBrim.Color = Color3.fromRGB(40, 30, 100)
+	hatBrim.Material = Enum.Material.Fabric
+	hatBrim.Anchored = true
+	hatBrim.CanCollide = false
+	hatBrim.CFrame = head.CFrame * CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(90))
+	hatBrim.Parent = model
+
+	local hatTop = Instance.new("Part")
+	hatTop.Name = "HatTop"
+	hatTop.Size = Vector3.new(1.6, 2.5, 1.6)
+	hatTop.Color = Color3.fromRGB(40, 30, 100)
+	hatTop.Material = Enum.Material.Fabric
+	hatTop.Anchored = true
+	hatTop.CanCollide = false
+	hatTop.CFrame = head.CFrame * CFrame.new(0, 2.2, 0)
+	hatTop.Parent = model
+
+	-- Hat star decoration
+	local star = Instance.new("Part")
+	star.Name = "HatStar"
+	star.Shape = Enum.PartType.Ball
+	star.Size = Vector3.new(0.5, 0.5, 0.5)
+	star.Color = Color3.fromRGB(255, 220, 80)
+	star.Material = Enum.Material.Neon
+	star.Anchored = true
+	star.CanCollide = false
+	star.CFrame = hatTop.CFrame * CFrame.new(0, 1.3, 0)
+	star.Parent = model
+
+	-- Left Arm
+	local leftArm = Instance.new("Part")
+	leftArm.Name = "LeftArm"
+	leftArm.Size = Vector3.new(0.9, 2.0, 0.9)
+	leftArm.Color = robeColor
+	leftArm.Material = Enum.Material.Fabric
+	leftArm.Anchored = true
+	leftArm.CanCollide = false
+	leftArm.CFrame = root.CFrame * CFrame.new(-1.55, -0.3, 0)
+	leftArm.Parent = model
+
+	-- Left Hand
+	local leftHand = Instance.new("Part")
+	leftHand.Name = "LeftHand"
+	leftHand.Shape = Enum.PartType.Ball
+	leftHand.Size = Vector3.new(0.7, 0.7, 0.7)
+	leftHand.Color = skinColor
+	leftHand.Material = mat
+	leftHand.Anchored = true
+	leftHand.CanCollide = false
+	leftHand.CFrame = leftArm.CFrame * CFrame.new(0, -1.2, 0)
+	leftHand.Parent = model
+
+	-- Right Arm
+	local rightArm = Instance.new("Part")
+	rightArm.Name = "RightArm"
+	rightArm.Size = Vector3.new(0.9, 2.0, 0.9)
+	rightArm.Color = robeColor
+	rightArm.Material = Enum.Material.Fabric
+	rightArm.Anchored = true
+	rightArm.CanCollide = false
+	rightArm.CFrame = root.CFrame * CFrame.new(1.55, -0.3, 0)
+	rightArm.Parent = model
+
+	-- Right Hand
+	local rightHand = Instance.new("Part")
+	rightHand.Name = "RightHand"
+	rightHand.Shape = Enum.PartType.Ball
+	rightHand.Size = Vector3.new(0.7, 0.7, 0.7)
+	rightHand.Color = skinColor
+	rightHand.Material = mat
+	rightHand.Anchored = true
+	rightHand.CanCollide = false
+	rightHand.CFrame = rightArm.CFrame * CFrame.new(0, -1.2, 0)
+	rightHand.Parent = model
+
+	-- Staff in right hand
+	local staff = Instance.new("Part")
+	staff.Name = "Staff"
+	staff.Size = Vector3.new(0.35, 5, 0.35)
+	staff.Color = Color3.fromRGB(110, 80, 50)
+	staff.Material = Enum.Material.Wood
+	staff.Anchored = true
+	staff.CanCollide = false
+	staff.CFrame = rightHand.CFrame * CFrame.new(0, 1.5, 0)
+	staff.Parent = model
+
+	-- Staff crystal
+	local crystal = Instance.new("Part")
+	crystal.Name = "StaffCrystal"
+	crystal.Shape = Enum.PartType.Ball
+	crystal.Size = Vector3.new(0.8, 0.8, 0.8)
+	crystal.Color = Color3.fromRGB(100, 180, 255)
+	crystal.Material = Enum.Material.Neon
+	crystal.Anchored = true
+	crystal.CanCollide = false
+	crystal.CFrame = staff.CFrame * CFrame.new(0, 2.8, 0)
+	crystal.Parent = model
+
+	-- Glowing quest exclamation mark (!)
+	local questMarker = Instance.new("BillboardGui")
+	questMarker.Name = "QuestMarker"
+	questMarker.Size = UDim2.new(0, 40, 0, 50)
+	questMarker.StudsOffset = Vector3.new(0, 6, 0)
+	questMarker.AlwaysOnTop = true
+	questMarker.Parent = root
+
+	local markerLabel = Instance.new("TextLabel")
+	markerLabel.Size = UDim2.new(1, 0, 1, 0)
+	markerLabel.BackgroundTransparency = 1
+	markerLabel.Text = "!"
+	markerLabel.TextColor3 = Color3.fromRGB(255, 220, 50)
+	markerLabel.TextStrokeColor3 = Color3.fromRGB(180, 120, 0)
+	markerLabel.TextStrokeTransparency = 0
+	markerLabel.Font = Enum.Font.GothamBold
+	markerLabel.TextSize = 36
+	markerLabel.Parent = questMarker
+
+	-- Name billboard
 	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.new(0, 120, 0, 40)
-	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.Size = UDim2.new(0, 140, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = root
 
@@ -1179,8 +3380,8 @@ function QuestService:CreateNPC(position)
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = config.npcName
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.5
+	label.TextColor3 = Color3.fromRGB(255, 220, 100)
+	label.TextStrokeTransparency = 0.3
 	label.Font = Enum.Font.GothamBold
 	label.TextSize = 16
 	label.Parent = billboard
@@ -1281,7 +3482,9 @@ function QuestService:FireQuestUpdated(player)
 end
 
 function QuestService:Start()
-	self:CreateNPC(Vector3.new(-30, 3, 0))
+	local pos = Vector3.new(50, 0, 237)
+	local y = self._mapGenerator:GetGroundHeight(pos.X, pos.Z)
+	self:CreateNPC(CFrame.new(pos.X, y + 2, pos.Z) * CFrame.Angles(0, math.pi, 0))
 
 	self._remotes.AcceptQuest.OnServerEvent:Connect(function(player, questId)
 		if self:AcceptQuest(player, questId) then
@@ -1294,7 +3497,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="18">
+        <Item class="ModuleScript" referent="20">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1308,38 +3511,277 @@ ShopService._playerData = nil
 ShopService._combatService = nil
 ShopService._remotes = nil
 
-function ShopService:Init(playerDataService, combatService, remotes)
+function ShopService:Init(playerDataService, combatService, remotes, mapGeneratorService)
 	self._playerData = playerDataService
 	self._combatService = combatService
 	self._remotes = remotes
+	self._mapGenerator = mapGeneratorService
 end
 
-function ShopService:CreateNPC(position)
+function ShopService:CreateNPC(cframe)
 	local model = Instance.new("Model")
 	model.Name = "Shop Keeper"
 
+	local skinColor = Color3.fromRGB(200, 160, 120)
+	local shirtColor = Color3.fromRGB(180, 140, 60)
+	local apronColor = Color3.fromRGB(220, 200, 170)
+	local pantsColor = Color3.fromRGB(100, 80, 50)
+	local mat = Enum.Material.SmoothPlastic
+
+	-- Torso / Shirt
 	local root = Instance.new("Part")
 	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(2, 2, 1)
-	root.Position = position
+	root.Size = Vector3.new(2.4, 2.6, 1.4)
+	if typeof(cframe) == "CFrame" then
+		root.CFrame = cframe
+	else
+		root.Position = cframe
+	end
 	root.Anchored = true
 	root.CanCollide = true
-	root.Color = Color3.fromRGB(180, 140, 60)
-	root.Material = Enum.Material.SmoothPlastic
+	root.Color = shirtColor
+	root.Material = Enum.Material.Fabric
 	root.Parent = model
 
+	-- Apron (front)
+	local apron = Instance.new("Part")
+	apron.Name = "Apron"
+	apron.Size = Vector3.new(1.8, 3.2, 0.2)
+	apron.Color = apronColor
+	apron.Material = Enum.Material.Fabric
+	apron.Anchored = true
+	apron.CanCollide = false
+	apron.CFrame = root.CFrame * CFrame.new(0, -0.8, -0.7)
+	apron.Parent = model
+
+	-- Apron strap
+	local strap = Instance.new("Part")
+	strap.Name = "ApronStrap"
+	strap.Size = Vector3.new(0.3, 1.5, 0.15)
+	strap.Color = apronColor
+	strap.Material = Enum.Material.Fabric
+	strap.Anchored = true
+	strap.CanCollide = false
+	strap.CFrame = root.CFrame * CFrame.new(0, 0.8, -0.65)
+	strap.Parent = model
+
+	-- Head
 	local head = Instance.new("Part")
 	head.Name = "Head"
-	head.Size = Vector3.new(1.5, 1.5, 1.5)
-	head.Color = Color3.fromRGB(220, 180, 140)
+	head.Shape = Enum.PartType.Ball
+	head.Size = Vector3.new(2, 2, 2)
+	head.Color = skinColor
+	head.Material = mat
 	head.Anchored = true
 	head.CanCollide = false
-	head.CFrame = root.CFrame * CFrame.new(0, 1.75, 0)
+	head.CFrame = root.CFrame * CFrame.new(0, 2.1, 0)
 	head.Parent = model
 
+	-- Left Eye
+	local leftEye = Instance.new("Part")
+	leftEye.Name = "LeftEye"
+	leftEye.Shape = Enum.PartType.Ball
+	leftEye.Size = Vector3.new(0.3, 0.3, 0.15)
+	leftEye.Color = Color3.fromRGB(60, 40, 20)
+	leftEye.Material = mat
+	leftEye.Anchored = true
+	leftEye.CanCollide = false
+	leftEye.CFrame = head.CFrame * CFrame.new(-0.35, 0.1, -0.85)
+	leftEye.Parent = model
+
+	-- Right Eye
+	local rightEye = Instance.new("Part")
+	rightEye.Name = "RightEye"
+	rightEye.Shape = Enum.PartType.Ball
+	rightEye.Size = Vector3.new(0.3, 0.3, 0.15)
+	rightEye.Color = Color3.fromRGB(60, 40, 20)
+	rightEye.Material = mat
+	rightEye.Anchored = true
+	rightEye.CanCollide = false
+	rightEye.CFrame = head.CFrame * CFrame.new(0.35, 0.1, -0.85)
+	rightEye.Parent = model
+
+	-- Friendly smile
+	local smile = Instance.new("Part")
+	smile.Name = "Smile"
+	smile.Size = Vector3.new(0.7, 0.15, 0.1)
+	smile.Color = Color3.fromRGB(180, 100, 80)
+	smile.Material = mat
+	smile.Anchored = true
+	smile.CanCollide = false
+	smile.CFrame = head.CFrame * CFrame.new(0, -0.35, -0.9)
+	smile.Parent = model
+
+	-- Mustache
+	local mustache = Instance.new("Part")
+	mustache.Name = "Mustache"
+	mustache.Size = Vector3.new(1.0, 0.25, 0.2)
+	mustache.Color = Color3.fromRGB(80, 55, 30)
+	mustache.Material = Enum.Material.Fabric
+	mustache.Anchored = true
+	mustache.CanCollide = false
+	mustache.CFrame = head.CFrame * CFrame.new(0, -0.15, -0.85)
+	mustache.Parent = model
+
+	-- Merchant Hat (beret style)
+	local hatBase = Instance.new("Part")
+	hatBase.Name = "HatBase"
+	hatBase.Shape = Enum.PartType.Cylinder
+	hatBase.Size = Vector3.new(0.3, 2.6, 2.6)
+	hatBase.Color = Color3.fromRGB(140, 50, 40)
+	hatBase.Material = Enum.Material.Fabric
+	hatBase.Anchored = true
+	hatBase.CanCollide = false
+	hatBase.CFrame = head.CFrame * CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(90))
+	hatBase.Parent = model
+
+	local hatTop = Instance.new("Part")
+	hatTop.Name = "HatTop"
+	hatTop.Shape = Enum.PartType.Ball
+	hatTop.Size = Vector3.new(2.2, 1.2, 2.2)
+	hatTop.Color = Color3.fromRGB(140, 50, 40)
+	hatTop.Material = Enum.Material.Fabric
+	hatTop.Anchored = true
+	hatTop.CanCollide = false
+	hatTop.CFrame = head.CFrame * CFrame.new(0, 1.2, 0)
+	hatTop.Parent = model
+
+	-- Hat feather
+	local feather = Instance.new("Part")
+	feather.Name = "Feather"
+	feather.Size = Vector3.new(0.15, 1.5, 0.6)
+	feather.Color = Color3.fromRGB(255, 220, 80)
+	feather.Material = Enum.Material.Fabric
+	feather.Anchored = true
+	feather.CanCollide = false
+	feather.CFrame = hatTop.CFrame * CFrame.new(0.8, 0.5, 0) * CFrame.Angles(0, 0, math.rad(15))
+	feather.Parent = model
+
+	-- Left Arm
+	local leftArm = Instance.new("Part")
+	leftArm.Name = "LeftArm"
+	leftArm.Size = Vector3.new(0.9, 2.0, 0.9)
+	leftArm.Color = shirtColor
+	leftArm.Material = Enum.Material.Fabric
+	leftArm.Anchored = true
+	leftArm.CanCollide = false
+	leftArm.CFrame = root.CFrame * CFrame.new(-1.65, -0.2, 0)
+	leftArm.Parent = model
+
+	-- Left Hand
+	local leftHand = Instance.new("Part")
+	leftHand.Name = "LeftHand"
+	leftHand.Shape = Enum.PartType.Ball
+	leftHand.Size = Vector3.new(0.7, 0.7, 0.7)
+	leftHand.Color = skinColor
+	leftHand.Material = mat
+	leftHand.Anchored = true
+	leftHand.CanCollide = false
+	leftHand.CFrame = leftArm.CFrame * CFrame.new(0, -1.2, 0)
+	leftHand.Parent = model
+
+	-- Right Arm
+	local rightArm = Instance.new("Part")
+	rightArm.Name = "RightArm"
+	rightArm.Size = Vector3.new(0.9, 2.0, 0.9)
+	rightArm.Color = shirtColor
+	rightArm.Material = Enum.Material.Fabric
+	rightArm.Anchored = true
+	rightArm.CanCollide = false
+	rightArm.CFrame = root.CFrame * CFrame.new(1.65, -0.2, 0)
+	rightArm.Parent = model
+
+	-- Right Hand
+	local rightHand = Instance.new("Part")
+	rightHand.Name = "RightHand"
+	rightHand.Shape = Enum.PartType.Ball
+	rightHand.Size = Vector3.new(0.7, 0.7, 0.7)
+	rightHand.Color = skinColor
+	rightHand.Material = mat
+	rightHand.Anchored = true
+	rightHand.CanCollide = false
+	rightHand.CFrame = rightArm.CFrame * CFrame.new(0, -1.2, 0)
+	rightHand.Parent = model
+
+	-- Coin bag in left hand
+	local coinBag = Instance.new("Part")
+	coinBag.Name = "CoinBag"
+	coinBag.Shape = Enum.PartType.Ball
+	coinBag.Size = Vector3.new(1.2, 1.0, 1.0)
+	coinBag.Color = Color3.fromRGB(160, 120, 60)
+	coinBag.Material = Enum.Material.Leather
+	coinBag.Anchored = true
+	coinBag.CanCollide = false
+	coinBag.CFrame = leftHand.CFrame * CFrame.new(0, -0.6, 0)
+	coinBag.Parent = model
+
+	-- Coin peeking out of bag
+	local coin = Instance.new("Part")
+	coin.Name = "Coin"
+	coin.Shape = Enum.PartType.Cylinder
+	coin.Size = Vector3.new(0.1, 0.6, 0.6)
+	coin.Color = Color3.fromRGB(255, 210, 50)
+	coin.Material = Enum.Material.Neon
+	coin.Anchored = true
+	coin.CanCollide = false
+	coin.CFrame = coinBag.CFrame * CFrame.new(0, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90))
+	coin.Parent = model
+
+	-- Left Leg
+	local leftLeg = Instance.new("Part")
+	leftLeg.Name = "LeftLeg"
+	leftLeg.Size = Vector3.new(1.0, 2.0, 1.0)
+	leftLeg.Color = pantsColor
+	leftLeg.Material = Enum.Material.Fabric
+	leftLeg.Anchored = true
+	leftLeg.CanCollide = false
+	leftLeg.CFrame = root.CFrame * CFrame.new(-0.6, -2.3, 0)
+	leftLeg.Parent = model
+
+	-- Right Leg
+	local rightLeg = Instance.new("Part")
+	rightLeg.Name = "RightLeg"
+	rightLeg.Size = Vector3.new(1.0, 2.0, 1.0)
+	rightLeg.Color = pantsColor
+	rightLeg.Material = Enum.Material.Fabric
+	rightLeg.Anchored = true
+	rightLeg.CanCollide = false
+	rightLeg.CFrame = root.CFrame * CFrame.new(0.6, -2.3, 0)
+	rightLeg.Parent = model
+
+	-- Boots
+	for _, legPart in {leftLeg, rightLeg} do
+		local boot = Instance.new("Part")
+		boot.Name = "Boot"
+		boot.Size = Vector3.new(1.1, 0.6, 1.4)
+		boot.Color = Color3.fromRGB(60, 40, 25)
+		boot.Material = Enum.Material.Leather
+		boot.Anchored = true
+		boot.CanCollide = false
+		boot.CFrame = legPart.CFrame * CFrame.new(0, -1.1, 0.1)
+		boot.Parent = model
+	end
+
+	-- Coin icon above head
+	local coinMarker = Instance.new("BillboardGui")
+	coinMarker.Name = "CoinMarker"
+	coinMarker.Size = UDim2.new(0, 36, 0, 36)
+	coinMarker.StudsOffset = Vector3.new(0, 6, 0)
+	coinMarker.AlwaysOnTop = true
+	coinMarker.Parent = root
+
+	local coinIcon = Instance.new("TextLabel")
+	coinIcon.Size = UDim2.new(1, 0, 1, 0)
+	coinIcon.BackgroundTransparency = 1
+	coinIcon.Text = "💰"
+	coinIcon.TextSize = 28
+	coinIcon.Font = Enum.Font.GothamBold
+	coinIcon.Parent = coinMarker
+
+	-- Name billboard
 	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.new(0, 120, 0, 40)
-	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.Size = UDim2.new(0, 140, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = root
 
@@ -1347,8 +3789,8 @@ function ShopService:CreateNPC(position)
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = "Shop Keeper"
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.5
+	label.TextColor3 = Color3.fromRGB(255, 210, 80)
+	label.TextStrokeTransparency = 0.3
 	label.Font = Enum.Font.GothamBold
 	label.TextSize = 16
 	label.Parent = billboard
@@ -1424,7 +3866,9 @@ function ShopService:Purchase(player, itemId)
 end
 
 function ShopService:Start()
-	self:CreateNPC(Vector3.new(30, 3, 0))
+	local pos = Vector3.new(-50, 0, 237)
+	local y = self._mapGenerator:GetGroundHeight(pos.X, pos.Z)
+	self:CreateNPC(CFrame.new(pos.X, y + 2, pos.Z) * CFrame.Angles(0, math.pi, 0))
 
 	self._remotes.PurchaseItem.OnServerEvent:Connect(function(player, itemId)
 		local success, message = self:Purchase(player, itemId)
@@ -1441,68 +3885,183 @@ return ShopService
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="19">
+  <Item class="StarterPlayer" referent="21">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="20">
+    <Item class="StarterPlayerScripts" referent="22">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="21">
+      <Item class="Folder" referent="23">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="LocalScript" referent="22">
+        <Item class="LocalScript" referent="24">
           <Properties>
             <string name="Name">CombatController</string>
             <string name="Source"><![CDATA[local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local lastAttack = 0
-local ATTACK_COOLDOWN = 0.6
+local ATTACK_COOLDOWN = 0.7
 
-local function onToolActivated()
+local comboStep = 1
+
+local loadedAnims = {}
+
+local function playAttackAnimation(character, tool)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+	
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
+	
+	local isR6 = humanoid.RigType == Enum.HumanoidRigType.R6
+	
+	-- Base Arm Swing Animation (ensures the arm moves reliably!)
+	local animId = isR6 and "rbxassetid://1299689" or "rbxassetid://522635514"
+	local track = loadedAnims[animId]
+	if not track then
+		local anim = Instance.new("Animation")
+		anim.AnimationId = animId
+		track = animator:LoadAnimation(anim)
+		loadedAnims[animId] = track
+	end
+	track:Play(0.1, 1, 1.5)
+	
+	-- 3-Hit Combo: Procedural Tool.Grip swing (very visible and satisfying)
+	if not tool:GetAttribute("OriginalGrip") then
+		tool:SetAttribute("OriginalGrip", tool.Grip)
+	end
+	local origGrip = tool:GetAttribute("OriginalGrip")
+	
+	local isStaff = tool.Name:lower():find("staff")
+	local windUpGrip, strikeGrip
+	local slashAngleX, slashAngleY, slashAngleZ
+	
+	if comboStep == 1 then
+		-- Move 1: Right to Left Swing
+		windUpGrip = origGrip * CFrame.new(-1, 0, 0) * CFrame.Angles(math.rad(0), math.rad(0), math.rad(-45))
+		strikeGrip = origGrip * CFrame.new(1, 0, 0) * CFrame.Angles(math.rad(0), math.rad(0), math.rad(45))
+		slashAngleX, slashAngleY, slashAngleZ = 0, 90, 45 
+	elseif comboStep == 2 then
+		-- Move 2: Left to Right Swing
+		windUpGrip = origGrip * CFrame.new(1, 0, 0) * CFrame.Angles(math.rad(0), math.rad(0), math.rad(45))
+		strikeGrip = origGrip * CFrame.new(-1, 0, 0) * CFrame.Angles(math.rad(0), math.rad(0), math.rad(-45))
+		slashAngleX, slashAngleY, slashAngleZ = 0, 90, -45 
+	else
+		-- Move 3: Overhead / Thrust
+		if isStaff then
+			windUpGrip = origGrip * CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(45), 0, 0)
+			strikeGrip = origGrip * CFrame.new(0, 1.5, 0) * CFrame.Angles(math.rad(-45), 0, 0)
+		else
+			windUpGrip = origGrip * CFrame.new(0, -1, -1) * CFrame.Angles(math.rad(90), 0, 0)
+			strikeGrip = origGrip * CFrame.new(0, 1, 1) * CFrame.Angles(math.rad(-90), 0, 0)
+		end
+		slashAngleX, slashAngleY, slashAngleZ = 0, 90, 0
+	end
+	
+	comboStep = comboStep + 1
+	if comboStep > 3 then comboStep = 1 end
+	
+	local windupTween = TweenService:Create(tool, TweenInfo.new(0.1, Enum.EasingStyle.Sine), {Grip = windUpGrip})
+	local strikeTween = TweenService:Create(tool, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Grip = strikeGrip})
+	local recoverTween = TweenService:Create(tool, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {Grip = origGrip})
+	
+	windupTween:Play()
+	windupTween.Completed:Connect(function()
+		strikeTween:Play()
+		
+		-- Slash Visual Effect
+		local handle = tool:FindFirstChild("Handle")
+		if handle then
+			local slash = Instance.new("Part")
+			slash.Name = "SlashEffect"
+			slash.Size = Vector3.new(0.2, 4, 4)
+			slash.Transparency = 0.3
+			slash.Color = isStaff and Color3.fromRGB(150, 50, 255) or Color3.fromRGB(200, 220, 255)
+			slash.Material = Enum.Material.Neon
+			slash.CanCollide = false
+			slash.Anchored = true
+			
+			local root = character.PrimaryPart
+			if root then
+				local cframe = root.CFrame * CFrame.new(0, 0, -3) * CFrame.Angles(math.rad(slashAngleX), math.rad(slashAngleY), math.rad(slashAngleZ))
+				slash.CFrame = cframe
+				slash.Parent = workspace
+				
+				local tween = TweenService:Create(slash, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Size = Vector3.new(0, 8, 8),
+					Transparency = 1,
+					CFrame = cframe * CFrame.new(0, 0, -2)
+				})
+				tween:Play()
+				tween.Completed:Connect(function() slash:Destroy() end)
+			end
+		end
+		
+		strikeTween.Completed:Connect(function()
+			recoverTween:Play()
+		end)
+	end)
+end
+
+local function attack()
 	local now = tick()
 	if now - lastAttack < ATTACK_COOLDOWN then
 		return
 	end
+	
+	local character = player.Character
+	if character then
+		local tool = character:FindFirstChildOfClass("Tool")
+		if tool then
+			playAttackAnimation(character, tool)
+		end
+	end
+	
 	lastAttack = now
 	remotes.Attack:FireServer()
 end
 
-local function connectTool(tool)
-	if tool:IsA("Tool") and tool:GetAttribute("WeaponId") then
-		tool.Activated:Connect(onToolActivated)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		attack()
+	elseif input.KeyCode == Enum.KeyCode.One then
+		attack()
+	elseif input.KeyCode == Enum.KeyCode.Two then
+		print("Skill 1 triggered")
+		-- TODO: Implement Skill 1
+	elseif input.KeyCode == Enum.KeyCode.Three then
+		print("Skill 2 triggered")
+		-- TODO: Implement Skill 2
+	elseif input.KeyCode == Enum.KeyCode.Four then
+		print("Skill 3 triggered")
+		-- TODO: Implement Skill 3
+	elseif input.KeyCode == Enum.KeyCode.Five then
+		print("Ultimate triggered")
+		-- TODO: Implement Ultimate
+	elseif input.KeyCode == Enum.KeyCode.Six then
+		remotes.UseItem:FireServer("HealthPotion")
+	elseif input.KeyCode == Enum.KeyCode.Seven then
+		remotes.UseItem:FireServer("ManaPotion")
 	end
-end
-
-local function watchContainer(container)
-	for _, child in container:GetChildren() do
-		connectTool(child)
-	end
-	container.ChildAdded:Connect(connectTool)
-end
-
-local function setupCharacter(character)
-	local backpack = player:WaitForChild("Backpack")
-	watchContainer(backpack)
-	watchContainer(character)
-end
-
-player.CharacterAdded:Connect(setupCharacter)
-if player.Character then
-	setupCharacter(player.Character)
-end
-
-watchContainer(player:WaitForChild("Backpack"))
+end)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="23">
+        <Item class="LocalScript" referent="25">
           <Properties>
             <string name="Name">InventoryController</string>
             <string name="Source"><![CDATA[local Players = game:GetService("Players")
@@ -1541,7 +4100,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -20, 0, 36)
 title.Position = UDim2.new(0, 10, 0, 8)
 title.BackgroundTransparency = 1
-title.Text = "Inventory (Press I to close)"
+title.Text = "Inventory (Press B to close)"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
@@ -1564,7 +4123,7 @@ listLayout.Parent = listFrame
 
 local function renderInventory()
 	for _, child in listFrame:GetChildren() do
-		if child:IsA("Frame") then
+		if child:IsA("Frame") or child:IsA("TextLabel") then
 			child:Destroy()
 		end
 	end
@@ -1660,11 +4219,20 @@ local function setVisible(value)
 	end
 end
 
+-- Expose a BindableEvent so UIController can toggle the inventory
+local toggleEvent = Instance.new("BindableEvent")
+toggleEvent.Name = "ToggleInventory"
+toggleEvent.Parent = screenGui
+
+toggleEvent.Event:Connect(function()
+	setVisible(not visible)
+end)
+
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.I then
+	if input.KeyCode == Enum.KeyCode.B then
 		setVisible(not visible)
 	end
 end)
@@ -1680,19 +4248,24 @@ remotes.RequestInventory:FireServer()
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="24">
+        <Item class="LocalScript" referent="26">
           <Properties>
             <string name="Name">UIController</string>
             <string name="Source"><![CDATA[local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+
+pcall(function()
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+end)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local stats = {
-	hp = 100,
-	maxHp = 100,
+	hp = 2000,
+	maxHp = 10000,
 	level = 1,
 	xp = 0,
 	coins = 0,
@@ -1947,6 +4520,95 @@ closeShopBtn.TextColor3 = Color3.new(1, 1, 1)
 closeShopBtn.Font = Enum.Font.GothamBold
 closeShopBtn.TextSize = 14
 closeShopBtn.Parent = shopModal
+
+-- Action Bar
+local actionBar = Instance.new("Frame")
+actionBar.Name = "ActionBar"
+actionBar.Size = UDim2.new(0, 380, 0, 60)
+actionBar.Position = UDim2.new(0.5, -190, 1, -70)
+actionBar.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+actionBar.BackgroundTransparency = 0.5
+actionBar.BorderSizePixel = 0
+actionBar.Parent = screenGui
+
+local actionLayout = Instance.new("UIListLayout")
+actionLayout.FillDirection = Enum.FillDirection.Horizontal
+actionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+actionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+actionLayout.Padding = UDim.new(0, 8)
+actionLayout.Parent = actionBar
+
+local actionSlots = {
+	{key = "1", name = "Attack"},
+	{key = "2", name = "Skill 1"},
+	{key = "3", name = "Skill 2"},
+	{key = "4", name = "Skill 3"},
+	{key = "5", name = "Ultimate"},
+	{key = "6", name = "HP Pot"},
+	{key = "7", name = "MP Pot"},
+}
+
+for i, slotData in actionSlots do
+	local slot = Instance.new("Frame")
+	slot.Name = "Slot" .. slotData.key
+	slot.Size = UDim2.new(0, 46, 0, 46)
+	slot.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+	slot.BorderSizePixel = 0
+	slot.Parent = actionBar
+	
+	local slotCorner = Instance.new("UICorner")
+	slotCorner.CornerRadius = UDim.new(0, 6)
+	slotCorner.Parent = slot
+	
+	local keyLabel = Instance.new("TextLabel")
+	keyLabel.Size = UDim2.new(0, 16, 0, 16)
+	keyLabel.Position = UDim2.new(0, 2, 0, 2)
+	keyLabel.BackgroundTransparency = 1
+	keyLabel.Text = slotData.key
+	keyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	keyLabel.Font = Enum.Font.GothamBold
+	keyLabel.TextSize = 10
+	keyLabel.TextXAlignment = Enum.TextXAlignment.Left
+	keyLabel.Parent = slot
+	
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, 0, 0, 16)
+	nameLabel.Position = UDim2.new(0, 0, 1, -16)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = slotData.name
+	nameLabel.TextColor3 = Color3.new(1, 1, 1)
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextSize = 9
+	nameLabel.Parent = slot
+end
+
+-- Inventory Button (visible on HUD, positioned to the right of the action bar)
+local inventoryBtn = Instance.new("TextButton")
+inventoryBtn.Name = "InventoryButton"
+inventoryBtn.Size = UDim2.new(0, 80, 0, 46)
+inventoryBtn.Position = UDim2.new(1, -96, 1, -70)
+inventoryBtn.BackgroundColor3 = Color3.fromRGB(50, 45, 70)
+inventoryBtn.BorderSizePixel = 0
+inventoryBtn.Text = "Bag (B)"
+inventoryBtn.TextColor3 = Color3.fromRGB(255, 220, 100)
+inventoryBtn.Font = Enum.Font.GothamBold
+inventoryBtn.TextSize = 14
+inventoryBtn.Parent = screenGui
+
+local invBtnCorner = Instance.new("UICorner")
+invBtnCorner.CornerRadius = UDim.new(0, 8)
+invBtnCorner.Parent = inventoryBtn
+
+inventoryBtn.MouseButton1Click:Connect(function()
+	-- Find the InventoryUI and fire its toggle event
+	local inventoryUI = playerGui:FindFirstChild("InventoryUI")
+	if inventoryUI then
+		local toggleEvent = inventoryUI:FindFirstChild("ToggleInventory")
+		if toggleEvent then
+			toggleEvent:Fire()
+		end
+	end
+end)
 
 local function updateHud()
 	levelLabel.Text = "Level " .. stats.level

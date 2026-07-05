@@ -136,9 +136,9 @@ function CombatService:Start()
 		self:HandleAttack(player)
 	end)
 
-	-- Give weapon on character spawn, using CharacterAppearanceLoaded for reliability
+	-- Give weapon on character spawn
 	Players.PlayerAdded:Connect(function(player)
-		player.CharacterAppearanceLoaded:Connect(function()
+		player.CharacterAdded:Connect(function()
 			task.wait(0.5) -- Let EquipmentService finish first
 			self:GiveSword(player)
 		end)
@@ -151,7 +151,7 @@ function CombatService:Start()
 				self:GiveSword(player)
 			end)
 		end
-		player.CharacterAppearanceLoaded:Connect(function()
+		player.CharacterAdded:Connect(function()
 			task.wait(0.5)
 			self:GiveSword(player)
 		end)

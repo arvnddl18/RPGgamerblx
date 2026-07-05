@@ -34,7 +34,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -20, 0, 36)
 title.Position = UDim2.new(0, 10, 0, 8)
 title.BackgroundTransparency = 1
-title.Text = "Inventory (Press I to close)"
+title.Text = "Inventory (Press B to close)"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
@@ -166,7 +166,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.I then
+	if input.KeyCode == Enum.KeyCode.B then
 		setVisible(not visible)
 	end
 end)
