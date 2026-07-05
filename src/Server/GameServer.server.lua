@@ -110,8 +110,7 @@ local function setupWorld()
 	end
 end
 
-setupWorld()
-
+-- Create core remotes BEFORE map generation so clients can connect immediately
 local coreRemotes = {
 	"Attack", "CastSkill", "SkillCooldownUpdated", "RequestDash", "DashCooldownUpdated",
 	"StatsUpdated", "InventoryUpdated", "RequestInventory", "UseItem",
@@ -124,6 +123,8 @@ local coreRemotes = {
 for _, remoteName in coreRemotes do
 	Framework:GetRemote(remoteName)
 end
+
+setupWorld()
 
 -- 1. Register all services
 for _, module in Services:GetChildren() do

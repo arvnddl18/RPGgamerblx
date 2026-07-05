@@ -13,20 +13,34 @@ ClassSelectionController._remotes = nil
 
 function ClassSelectionController:Init()
 	local player = Players.LocalPlayer
-	self._remotes = ReplicatedStorage:WaitForChild("Remotes")
+	-- Create UI immediately without waiting for remotes
 	self._ui = ClassSelectionUI.new(player:WaitForChild("PlayerGui"))
 
-	self._ui:OnConfirm(function(classId)
-		self._remotes.SelectClass:FireServer(classId)
-	end)
+	-- Connect to remotes asynchronously so UI creation isn't blocked by server map generation
+	task.spawn(function()
+		self._remotes = ReplicatedStorage:WaitForChild("Remotes")
 
-	self._remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
-		self:OnStatsUpdated(payload)
-	end)
+		self._ui:OnConfirm(function(classId)
+			if self._remotes then
+				self._remotes.SelectClass:FireServer(classId)
+			end
+		end)
 
-	self._remotes.ClassSelected.OnClientEvent:Connect(function()
-		self._hasSelectedClass = true
-		self._ui:Hide()
+		self._remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
+			self:OnStatsUpdated(payload)
+		end)
+
+		self._remotes.ClassSelected.OnClientEvent:Connect(function()
+			self._hasSelectedClass = true
+			if self._ui then
+				self._ui:Hide()
+			end
+		end)
+
+		-- Now that remotes are connected, show UI if no class selected yet
+		if not self._hasSelectedClass and self._ui and not self._ui:IsVisible() then
+			self._ui:Show()
+		end
 	end)
 end
 
@@ -40,11 +54,10 @@ function ClassSelectionController:OnStatsUpdated(payload)
 end
 
 function ClassSelectionController:Start()
-	task.defer(function()
-		if not self._hasSelectedClass then
-			self._ui:Show()
-		end
-	end)
+	-- Show UI immediately if no class selected yet
+	if not self._hasSelectedClass and self._ui then
+		self._ui:Show()
+	end
 end
 
 Framework:RegisterController("ClassSelectionController", ClassSelectionController)
