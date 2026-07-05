@@ -44,7 +44,7 @@ local Items = {
 		usable = false,
 		stackable = false,
 		damage = 25,
-		statBonuses = { physicalAttack = 5 },
+		statBonuses = { PhysicalDamage = 5 },
 		color = Color3.fromRGB(160, 160, 180),
 	},
 	WoodenSword = {
@@ -57,7 +57,7 @@ local Items = {
 		usable = false,
 		stackable = false,
 		damage = 12,
-		statBonuses = { physicalAttack = 2 },
+		statBonuses = { PhysicalDamage = 2 },
 		color = Color3.fromRGB(139, 90, 43),
 	},
 
@@ -70,7 +70,7 @@ local Items = {
 		slot = "weapon",
 		classRestriction = "Warrior",
 		damage = 15,
-		statBonuses = { physicalAttack = 5, defense = 1 },
+		statBonuses = { PhysicalDamage = 5, PhysicalResistance = 1 },
 		color = Color3.fromRGB(180, 60, 60),
 	},
 	WarriorHelm = {
@@ -81,7 +81,7 @@ local Items = {
 		category = "armor",
 		slot = "helmet",
 		classRestriction = "Warrior",
-		statBonuses = { defense = 3, maxHp = 10 },
+		statBonuses = { PhysicalResistance = 3, MaxHP = 10 },
 		color = Color3.fromRGB(150, 150, 160),
 	},
 	WarriorPlate = {
@@ -92,7 +92,7 @@ local Items = {
 		category = "armor",
 		slot = "armor",
 		classRestriction = "Warrior",
-		statBonuses = { defense = 5, maxHp = 15 },
+		statBonuses = { PhysicalResistance = 5, MaxHP = 15 },
 		color = Color3.fromRGB(120, 120, 130),
 	},
 	WarriorLeggings = {
@@ -103,7 +103,7 @@ local Items = {
 		category = "armor",
 		slot = "pants",
 		classRestriction = "Warrior",
-		statBonuses = { defense = 2, maxHp = 5 },
+		statBonuses = { PhysicalResistance = 2, MaxHP = 5 },
 		color = Color3.fromRGB(100, 100, 110),
 	},
 	WarriorBoots = {
@@ -114,7 +114,7 @@ local Items = {
 		category = "armor",
 		slot = "boots",
 		classRestriction = "Warrior",
-		statBonuses = { defense = 2, movementSpeed = 1 },
+		statBonuses = { PhysicalResistance = 2, MoveSpeed = 1 },
 		color = Color3.fromRGB(80, 80, 90),
 	},
 	WarriorGauntlets = {
@@ -125,7 +125,7 @@ local Items = {
 		category = "armor",
 		slot = "gloves",
 		classRestriction = "Warrior",
-		statBonuses = { physicalAttack = 2, defense = 1 },
+		statBonuses = { PhysicalDamage = 2, PhysicalResistance = 1 },
 		color = Color3.fromRGB(100, 100, 110),
 	},
 
@@ -138,7 +138,7 @@ local Items = {
 		slot = "weapon",
 		classRestriction = "Mage",
 		damage = 8,
-		statBonuses = { magicAttack = 8 },
+		statBonuses = { MagicalDamage = 8 },
 		color = Color3.fromRGB(80, 100, 220),
 	},
 	MageHood = {
@@ -149,7 +149,7 @@ local Items = {
 		category = "armor",
 		slot = "helmet",
 		classRestriction = "Mage",
-		statBonuses = { magicAttack = 2, maxMana = 10 },
+		statBonuses = { MagicalDamage = 2, MaxMana = 10 },
 		color = Color3.fromRGB(60, 70, 160),
 	},
 	MageRobe = {
@@ -160,7 +160,7 @@ local Items = {
 		category = "armor",
 		slot = "armor",
 		classRestriction = "Mage",
-		statBonuses = { magicAttack = 4, maxMana = 15 },
+		statBonuses = { MagicalDamage = 4, MaxMana = 15 },
 		color = Color3.fromRGB(70, 80, 180),
 	},
 	MagePants = {
@@ -171,7 +171,7 @@ local Items = {
 		category = "armor",
 		slot = "pants",
 		classRestriction = "Mage",
-		statBonuses = { maxMana = 5 },
+		statBonuses = { MaxMana = 5 },
 		color = Color3.fromRGB(50, 60, 140),
 	},
 	MageBoots = {
@@ -182,7 +182,7 @@ local Items = {
 		category = "armor",
 		slot = "boots",
 		classRestriction = "Mage",
-		statBonuses = { movementSpeed = 1, maxMana = 5 },
+		statBonuses = { MoveSpeed = 1, MaxMana = 5 },
 		color = Color3.fromRGB(50, 50, 100),
 	},
 	MageGloves = {
@@ -193,7 +193,7 @@ local Items = {
 		category = "armor",
 		slot = "gloves",
 		classRestriction = "Mage",
-		statBonuses = { magicAttack = 3 },
+		statBonuses = { MagicalDamage = 3 },
 		color = Color3.fromRGB(60, 70, 150),
 	},
 
@@ -206,7 +206,7 @@ local Items = {
 		slot = "weapon",
 		classRestriction = "Archer",
 		damage = 12,
-		statBonuses = { physicalAttack = 4 },
+		statBonuses = { PhysicalDamage = 4 },
 		color = Color3.fromRGB(60, 160, 80),
 	},
 	ArcherCap = {
@@ -217,7 +217,7 @@ local Items = {
 		category = "armor",
 		slot = "helmet",
 		classRestriction = "Archer",
-		statBonuses = { physicalAttack = 1, movementSpeed = 1 },
+		statBonuses = { PhysicalDamage = 1, MoveSpeed = 1 },
 		color = Color3.fromRGB(80, 120, 60),
 	},
 	ArcherVest = {
@@ -228,7 +228,7 @@ local Items = {
 		category = "armor",
 		slot = "armor",
 		classRestriction = "Archer",
-		statBonuses = { defense = 2, movementSpeed = 1 },
+		statBonuses = { PhysicalResistance = 2, MoveSpeed = 1 },
 		color = Color3.fromRGB(70, 110, 50),
 	},
 	ArcherPants = {
@@ -239,7 +239,7 @@ local Items = {
 		category = "armor",
 		slot = "pants",
 		classRestriction = "Archer",
-		statBonuses = { movementSpeed = 1 },
+		statBonuses = { MoveSpeed = 1 },
 		color = Color3.fromRGB(60, 90, 45),
 	},
 	ArcherBoots = {
@@ -250,7 +250,7 @@ local Items = {
 		category = "armor",
 		slot = "boots",
 		classRestriction = "Archer",
-		statBonuses = { movementSpeed = 2 },
+		statBonuses = { MoveSpeed = 2 },
 		color = Color3.fromRGB(50, 80, 40),
 	},
 	ArcherGloves = {
@@ -261,7 +261,7 @@ local Items = {
 		category = "armor",
 		slot = "gloves",
 		classRestriction = "Archer",
-		statBonuses = { physicalAttack = 2 },
+		statBonuses = { PhysicalDamage = 2 },
 		color = Color3.fromRGB(70, 100, 50),
 	},
 
@@ -274,7 +274,7 @@ local Items = {
 		slot = "weapon",
 		classRestriction = "Priest",
 		damage = 10,
-		statBonuses = { magicAttack = 4 },
+		statBonuses = { MagicalDamage = 4 },
 		color = Color3.fromRGB(220, 200, 80),
 	},
 	PriestHood = {
@@ -285,7 +285,7 @@ local Items = {
 		category = "armor",
 		slot = "helmet",
 		classRestriction = "Priest",
-		statBonuses = { magicAttack = 2, maxMana = 8 },
+		statBonuses = { MagicalDamage = 2, MaxMana = 8 },
 		color = Color3.fromRGB(240, 240, 220),
 	},
 	PriestRobe = {
@@ -296,7 +296,7 @@ local Items = {
 		category = "armor",
 		slot = "armor",
 		classRestriction = "Priest",
-		statBonuses = { magicAttack = 3, maxMana = 12, maxHp = 5 },
+		statBonuses = { MagicalDamage = 3, MaxMana = 12, MaxHP = 5 },
 		color = Color3.fromRGB(220, 220, 200),
 	},
 	PriestPants = {
@@ -307,7 +307,7 @@ local Items = {
 		category = "armor",
 		slot = "pants",
 		classRestriction = "Priest",
-		statBonuses = { maxMana = 5 },
+		statBonuses = { MaxMana = 5 },
 		color = Color3.fromRGB(200, 200, 180),
 	},
 	PriestBoots = {
@@ -318,7 +318,7 @@ local Items = {
 		category = "armor",
 		slot = "boots",
 		classRestriction = "Priest",
-		statBonuses = { maxMana = 3 },
+		statBonuses = { MaxMana = 3 },
 		color = Color3.fromRGB(180, 180, 160),
 	},
 	PriestGloves = {
@@ -329,7 +329,7 @@ local Items = {
 		category = "armor",
 		slot = "gloves",
 		classRestriction = "Priest",
-		statBonuses = { magicAttack = 2, maxMana = 5 },
+		statBonuses = { MagicalDamage = 2, MaxMana = 5 },
 		color = Color3.fromRGB(210, 210, 190),
 	},
 
@@ -342,7 +342,7 @@ local Items = {
 		slot = "weapon",
 		classRestriction = "Kavalier",
 		damage = 14,
-		statBonuses = { physicalAttack = 5 },
+		statBonuses = { PhysicalDamage = 5 },
 		color = Color3.fromRGB(140, 80, 200),
 	},
 	KavalierHelm = {
@@ -353,7 +353,7 @@ local Items = {
 		category = "armor",
 		slot = "helmet",
 		classRestriction = "Kavalier",
-		statBonuses = { defense = 2, physicalAttack = 1 },
+		statBonuses = { PhysicalResistance = 2, PhysicalDamage = 1 },
 		color = Color3.fromRGB(130, 70, 180),
 	},
 	KavalierArmor = {
@@ -364,7 +364,7 @@ local Items = {
 		category = "armor",
 		slot = "armor",
 		classRestriction = "Kavalier",
-		statBonuses = { defense = 4, maxHp = 10 },
+		statBonuses = { PhysicalResistance = 4, MaxHP = 10 },
 		color = Color3.fromRGB(110, 60, 160),
 	},
 	KavalierPants = {
@@ -375,7 +375,7 @@ local Items = {
 		category = "armor",
 		slot = "pants",
 		classRestriction = "Kavalier",
-		statBonuses = { defense = 2, movementSpeed = 1 },
+		statBonuses = { PhysicalResistance = 2, MoveSpeed = 1 },
 		color = Color3.fromRGB(100, 55, 150),
 	},
 	KavalierBoots = {
@@ -386,7 +386,7 @@ local Items = {
 		category = "armor",
 		slot = "boots",
 		classRestriction = "Kavalier",
-		statBonuses = { movementSpeed = 2 },
+		statBonuses = { MoveSpeed = 2 },
 		color = Color3.fromRGB(90, 50, 140),
 	},
 	KavalierGauntlets = {
@@ -397,7 +397,7 @@ local Items = {
 		category = "armor",
 		slot = "gloves",
 		classRestriction = "Kavalier",
-		statBonuses = { physicalAttack = 2 },
+		statBonuses = { PhysicalDamage = 2 },
 		color = Color3.fromRGB(120, 65, 170),
 	},
 }

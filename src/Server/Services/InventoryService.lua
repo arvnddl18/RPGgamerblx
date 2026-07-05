@@ -70,21 +70,29 @@ function InventoryService:UseItem(player, itemId)
 		return false
 	end
 
-	if item.type == "consumable" and item.healAmount then
+	if item.type == "consumable" then
 		if not self._playerData:RemoveItem(player, itemId, 1) then
 			return false
 		end
-		self._playerData:Heal(player, item.healAmount)
-		self._remotes.Notification:FireClient(player, "Used " .. item.name .. " (+" .. item.healAmount .. " HP)")
-		return true
-	end
+		
+		if item.healAmount then
+			self._playerData:Heal(player, item.healAmount)
+			self._remotes.Notification:FireClient(player, "Used " .. item.name .. " (+" .. item.healAmount .. " HP)")
+		end
+		
+		if item.manaAmount then
+			self._playerData:RestoreMana(player, item.manaAmount)
+			self._remotes.Notification:FireClient(player, "Used " .. item.name .. " (+" .. item.manaAmount .. " Mana)")
+		end
 
-	if item.type == "consumable" and item.manaAmount then
-		if not self._playerData:RemoveItem(player, itemId, 1) then
-			return false
+		if item.buffEffectId then
+			local Framework = require(ReplicatedStorage.Shared.Framework)
+			local buffService = Framework:GetService("BuffService")
+			if buffService then
+				buffService:ApplyEffect(player, item.buffEffectId, item.buffDuration or 10, player, item.buffIntensity)
+			end
 		end
-		self._playerData:RestoreMana(player, item.manaAmount)
-		self._remotes.Notification:FireClient(player, "Used " .. item.name .. " (+" .. item.manaAmount .. " Mana)")
+
 		return true
 	end
 

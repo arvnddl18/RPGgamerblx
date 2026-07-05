@@ -62,10 +62,7 @@ function SkillService:GetAttackerStats(player)
 	if not data then
 		return {}
 	end
-	return {
-		physicalAttack = data.physicalAttack,
-		magicAttack = data.magicAttack,
-	}
+	return data.combatStats
 end
 
 function SkillService:FindMeleeTargets(character, range, coneOnly)
@@ -123,18 +120,18 @@ end
 
 function SkillService:ApplySkillDamage(player, skill, targets)
 	local attackerStats = self:GetAttackerStats(player)
-	local damage
-	if skill.slotType == "autoAttack" then
-		damage = self._playerData:GetWeaponDamage(player)
-	else
-		local baseDamage = skill.damage or 0
-		damage = DamageCalculator.Compute(baseDamage, attackerStats, skill.skillType)
-	end
+	local baseDamage = skill.damage or 0
 
 	for _, enemy in targets do
-		local enemyDefense = enemy:GetAttribute("Defense") or 0
-		local finalDamage = DamageCalculator.ApplyDefense(damage, enemyDefense)
-		self._enemyService:DamageEnemy(enemy, finalDamage, player)
+		self._enemyService:DamageEnemy(enemy, baseDamage, attackerStats, player, skill.skillType)
+		
+		if skill.statusEffect then
+			local Framework = require(ReplicatedStorage.Shared.Framework)
+			local buffService = Framework:GetService("BuffService")
+			if buffService then
+				buffService:ApplyEffect(enemy, skill.statusEffect, skill.statusDuration or 3, player, skill.statusIntensity)
+			end
+		end
 	end
 end
 
@@ -182,6 +179,11 @@ end
 
 function SkillService:HandleCastSkill(player, slotIndex)
 	if not self._playerData:HasSelectedClass(player) then
+		return
+	end
+	
+	local character = player.Character
+	if character and (character:GetAttribute("IsStunned") or character:GetAttribute("IsSilenced") or character:GetAttribute("IsKnockedDown")) then
 		return
 	end
 

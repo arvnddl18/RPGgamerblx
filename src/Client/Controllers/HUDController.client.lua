@@ -325,12 +325,16 @@ local function updateHud()
 		return
 	end
 
-	levelLabel.Text = "Level " .. stats.level
+	levelLabel.Text = "Level " .. tostring(stats.level or 1)
 	classLabel.Text = stats.classId or ""
-	hpBar:Update(stats.hp, stats.maxHp, math.floor(stats.hp) .. " / " .. stats.maxHp .. " HP")
-	manaBar:Update(stats.mana, stats.maxMana, math.floor(stats.mana) .. " / " .. stats.maxMana .. " Mana")
+	local hp = tonumber(stats.hp) or 0
+	local maxHp = tonumber(stats.maxHp) or 0
+	local mana = tonumber(stats.mana) or 0
+	local maxMana = tonumber(stats.maxMana) or 0
+	hpBar:Update(hp, maxHp, math.floor(hp) .. " / " .. maxHp .. " HP")
+	manaBar:Update(mana, maxMana, math.floor(mana) .. " / " .. maxMana .. " Mana")
 	local reqXp = stats.requiredXp or 100
-	xpBar:Update(stats.xp, reqXp, stats.xp .. " / " .. reqXp .. " XP")
+	xpBar:Update(stats.xp or 0, reqXp, (stats.xp or 0) .. " / " .. reqXp .. " XP")
 	goldLabel.Text = "Gold: " .. (stats.gold or stats.coins or 0)
 end
 

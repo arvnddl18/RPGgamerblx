@@ -145,13 +145,18 @@ function CombatService:HandleAttack(player)
 	if not humanoid or humanoid.Health <= 0 then
 		return
 	end
+	
+	if character:GetAttribute("IsStunned") or character:GetAttribute("IsKnockedDown") then
+		return
+	end
 
 	self._cooldowns[player] = now
-	local damage = self._playerData:GetWeaponDamage(player)
+	local data = self._playerData:GetData(player)
+	local attackerStats = data.combatStats
 	local targets = self:FindAttackTargets(character)
 
 	for _, enemy in targets do
-		self._enemyService:DamageEnemy(enemy, damage, player)
+		self._enemyService:DamageEnemy(enemy, 0, attackerStats, player, "physical")
 	end
 end
 

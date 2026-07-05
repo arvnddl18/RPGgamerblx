@@ -352,21 +352,24 @@ function EnemyService:CreateGoblin(position)
 
 	-- Humanoid
 	local humanoid = Instance.new("Humanoid")
-	humanoid.MaxHealth = config.maxHealth
-	humanoid.Health = config.maxHealth
-	humanoid.WalkSpeed = 4
+	humanoid.MaxHealth = config.MaxHP or 50
+	humanoid.Health = config.MaxHP or 50
+	humanoid.WalkSpeed = config.MoveSpeed or 4
 	humanoid.HipHeight = 1.5
 	humanoid.Parent = model
 
 	model.PrimaryPart = torso
 	model:SetAttribute("EnemyType", config.id)
-	model:SetAttribute("Health", config.maxHealth)
-	model:SetAttribute("MaxHealth", config.maxHealth)
-	model:SetAttribute("Defense", config.defense or 0)
-	model:SetAttribute("Attack", config.damage or 5)
+	model:SetAttribute("Health", config.MaxHP or 50)
+	model:SetAttribute("MaxHealth", config.MaxHP or 50)
+	model:SetAttribute("PhysicalResistance", config.PhysicalResistance or 0)
+	model:SetAttribute("MagicalResistance", config.MagicalResistance or 0)
+	model:SetAttribute("Evasion", config.Evasion or 0)
+	model:SetAttribute("CritReduction", config.CritReduction or 0)
+	model:SetAttribute("Attack", config.PhysicalDamage or 5)
 
 	CollectionService:AddTag(model, "Enemy")
-	self:CreateHealthBar(model, config.maxHealth)
+	self:CreateHealthBar(model, config.MaxHP or 50)
 
 	EnemyStateMachine.InitEnemy(model, position, config)
 
@@ -409,23 +412,40 @@ function EnemyService:GetNearestPlayer(position, range)
 	return nearestPlayer, nearestDistance
 end
 
-function EnemyService:DamageEnemy(enemy, amount, attacker)
+function EnemyService:DamageEnemy(enemy, baseDamage, attackerStats, attacker, damageType)
 	if not enemy.Parent then
 		return
 	end
 
 	local health = enemy:GetAttribute("Health") or 0
-	health = math.max(0, health - amount)
-	enemy:SetAttribute("Health", health)
+	if health <= 0 then return end
 
-	if attacker and attacker:IsA("Player") then
-		enemy:SetAttribute("AggroTarget", attacker.UserId)
-	end
+	local targetStats = {
+		maxHp = enemy:GetAttribute("MaxHealth") or 50,
+		defense = enemy:GetAttribute("PhysicalResistance") or 0,
+		magicalResistance = enemy:GetAttribute("MagicalResistance") or 0,
+		evasion = enemy:GetAttribute("Evasion") or 0,
+		critReduction = enemy:GetAttribute("CritReduction") or 0,
+	}
 
-	self:UpdateHealthBar(enemy)
+	local DamageCalculator = require(ReplicatedStorage.Shared.Combat.DamageCalculator)
+	local result = DamageCalculator.ComputeHit(baseDamage, attackerStats, targetStats, damageType or "physical")
 
-	if health <= 0 then
-		self:OnEnemyKilled(enemy, attacker)
+	if not result.isMiss then
+		health = math.max(0, health - result.damage)
+		enemy:SetAttribute("Health", health)
+
+		if attacker and attacker:IsA("Player") then
+			enemy:SetAttribute("AggroTarget", attacker.UserId)
+		end
+
+		self:UpdateHealthBar(enemy)
+		
+		-- Optionally fire a remote to show damage numbers here
+		
+		if health <= 0 then
+			self:OnEnemyKilled(enemy, attacker)
+		end
 	end
 end
 

@@ -64,21 +64,18 @@ local function createEmptyEquipped()
 end
 
 local function createEmptyData()
+	local ok, StatsModule = pcall(require, ReplicatedStorage.Shared.Combat.StatsModule)
+	local baseStats = ok and StatsModule.GetBaseStats() or {}
 	return {
 		classId = nil,
 		hasSelectedClass = false,
 		hp = 1,
-		maxHp = 1,
 		mana = 0,
-		maxMana = 0,
 		level = 1,
 		xp = 0,
 		requiredXp = LevelGrowth.GetRequiredXp(1),
 		coins = 0,
-		physicalAttack = 0,
-		magicAttack = 0,
-		defense = 0,
-		movementSpeed = 0,
+		combatStats = baseStats,
 		equipped = createEmptyEquipped(),
 		equippedWeapon = nil,
 		skillLoadout = {},
@@ -93,21 +90,23 @@ local function createEmptyData()
 end
 
 local function sumEquipmentBonuses(equipped)
-	local bonuses = {
-		maxHp = 0,
-		maxMana = 0,
-		physicalAttack = 0,
-		magicAttack = 0,
-		defense = 0,
-		movementSpeed = 0,
-	}
+	local bonuses = {}
 
-	for _, slot in EQUIPMENT_SLOTS do
-		local itemId = equipped[slot]
-		if itemId then
+	for _, equippedItem in pairs(equipped) do
+		if equippedItem and type(equippedItem) == "table" then
+			local itemId = equippedItem.id
 			local item = Items[itemId]
+			local multiplier = equippedItem.statMultiplier or 1.0
+			
 			if item and item.statBonuses then
-				for stat, value in item.statBonuses do
+				for stat, value in pairs(item.statBonuses) do
+					bonuses[stat] = (bonuses[stat] or 0) + (value * multiplier)
+				end
+			end
+		elseif equippedItem and type(equippedItem) == "string" then
+			local item = Items[equippedItem]
+			if item and item.statBonuses then
+				for stat, value in pairs(item.statBonuses) do
 					bonuses[stat] = (bonuses[stat] or 0) + value
 				end
 			end
@@ -135,9 +134,9 @@ local function syncHumanoid(player, data)
 		return
 	end
 
-	humanoid.MaxHealth = math.max(1, data.maxHp)
-	humanoid.Health = math.clamp(data.hp, 0, data.maxHp)
-	humanoid.WalkSpeed = math.max(0, data.movementSpeed)
+	humanoid.MaxHealth = math.max(1, data.combatStats.maxHp)
+	humanoid.Health = math.clamp(data.hp, 0, data.combatStats.maxHp)
+	humanoid.WalkSpeed = math.max(0, data.combatStats.movementSpeed)
 	humanoid.JumpPower = 50
 end
 
@@ -147,18 +146,15 @@ local function buildStatsPayload(player, data)
 		classId = data.classId,
 		hasSelectedClass = data.hasSelectedClass,
 		hp = data.hp,
-		maxHp = data.maxHp,
 		mana = data.mana,
-		maxMana = data.maxMana,
+		maxHp = data.combatStats.maxHp,
+		maxMana = data.combatStats.maxMana,
+		combatStats = data.combatStats,
 		level = leaderstats and leaderstats.Level.Value or data.level,
 		xp = leaderstats and leaderstats.XP.Value or data.xp,
 		requiredXp = data.requiredXp,
 		coins = leaderstats and leaderstats.Coins.Value or data.coins,
 		gold = leaderstats and leaderstats.Coins.Value or data.coins,
-		physicalAttack = data.physicalAttack,
-		magicAttack = data.magicAttack,
-		defense = data.defense,
-		movementSpeed = data.movementSpeed,
 		equippedWeapon = data.equippedWeapon,
 		equipped = data.equipped,
 		skillLoadout = data.skillLoadout,
@@ -180,17 +176,21 @@ function PlayerDataService:RecalculateStats(player)
 	local levelBonuses = LevelGrowth.GetLevelBonuses(data.level)
 	local equipBonuses = sumEquipmentBonuses(data.equipped)
 	local base = classConfig.baseStats
+	
+	local combinedBase = {}
+	for k, v in pairs(base) do
+		combinedBase[k] = v + (levelBonuses[k] or 0)
+	end
 
-	data.maxHp = base.maxHp + levelBonuses.maxHp + equipBonuses.maxHp
-	data.maxMana = base.maxMana + levelBonuses.maxMana + equipBonuses.maxMana
-	data.physicalAttack = base.physicalAttack + levelBonuses.physicalAttack + equipBonuses.physicalAttack
-	data.magicAttack = base.magicAttack + levelBonuses.magicAttack + equipBonuses.magicAttack
-	data.defense = base.defense + levelBonuses.defense + equipBonuses.defense
-	data.movementSpeed = base.movementSpeed + equipBonuses.movementSpeed
+	local ok, StatsModule = pcall(require, ReplicatedStorage.Shared.Combat.StatsModule)
+	if ok then
+		data.combatStats = StatsModule.CombineStats(combinedBase, equipBonuses, nil, nil)
+	end
+	
 	data.requiredXp = LevelGrowth.GetRequiredXp(data.level)
 
-	data.hp = math.clamp(data.hp, 0, data.maxHp)
-	data.mana = math.clamp(data.mana, 0, data.maxMana)
+	data.hp = math.clamp(data.hp, 0, data.combatStats.maxHp)
+	data.mana = math.clamp(data.mana, 0, data.combatStats.maxMana)
 	data.equippedWeapon = data.equipped.weapon
 end
 
@@ -227,8 +227,8 @@ function PlayerDataService:ApplyClass(player, classId)
 	}
 
 	self:RecalculateStats(player)
-	data.hp = data.maxHp
-	data.mana = data.maxMana
+	data.hp = data.combatStats.maxHp
+	data.mana = data.combatStats.maxMana
 	data.equippedWeapon = data.equipped.weapon
 
 	local leaderstats = player:FindFirstChild("leaderstats")
@@ -302,8 +302,8 @@ function PlayerDataService:LoadFromSnapshot(player, snapshot)
 
 	if data.hasSelectedClass then
 		self:RecalculateStats(player)
-		data.hp = math.min(data.hp, data.maxHp)
-		data.mana = math.min(data.mana, data.maxMana)
+		data.hp = math.min(data.hp, data.combatStats.maxHp)
+		data.mana = math.min(data.mana, data.combatStats.maxMana)
 	end
 
 	data.requiredXp = LevelGrowth.GetRequiredXp(data.level)
@@ -389,8 +389,8 @@ function PlayerDataService:SetupPlayer(player)
 		task.wait(0.1)
 		local data = self._data[player]
 		if data and data.hasSelectedClass and data.hp <= 0 then
-			data.hp = data.maxHp
-			data.mana = data.maxMana
+			data.hp = data.combatStats.maxHp
+			data.mana = data.combatStats.maxMana
 		end
 		syncHumanoid(player, data)
 		self:FireStatsUpdated(player)
@@ -463,8 +463,8 @@ function PlayerDataService:AddXP(player, amount)
 		leaderstats.Level.Value = data.level
 		leaderstats.XP.Value = data.xp
 		self:RecalculateStats(player)
-		data.hp = data.maxHp
-		data.mana = data.maxMana
+		data.hp = data.combatStats.maxHp
+		data.mana = data.combatStats.maxMana
 		getRemotes().Notification:FireClient(player, "Level Up! You are now level " .. data.level)
 		if getRemotes():FindFirstChild("LevelUp") then
 			getRemotes().LevelUp:FireClient(player, data.level)
@@ -514,7 +514,7 @@ function PlayerDataService:Damage(player, amount)
 		return
 	end
 
-	local mitigated = math.max(1, amount - math.floor(data.defense * 0.5))
+	local mitigated = math.max(1, amount - math.floor(data.combatStats.defense * 0.5))
 	data.hp = math.max(0, data.hp - mitigated)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
@@ -545,7 +545,7 @@ function PlayerDataService:Heal(player, amount)
 		return false
 	end
 
-	data.hp = math.min(data.maxHp, data.hp + amount)
+	data.hp = math.min(data.combatStats.maxHp, data.hp + amount)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
 	return true
@@ -557,7 +557,7 @@ function PlayerDataService:RestoreMana(player, amount)
 		return false
 	end
 
-	data.mana = math.min(data.maxMana, data.mana + amount)
+	data.mana = math.min(data.combatStats.maxMana, data.mana + amount)
 	self:FireStatsUpdated(player)
 	return true
 end
@@ -582,7 +582,7 @@ function PlayerDataService:GetWeaponDamage(player)
 	local weaponId = data.equippedWeapon
 	local weapon = weaponId and Items[weaponId]
 	local weaponDamage = weapon and weapon.damage or 0
-	return math.max(1, data.physicalAttack + weaponDamage)
+	return math.max(1, data.combatStats.physicalAttack + weaponDamage)
 end
 
 function PlayerDataService:SetEquippedWeapon(player, weaponId)
@@ -605,26 +605,46 @@ function PlayerDataService:EquipItem(player, itemId)
 		return false, "Select a class first"
 	end
 
-	local item = Items[itemId]
-	if not item or not item.slot then
+	local itemConfig = Items[itemId]
+	if not itemConfig or not itemConfig.slot then
 		return false, "Item cannot be equipped"
 	end
 
-	if not self:HasItem(player, itemId, 1) then
+	-- Find the specific item entry in inventory
+	local itemEntry = nil
+	local itemIndex = nil
+	for i, entry in ipairs(data.inventory) do
+		if entry.id == itemId then
+			itemEntry = entry
+			itemIndex = i
+			break
+		end
+	end
+
+	if not itemEntry then
 		return false, "Item not in inventory"
 	end
 
-	local slot = item.slot
-	local currentId = data.equipped[slot]
-	if currentId then
-		self:AddItem(player, currentId, 1)
+	local slot = itemConfig.slot
+	local currentEquipped = data.equipped[slot]
+	
+	-- Remove the item from inventory (since it's moving to equipped)
+	if itemEntry.count > 1 then
+		itemEntry.count -= 1
+	else
+		table.remove(data.inventory, itemIndex)
+	end
+	getRemotes().InventoryUpdated:FireClient(player, data.inventory)
+	
+	-- If something was already equipped, return it to inventory
+	if currentEquipped then
+		self:AddItem(player, currentEquipped, 1)
 	end
 
-	if not self:RemoveItem(player, itemId, 1) then
-		return false, "Could not remove item from inventory"
-	end
-
-	data.equipped[slot] = itemId
+	-- Store the full item entry (including rarity, etc.) in equipped slot
+	local equippedItem = { id = itemEntry.id, rarity = itemEntry.rarity, statMultiplier = itemEntry.statMultiplier }
+	data.equipped[slot] = equippedItem
+	
 	self:RecalculateStats(player)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
@@ -641,9 +661,11 @@ function PlayerDataService:UnequipItem(player, slot)
 		return false, "Nothing equipped in that slot"
 	end
 
-	local itemId = data.equipped[slot]
-	self:AddItem(player, itemId, 1)
+	local equippedItem = data.equipped[slot]
+	-- Add back the specific item object
+	self:AddItem(player, equippedItem, 1)
 	data.equipped[slot] = nil
+	
 	self:RecalculateStats(player)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
@@ -655,29 +677,35 @@ function PlayerDataService:GetInventory(player)
 	return data and data.inventory or {}
 end
 
-function PlayerDataService:AddItem(player, itemId, count)
+function PlayerDataService:AddItem(player, itemData, count)
 	local data = self._data[player]
+	local itemId = type(itemData) == "table" and itemData.id or itemData
+	
 	if not data or not Items[itemId] then
 		return false
 	end
 
 	count = count or 1
-	local item = Items[itemId]
-	for _, entry in data.inventory do
-		if entry.id == itemId then
-			local maxStack = item.maxStack or 99
-			entry.count = math.min(maxStack, entry.count + count)
-			getRemotes().InventoryUpdated:FireClient(player, data.inventory)
-			markSaveDirty(player)
-			local questService = getQuestService()
-			if questService then
-				questService:OnItemCollected(player, itemId, count)
+	local itemConfig = Items[itemId]
+	
+	if itemConfig.stackable then
+		for _, entry in data.inventory do
+			if entry.id == itemId then
+				local maxStack = itemConfig.maxStack or 99
+				entry.count = math.min(maxStack, entry.count + count)
+				getRemotes().InventoryUpdated:FireClient(player, data.inventory)
+				markSaveDirty(player)
+				local questService = getQuestService()
+				if questService then questService:OnItemCollected(player, itemId, count) end
+				return true
 			end
-			return true
 		end
 	end
 
-	table.insert(data.inventory, { id = itemId, count = count })
+	local newEntry = type(itemData) == "table" and itemData or { id = itemId }
+	newEntry.count = count
+
+	table.insert(data.inventory, newEntry)
 	getRemotes().InventoryUpdated:FireClient(player, data.inventory)
 	markSaveDirty(player)
 	local questService = getQuestService()

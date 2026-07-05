@@ -94,6 +94,7 @@ local Skills = {
 		skillType = "magic",
 		aoe = true,
 	},
+		Mage_Meteor = {
 		id = "Mage_Meteor",
 		name = "Meteor",
 		description = "Summon a devastating meteor from the sky.",
@@ -145,6 +146,7 @@ local Skills = {
 		skillType = "ranged",
 		aoe = true,
 	},
+		Archer_SniperShot = {
 		id = "Archer_SniperShot",
 		name = "Sniper Shot",
 		description = "A precise shot that deals massive damage.",
@@ -196,6 +198,7 @@ local Skills = {
 		skillType = "magic",
 		aoe = true,
 	},
+		Priest_DivineProtection = {
 		id = "Priest_DivineProtection",
 		name = "Divine Protection",
 		description = "Shield yourself with divine power.",
@@ -247,6 +250,7 @@ local Skills = {
 		skillType = "melee",
 		aoe = true,
 	},
+		Kavalier_DragonCharge = {
 		id = "Kavalier_DragonCharge",
 		name = "Dragon Charge",
 		description = "Charge like a dragon, devastating all in your path.",

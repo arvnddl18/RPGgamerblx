@@ -1,11 +1,11 @@
 local Enemies = {
 	Goblin = {
 		id = "Goblin",
-		name = "Slime",
-		maxHealth = 50,
-		damage = 8,
-		defense = 3,
-		movementSpeed = 4,
+		name = "Goblin",
+		MaxHP = 50,
+		PhysicalDamage = 8,
+		PhysicalResistance = 3,
+		MoveSpeed = 4,
 		attackCooldown = 3,
 		aggroRange = 40,
 		attackRange = 6,

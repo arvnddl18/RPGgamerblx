@@ -1,0 +1,139 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local StatusEffectModule = require(Shared.Combat.StatusEffectModule)
+
+local BuffService = {}
+BuffService._activeBuffs = {}
+BuffService._playerData = nil
+
+function BuffService:Init()
+	local Framework = require(ReplicatedStorage.Shared.Framework)
+	self._playerData = Framework:GetService("PlayerDataService")
+	self._enemyService = Framework:GetService("EnemyService")
+end
+
+function BuffService:ApplyEffect(target, effectId, duration, instigator, customIntensity)
+	local config = StatusEffectModule.EffectTypes[effectId]
+	if not config then return false end
+	
+	if not self._activeBuffs[target] then
+		self._activeBuffs[target] = {}
+	end
+	
+	local targetBuffs = self._activeBuffs[target]
+	local existing = targetBuffs[effectId]
+	
+	if existing then
+		if config.stackBehavior == "Ignore" then
+			return false
+		elseif config.stackBehavior == "Refresh" then
+			existing.duration = duration
+			existing.startTime = tick()
+			return true
+		elseif config.stackBehavior == "Stack" then
+			existing.intensity = (existing.intensity or 1) + (customIntensity or 1)
+			existing.duration = duration
+			existing.startTime = tick()
+			return true
+		end
+	end
+	
+	targetBuffs[effectId] = {
+		id = effectId,
+		duration = duration,
+		startTime = tick(),
+		instigator = instigator,
+		intensity = customIntensity or 1,
+		lastTick = tick()
+	}
+	
+	-- Apply immediate visual/attribute changes
+	if config.disablesInput then
+		if target:IsA("Player") and target.Character then
+			target.Character:SetAttribute("IsStunned", true)
+		elseif typeof(target) == "Instance" then
+			target:SetAttribute("IsStunned", true)
+		end
+	end
+	
+	if config.forceRagdoll then
+		if target:IsA("Player") and target.Character then
+			target.Character:SetAttribute("IsKnockedDown", true)
+		elseif typeof(target) == "Instance" then
+			target:SetAttribute("IsKnockedDown", true)
+		end
+	end
+	
+	if target:IsA("Player") then
+		self._playerData:RecalculateStats(target)
+	end
+	
+	return true
+end
+
+function BuffService:RemoveEffect(target, effectId)
+	if not self._activeBuffs[target] then return end
+	local effect = self._activeBuffs[target][effectId]
+	if not effect then return end
+	
+	local config = StatusEffectModule.EffectTypes[effectId]
+	self._activeBuffs[target][effectId] = nil
+	
+	-- Cleanup
+	if config.disablesInput then
+		if target:IsA("Player") and target.Character then
+			target.Character:SetAttribute("IsStunned", false)
+		elseif typeof(target) == "Instance" then
+			target:SetAttribute("IsStunned", false)
+		end
+	end
+	
+	if config.forceRagdoll then
+		if target:IsA("Player") and target.Character then
+			target.Character:SetAttribute("IsKnockedDown", false)
+		elseif typeof(target) == "Instance" then
+			target:SetAttribute("IsKnockedDown", false)
+		end
+	end
+	
+	if target:IsA("Player") then
+		self._playerData:RecalculateStats(target)
+	end
+end
+
+function BuffService:TickEffects()
+	local now = tick()
+	for target, effects in pairs(self._activeBuffs) do
+		for effectId, effect in pairs(effects) do
+			local config = StatusEffectModule.EffectTypes[effectId]
+			
+			if now - effect.startTime >= effect.duration then
+				self:RemoveEffect(target, effectId)
+			else
+				-- Process DoT ticks
+				if config.isDoT and (now - effect.lastTick >= config.tickRate) then
+					effect.lastTick = now
+					local tickDamage = effect.intensity
+					
+					if target:IsA("Player") then
+						self._playerData:Damage(target, tickDamage, nil, config.damageType)
+					else
+						local attackerStats = { magicAttack = 0, physicalAttack = 0, accuracy = 1, critChance = 0, critDamage = 1 }
+						self._enemyService:DamageEnemy(target, tickDamage, attackerStats, effect.instigator, config.damageType)
+					end
+				end
+			end
+		end
+	end
+end
+
+function BuffService:Start()
+	task.spawn(function()
+		while true do
+			self:TickEffects()
+			task.wait(0.2)
+		end
+	end)
+end
+
+return BuffService
