@@ -90,9 +90,19 @@ end
 
 function EquipmentUI:Update(equipped, itemsConfig)
 	for slot, row in self._slots do
-		local itemId = equipped and equipped[slot]
+		local equippedEntry = equipped and equipped[slot]
+		local itemId = type(equippedEntry) == "table" and equippedEntry.id or equippedEntry
 		if itemId and itemsConfig[itemId] then
-			row.Text = SLOT_LABELS[slot] .. ": " .. itemsConfig[itemId].name
+			local label = SLOT_LABELS[slot] .. ": " .. itemsConfig[itemId].name
+			if type(equippedEntry) == "table" then
+				if equippedEntry.rarity then
+					label ..= " [" .. equippedEntry.rarity .. "]"
+				end
+				if equippedEntry.enhanceLevel and equippedEntry.enhanceLevel > 0 then
+					label ..= " +" .. equippedEntry.enhanceLevel
+				end
+			end
+			row.Text = label
 		else
 			row.Text = SLOT_LABELS[slot] .. ": Empty"
 		end

@@ -1,10 +1,12 @@
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Items = require(Shared.Config.Items)
 local Classes = require(Shared.Config.Classes)
 local LevelGrowth = require(Shared.Config.LevelGrowth)
+local RarityConfig = require(Shared.Config.RarityConfig)
 
 local PlayerDataService = {}
 PlayerDataService._data = {}
@@ -13,6 +15,37 @@ PlayerDataService._saveService = nil
 PlayerDataService._questService = nil
 
 local EQUIPMENT_SLOTS = { "weapon", "helmet", "armor", "pants", "boots", "gloves" }
+
+local function getEnhancementConfig()
+	local ok, config = pcall(require, Shared.Config.EnhancementConfig)
+	return ok and config or nil
+end
+
+local function normalizeInventoryEntry(entry)
+	if type(entry) ~= "table" or not entry.id then
+		return entry
+	end
+	local itemConfig = Items[entry.id]
+	if not itemConfig then
+		return entry
+	end
+	if itemConfig.supportsRarity and not entry.rarity then
+		entry.rarity = "Common"
+	end
+	if itemConfig.slot then
+		entry.enhanceLevel = entry.enhanceLevel or 0
+		entry.rarity = entry.rarity or "Common"
+		entry.statMultiplier = entry.statMultiplier or 1.0
+		if not entry.uid then
+			entry.uid = HttpService:GenerateGUID(false)
+		end
+	end
+	return entry
+end
+
+local function fireInventoryUpdated(player, inventory)
+	getRemotes().InventoryUpdated:FireClient(player, inventory)
+end
 
 local function getSaveService()
 	if not PlayerDataService._saveService then
@@ -88,6 +121,9 @@ local function createEmptyData()
 		},
 		pvpMode = "Peaceful",
 		lastCombatTime = nil,
+		karmaPoints = 0,
+		pkCount = 0,
+		karmaFlagExpiry = nil,
 	}
 end
 
@@ -101,6 +137,30 @@ local function getBuffService()
 		end
 	end
 	return PlayerDataService._buffService
+end
+
+local function getRestService()
+	if not PlayerDataService._restService then
+		local ok, Framework = pcall(function()
+			return require(ReplicatedStorage.Shared.Framework)
+		end)
+		if ok then
+			PlayerDataService._restService = Framework:GetService("RestService")
+		end
+	end
+	return PlayerDataService._restService
+end
+
+local function getKarmaService()
+	if not PlayerDataService._karmaService then
+		local ok, Framework = pcall(function()
+			return require(ReplicatedStorage.Shared.Framework)
+		end)
+		if ok then
+			PlayerDataService._karmaService = Framework:GetService("KarmaService")
+		end
+	end
+	return PlayerDataService._karmaService
 end
 
 local function getPvpService()
@@ -117,16 +177,20 @@ end
 
 local function sumEquipmentBonuses(equipped)
 	local bonuses = {}
+	local enhConfig = getEnhancementConfig()
 
 	for _, equippedItem in pairs(equipped) do
 		if equippedItem and type(equippedItem) == "table" then
 			local itemId = equippedItem.id
 			local item = Items[itemId]
 			local multiplier = equippedItem.statMultiplier or 1.0
+			local enhanceLevel = equippedItem.enhanceLevel or 0
+			local flatPerLevel = enhConfig and enhConfig.STAT_BONUS_PER_LEVEL or 1
+			local flatBonus = enhanceLevel * flatPerLevel
 			
 			if item and item.statBonuses then
 				for stat, value in pairs(item.statBonuses) do
-					bonuses[stat] = (bonuses[stat] or 0) + (value * multiplier)
+					bonuses[stat] = (bonuses[stat] or 0) + (value * multiplier) + flatBonus
 				end
 			end
 		elseif equippedItem and type(equippedItem) == "string" then
@@ -162,14 +226,23 @@ local function syncHumanoid(player, data)
 
 	humanoid.MaxHealth = math.max(1, data.combatStats.maxHp)
 	humanoid.Health = math.clamp(data.hp, 0, data.combatStats.maxHp)
-	humanoid.WalkSpeed = math.max(0, data.combatStats.movementSpeed)
-	humanoid.JumpPower = 50
+	if character:GetAttribute("IsResting") then
+		humanoid.WalkSpeed = 0
+		humanoid.JumpPower = 0
+	else
+		humanoid.WalkSpeed = math.max(0, data.combatStats.movementSpeed)
+		humanoid.JumpPower = 50
+	end
 end
 
 local function buildStatsPayload(player, data)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local buffService = getBuffService()
 	local shield = buffService and buffService:GetShieldAmount(player) or 0
+	local statusEffects = buffService and buffService:GetActiveEffectsSnapshot(player) or {}
+	local karmaService = getKarmaService()
+	local karmaState = karmaService and karmaService:GetKarmaState(player) or "Innocent"
+	local karmaFlagSecondsRemaining = karmaService and karmaService:GetKarmaFlagSecondsRemaining(player) or 0
 	return {
 		classId = data.classId,
 		hasSelectedClass = data.hasSelectedClass,
@@ -188,7 +261,12 @@ local function buildStatsPayload(player, data)
 		skillLoadout = data.skillLoadout,
 		quest = data.quest,
 		pvpMode = data.pvpMode or "Peaceful",
+		karmaPoints = data.karmaPoints or 0,
+		pkCount = data.pkCount or 0,
+		karmaState = karmaState,
+		karmaFlagSecondsRemaining = karmaFlagSecondsRemaining,
 		shield = shield,
+		statusEffects = statusEffects,
 	}
 end
 
@@ -246,7 +324,9 @@ function PlayerDataService:ApplyClass(player, classId)
 	data.equipped = createEmptyEquipped()
 
 	for slot, itemId in classConfig.startingEquipment do
-		data.equipped[slot] = itemId
+		local item = RarityConfig.GenerateItem(itemId, "Common")
+		normalizeInventoryEntry(item)
+		data.equipped[slot] = item
 	end
 
 	data.skillLoadout = {
@@ -294,7 +374,7 @@ function PlayerDataService:GetSaveSnapshot(player)
 	end
 
 	return {
-		version = 1,
+		version = 2,
 		classId = data.classId,
 		hasSelectedClass = data.hasSelectedClass,
 		level = data.level,
@@ -307,6 +387,10 @@ function PlayerDataService:GetSaveSnapshot(player)
 		inventory = data.inventory,
 		skillLoadout = data.skillLoadout,
 		quest = data.quest,
+		pvpMode = data.pvpMode or "Peaceful",
+		karmaPoints = data.karmaPoints or 0,
+		pkCount = data.pkCount or 0,
+		karmaFlagExpiry = data.karmaFlagExpiry,
 		position = position,
 	}
 end
@@ -327,8 +411,24 @@ function PlayerDataService:LoadFromSnapshot(player, snapshot)
 	data.equipped = snapshot.equipped or createEmptyEquipped()
 	data.equippedWeapon = snapshot.equippedWeapon or data.equipped.weapon
 	data.inventory = snapshot.inventory or {}
+	for _, entry in data.inventory do
+		normalizeInventoryEntry(entry)
+	end
+	for slot, equippedItem in pairs(data.equipped) do
+		if type(equippedItem) == "table" then
+			normalizeInventoryEntry(equippedItem)
+		elseif type(equippedItem) == "string" then
+			local migrated = RarityConfig.GenerateItem(equippedItem, "Common")
+			normalizeInventoryEntry(migrated)
+			data.equipped[slot] = migrated
+		end
+	end
 	data.skillLoadout = snapshot.skillLoadout or {}
 	data.quest = snapshot.quest or data.quest
+	data.pvpMode = snapshot.pvpMode or data.pvpMode or "Peaceful"
+	data.karmaPoints = snapshot.karmaPoints or 0
+	data.pkCount = snapshot.pkCount or 0
+	data.karmaFlagExpiry = snapshot.karmaFlagExpiry
 
 	if snapshot.position then
 		data.savedPosition = Vector3.new(snapshot.position.x, snapshot.position.y, snapshot.position.z)
@@ -433,6 +533,15 @@ function PlayerDataService:SetupPlayer(player)
 	local data = self._data[player]
 	if data then
 		player:SetAttribute("PvpMode", data.pvpMode or "Peaceful")
+		local karmaService = getKarmaService()
+		if karmaService then
+			karmaService:RestorePlayerFlag(player, data)
+			karmaService:SyncKarmaState(player)
+		end
+		local pvpService = getPvpService()
+		if pvpService then
+			pvpService:SyncPlayerAttribute(player)
+		end
 	end
 
 	player.CharacterAdded:Connect(function()
@@ -558,13 +667,18 @@ function PlayerDataService:TakeCoins(player, amount)
 	return true
 end
 
-function PlayerDataService:Damage(player, amount, attacker, skipMitigation)
+function PlayerDataService:Damage(player, amount, attacker, skipMitigation, damageType)
 	local data = self._data[player]
 	if not data or not data.hasSelectedClass then
 		return
 	end
 
 	data.lastCombatTime = tick()
+
+	local restService = getRestService()
+	if restService then
+		restService:CancelRest(player, true)
+	end
 
 	local buffService = getBuffService()
 	if buffService then
@@ -580,13 +694,30 @@ function PlayerDataService:Damage(player, amount, attacker, skipMitigation)
 	if skipMitigation then
 		mitigated = math.max(1, amount)
 	else
-		mitigated = math.max(1, amount - math.floor(data.combatStats.defense * 0.5))
+		local res = data.combatStats.defense
+		if damageType == "magic" then
+			res = data.combatStats.magicalResistance or 0
+		end
+		mitigated = math.max(1, amount - math.floor(res * 0.5))
 	end
 	data.hp = math.max(0, data.hp - mitigated)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
 
 	if data.hp <= 0 then
+		-- Kill-confirmation: apply karma penalty only when a Hostile player attacker
+		-- lands the killing blow on a Peaceful victim. Environmental/mob deaths pass no Player attacker.
+		if typeof(attacker) == "Instance" and attacker:IsA("Player") then
+			local pvpService = getPvpService()
+			local karmaService = getKarmaService()
+			if pvpService and karmaService
+				and pvpService:IsHostile(attacker)
+				and pvpService:GetPvpMode(player) == "Peaceful"
+			then
+				karmaService:ApplyKillPenalty(attacker)
+			end
+		end
+
 		local character = player.Character
 		if character then
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -649,7 +780,14 @@ function PlayerDataService:GetWeaponDamage(player)
 	local weaponId = data.equippedWeapon
 	local weapon = weaponId and Items[weaponId]
 	local weaponDamage = weapon and weapon.damage or 0
-	return math.max(1, data.combatStats.physicalAttack + weaponDamage)
+	local enhanceLevel = 0
+	if type(data.equipped.weapon) == "table" then
+		enhanceLevel = data.equipped.weapon.enhanceLevel or 0
+	end
+	local enhConfig = getEnhancementConfig()
+	local flatPerLevel = enhConfig and enhConfig.STAT_BONUS_PER_LEVEL or 1
+	local enhanceBonus = enhanceLevel * flatPerLevel
+	return math.max(1, data.combatStats.physicalAttack + weaponDamage + enhanceBonus)
 end
 
 function PlayerDataService:SetEquippedWeapon(player, weaponId)
@@ -692,6 +830,8 @@ function PlayerDataService:EquipItem(player, itemId)
 		return false, "Item not in inventory"
 	end
 
+	normalizeInventoryEntry(itemEntry)
+
 	local slot = itemConfig.slot
 	local currentEquipped = data.equipped[slot]
 	
@@ -708,8 +848,14 @@ function PlayerDataService:EquipItem(player, itemId)
 		self:AddItem(player, currentEquipped, 1)
 	end
 
-	-- Store the full item entry (including rarity, etc.) in equipped slot
-	local equippedItem = { id = itemEntry.id, rarity = itemEntry.rarity, statMultiplier = itemEntry.statMultiplier }
+	-- Store the full item entry (including rarity, uid, etc.) in equipped slot
+	local equippedItem = {
+		id = itemEntry.id,
+		uid = itemEntry.uid,
+		rarity = itemEntry.rarity,
+		statMultiplier = itemEntry.statMultiplier,
+		enhanceLevel = itemEntry.enhanceLevel or 0,
+	}
 	data.equipped[slot] = equippedItem
 	
 	self:RecalculateStats(player)
@@ -739,6 +885,100 @@ function PlayerDataService:UnequipItem(player, slot)
 	return true
 end
 
+function PlayerDataService:GetInventoryEntryByUid(player, uid)
+	local data = self._data[player]
+	if not data or not uid then
+		return nil, nil
+	end
+	for index, entry in data.inventory do
+		if entry.uid == uid then
+			return entry, index
+		end
+	end
+	return nil, nil
+end
+
+function PlayerDataService:FindEquippedSlotByUid(player, uid)
+	local data = self._data[player]
+	if not data or not uid then
+		return nil
+	end
+	for _, slot in EQUIPMENT_SLOTS do
+		local equipped = data.equipped[slot]
+		if type(equipped) == "table" and equipped.uid == uid then
+			return slot
+		end
+	end
+	return nil
+end
+
+function PlayerDataService:HasMaterial(player, itemId, amount, minRarity)
+	local data = self._data[player]
+	if not data then
+		return false
+	end
+	amount = amount or 1
+	minRarity = minRarity or "Common"
+	local total = 0
+	for _, entry in data.inventory do
+		if entry.id == itemId and RarityConfig.MeetsMinRarity(entry.rarity or "Common", minRarity) then
+			total += entry.count or 1
+		end
+	end
+	return total >= amount
+end
+
+function PlayerDataService:RemoveMaterial(player, itemId, amount, minRarity)
+	local data = self._data[player]
+	if not data then
+		return false
+	end
+	amount = amount or 1
+	minRarity = minRarity or "Common"
+	local remaining = amount
+	for i = #data.inventory, 1, -1 do
+		local entry = data.inventory[i]
+		if entry.id == itemId and RarityConfig.MeetsMinRarity(entry.rarity or "Common", minRarity) then
+			local take = math.min(remaining, entry.count or 1)
+			entry.count = (entry.count or 1) - take
+			remaining -= take
+			if entry.count <= 0 then
+				table.remove(data.inventory, i)
+			end
+			if remaining <= 0 then
+				fireInventoryUpdated(player, data.inventory)
+				markSaveDirty(player)
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function PlayerDataService:RemoveItemByUid(player, uid)
+	local data = self._data[player]
+	if not data or not uid then
+		return false
+	end
+	for i, entry in data.inventory do
+		if entry.uid == uid then
+			table.remove(data.inventory, i)
+			fireInventoryUpdated(player, data.inventory)
+			markSaveDirty(player)
+			return true, entry
+		end
+	end
+	return false
+end
+
+function PlayerDataService:UnequipByUid(player, uid)
+	local slot = self:FindEquippedSlotByUid(player, uid)
+	if slot then
+		return self:UnequipItem(player, slot)
+	end
+	return false
+end
+
 function PlayerDataService:GetInventory(player)
 	local data = self._data[player]
 	return data and data.inventory or {}
@@ -754,13 +994,16 @@ function PlayerDataService:AddItem(player, itemData, count)
 
 	count = count or 1
 	local itemConfig = Items[itemId]
+	local rarity = type(itemData) == "table" and itemData.rarity or nil
 	
 	if itemConfig.stackable then
+		local stackRarity = itemConfig.supportsRarity and (rarity or "Common") or nil
 		for _, entry in data.inventory do
-			if entry.id == itemId then
+			local rarityMatch = not stackRarity or (entry.rarity or "Common") == stackRarity
+			if entry.id == itemId and rarityMatch then
 				local maxStack = itemConfig.maxStack or 99
 				entry.count = math.min(maxStack, entry.count + count)
-				getRemotes().InventoryUpdated:FireClient(player, data.inventory)
+				fireInventoryUpdated(player, data.inventory)
 				markSaveDirty(player)
 				local questService = getQuestService()
 				if questService then questService:OnItemCollected(player, itemId, count) end
@@ -771,9 +1014,15 @@ function PlayerDataService:AddItem(player, itemData, count)
 
 	local newEntry = type(itemData) == "table" and itemData or { id = itemId }
 	newEntry.count = count
+	if itemConfig.slot and not newEntry.rarity then
+		local generated = RarityConfig.GenerateItem(itemId, "Common")
+		newEntry.rarity = generated.rarity
+		newEntry.statMultiplier = generated.statMultiplier
+	end
+	normalizeInventoryEntry(newEntry)
 
 	table.insert(data.inventory, newEntry)
-	getRemotes().InventoryUpdated:FireClient(player, data.inventory)
+	fireInventoryUpdated(player, data.inventory)
 	markSaveDirty(player)
 	local questService = getQuestService()
 	if questService then
@@ -782,7 +1031,7 @@ function PlayerDataService:AddItem(player, itemData, count)
 	return true
 end
 
-function PlayerDataService:RemoveItem(player, itemId, count)
+function PlayerDataService:RemoveItem(player, itemId, count, rarity)
 	local data = self._data[player]
 	if not data then
 		return false
@@ -790,7 +1039,8 @@ function PlayerDataService:RemoveItem(player, itemId, count)
 
 	count = count or 1
 	for i, entry in data.inventory do
-		if entry.id == itemId then
+		local rarityMatch = not rarity or (entry.rarity or "Common") == rarity
+		if entry.id == itemId and rarityMatch then
 			if entry.count < count then
 				return false
 			end
@@ -798,7 +1048,7 @@ function PlayerDataService:RemoveItem(player, itemId, count)
 			if entry.count <= 0 then
 				table.remove(data.inventory, i)
 			end
-			getRemotes().InventoryUpdated:FireClient(player, data.inventory)
+			fireInventoryUpdated(player, data.inventory)
 			markSaveDirty(player)
 			return true
 		end
@@ -813,12 +1063,13 @@ function PlayerDataService:HasItem(player, itemId, count)
 	end
 
 	count = count or 1
+	local total = 0
 	for _, entry in data.inventory do
-		if entry.id == itemId and entry.count >= count then
-			return true
+		if entry.id == itemId then
+			total += entry.count or 1
 		end
 	end
-	return false
+	return total >= count
 end
 
 function PlayerDataService:Start()

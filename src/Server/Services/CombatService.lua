@@ -10,6 +10,7 @@ local CombatService = {}
 CombatService._playerData = nil
 CombatService._enemyService = nil
 CombatService._pvpService = nil
+CombatService._restService = nil
 CombatService._cooldowns = {}
 
 local ATTACK_COOLDOWN = 0.6
@@ -20,6 +21,7 @@ function CombatService:Init()
 	self._playerData = Framework:GetService("PlayerDataService")
 	self._enemyService = Framework:GetService("EnemyService")
 	self._pvpService = Framework:GetService("PvpService")
+	self._restService = Framework:GetService("RestService")
 	self._remotes = Framework:GetRemotesFolder()
 end
 
@@ -196,6 +198,10 @@ function CombatService:HandleAttack(player)
 
 	if character:GetAttribute("IsStunned") or character:GetAttribute("IsKnockedDown") then
 		return
+	end
+
+	if self._restService then
+		self._restService:CancelRest(player, true)
 	end
 
 	self._cooldowns[player] = now

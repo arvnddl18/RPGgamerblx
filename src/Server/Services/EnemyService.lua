@@ -17,45 +17,34 @@ EnemyService._inventoryService = nil
 EnemyService._enemies = {}
 EnemyService._attackCooldowns = {}
 
--- All spawn positions are OUTSIDE the village walls (village radius ~600, wilderness starts at 800+).
--- Spread across north/south/east/west forest and mountain areas.
-local SPAWN_POSITIONS = {
-	-- North forest (Z negative = north)
-	Vector3.new(0,   3, -900),
-	Vector3.new(200, 3, -950),
-	Vector3.new(-200, 3, -950),
-	Vector3.new(100, 3, -1100),
-	Vector3.new(-100, 3, -1100),
+local SPAWN_GROUPS = {
+	-- North forest
+	{ type = "Orc", count = 3, center = Vector3.new(0, 3, -900), radius = 40 },
+	{ type = "Goblin", count = 4, center = Vector3.new(200, 3, -950), radius = 30 },
+	{ type = "Spider", count = 4, center = Vector3.new(-200, 3, -950), radius = 35 },
+	{ type = "Skeleton", count = 3, center = Vector3.new(100, 3, -1100), radius = 30 },
+	{ type = "DireWolf", count = 2, center = Vector3.new(-100, 3, -1100), radius = 40 },
 
 	-- South forest
-	Vector3.new(0,   3,  900),
-	Vector3.new(200, 3,  950),
-	Vector3.new(-200, 3,  950),
+	{ type = "Slime", count = 5, center = Vector3.new(0, 3, 900), radius = 25 },
+	{ type = "Goblin", count = 3, center = Vector3.new(200, 3, 950), radius = 30 },
+	{ type = "DireWolf", count = 3, center = Vector3.new(-200, 3, 950), radius = 35 },
 
 	-- East mountains
-	Vector3.new(900,  3,  0),
-	Vector3.new(1000, 3,  200),
-	Vector3.new(1000, 3, -200),
-	Vector3.new(1100, 3,  0),
+	{ type = "Orc", count = 2, center = Vector3.new(900, 3, 0), radius = 40 },
+	{ type = "Spider", count = 3, center = Vector3.new(1000, 3, 200), radius = 30 },
+	{ type = "Skeleton", count = 4, center = Vector3.new(1000, 3, -200), radius = 35 },
 
 	-- West mountains
-	Vector3.new(-900,  3,  0),
-	Vector3.new(-1000, 3,  200),
-	Vector3.new(-1000, 3, -200),
+	{ type = "Orc", count = 2, center = Vector3.new(-900, 3, 0), radius = 40 },
+	{ type = "Goblin", count = 4, center = Vector3.new(-1000, 3, 200), radius = 30 },
+	{ type = "Skeleton", count = 3, center = Vector3.new(-1000, 3, -200), radius = 35 },
 
-	-- Northeast wilderness
-	Vector3.new(700,  3, -700),
-	Vector3.new(850,  3, -850),
-
-	-- Northwest wilderness
-	Vector3.new(-700, 3, -700),
-	Vector3.new(-850, 3, -850),
-
-	-- Southeast wilderness
-	Vector3.new(700,  3,  700),
-
-	-- Southwest wilderness
-	Vector3.new(-700, 3,  700),
+	-- Wilderness corners
+	{ type = "DireWolf", count = 3, center = Vector3.new(700, 3, -700), radius = 40 },
+	{ type = "Spider", count = 4, center = Vector3.new(-700, 3, -700), radius = 30 },
+	{ type = "Slime", count = 5, center = Vector3.new(700, 3, 700), radius = 25 },
+	{ type = "Goblin", count = 4, center = Vector3.new(-700, 3, 700), radius = 30 },
 }
 
 -- Increased aggro range so enemies actively hunt nearby players
@@ -66,6 +55,7 @@ function EnemyService:Init()
 	self._playerData = Framework:GetService("PlayerDataService")
 	self._questService = Framework:GetService("QuestService")
 	self._inventoryService = Framework:GetService("InventoryService")
+	self._karmaService = Framework:GetService("KarmaService")
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
 end
 
@@ -112,13 +102,15 @@ function EnemyService:UpdateHealthBar(enemy)
 	end
 end
 
-function EnemyService:CreateGoblin(position)
-	local config = Enemies.Goblin
+function EnemyService:CreateEnemy(enemyId, position, spawnCenter, spawnRadius)
+	local config = Enemies[enemyId]
+	if not config then return nil end
 	local model = Instance.new("Model")
 	model.Name = config.name
 
-	local skinColor = Color3.fromRGB(80, 160, 60)
-	local darkSkin = Color3.fromRGB(60, 130, 45)
+	local skinColor = config.color or Color3.fromRGB(80, 160, 60)
+	local h, s, v = skinColor:ToHSV()
+	local darkSkin = Color3.fromHSV(h, s, math.max(0, v - 0.2))
 	local mat = Enum.Material.SmoothPlastic
 
 	-- Torso (main body)
@@ -368,6 +360,9 @@ function EnemyService:CreateGoblin(position)
 	model:SetAttribute("CritReduction", config.CritReduction or 0)
 	model:SetAttribute("Attack", config.PhysicalDamage or 5)
 
+	model:SetAttribute("SpawnCenter", spawnCenter or position)
+	model:SetAttribute("SpawnRadius", spawnRadius or 10)
+
 	CollectionService:AddTag(model, "Enemy")
 	self:CreateHealthBar(model, config.MaxHP or 50)
 
@@ -386,9 +381,15 @@ function EnemyService:SpawnEnemies()
 		enemiesFolder.Parent = workspace
 	end
 
-	for _, position in SPAWN_POSITIONS do
-		local y = self._mapGenerator:GetGroundHeight(position.X, position.Z)
-		self:CreateGoblin(Vector3.new(position.X, y + 3, position.Z))
+	for _, group in SPAWN_GROUPS do
+		for i = 1, group.count do
+			local offsetX = (math.random() - 0.5) * 2 * group.radius
+			local offsetZ = (math.random() - 0.5) * 2 * group.radius
+			local posX = group.center.X + offsetX
+			local posZ = group.center.Z + offsetZ
+			local y = self._mapGenerator:GetGroundHeight(posX, posZ)
+			self:CreateEnemy(group.type, Vector3.new(posX, y + 3, posZ), group.center, group.radius)
+		end
 	end
 end
 
@@ -449,7 +450,7 @@ function EnemyService:DamageEnemy(enemy, baseDamage, attackerStats, attacker, da
 	end
 end
 
-function EnemyService:CreatePickup(position, itemId)
+function EnemyService:CreatePickup(position, itemId, rarity)
 	local item = Items[itemId]
 	if not item then
 		return
@@ -464,6 +465,9 @@ function EnemyService:CreatePickup(position, itemId)
 	part.Color = item.color
 	part.Material = Enum.Material.Neon
 	part:SetAttribute("ItemId", itemId)
+	if rarity then
+		part:SetAttribute("MaterialRarity", rarity)
+	end
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Pick up"
@@ -483,7 +487,8 @@ function EnemyService:CreatePickup(position, itemId)
 end
 
 function EnemyService:OnEnemyKilled(enemy, killer)
-	local config = Enemies.Goblin
+	local enemyId = enemy:GetAttribute("EnemyType") or "Goblin"
+	local config = Enemies[enemyId]
 	local root = enemy.PrimaryPart
 	local deathPosition = root and root.Position or Vector3.new()
 
@@ -492,6 +497,9 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 		self._playerData:AddCoins(killer, config.coinReward)
 		if self._questService then
 			self._questService:OnEnemyKilled(killer, config.id)
+		end
+		if self._karmaService then
+			self._karmaService:OnMobKilled(killer)
 		end
 	end
 
@@ -502,20 +510,19 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 		end
 		lootItem = lootItem or config.dropItem
 		if lootItem then
-			self:CreatePickup(deathPosition, lootItem)
+			local itemConfig = Items[lootItem]
+			if itemConfig and itemConfig.supportsRarity then
+				local MaterialRarityConfig = require(Shared.Config.MaterialRarityConfig)
+				local rarity = MaterialRarityConfig.Roll()
+				self:CreatePickup(deathPosition, lootItem, rarity)
+			else
+				self:CreatePickup(deathPosition, lootItem)
+			end
 		end
 	end
 
-	-- Find the closest original spawn point to respawn at
-	local closestSpawn = SPAWN_POSITIONS[1]
-	local closestDist = math.huge
-	for _, spawnPos in SPAWN_POSITIONS do
-		local dist = (Vector3.new(spawnPos.X, 0, spawnPos.Z) - Vector3.new(deathPosition.X, 0, deathPosition.Z)).Magnitude
-		if dist < closestDist then
-			closestDist = dist
-			closestSpawn = spawnPos
-		end
-	end
+	local spawnCenter = enemy:GetAttribute("SpawnCenter") or Vector3.new()
+	local spawnRadius = enemy:GetAttribute("SpawnRadius") or 10
 
 	for i, e in self._enemies do
 		if e == enemy then
@@ -526,15 +533,18 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 
 	enemy:Destroy()
 
-	-- Respawn at the closest original spawn point after a delay
+	-- Respawn near the original group spawn point after a delay
 	task.delay(5, function()
-		local y = self._mapGenerator:GetGroundHeight(closestSpawn.X, closestSpawn.Z)
-		self:CreateGoblin(Vector3.new(closestSpawn.X, y + 3, closestSpawn.Z))
+		local offsetX = (math.random() - 0.5) * 2 * spawnRadius
+		local offsetZ = (math.random() - 0.5) * 2 * spawnRadius
+		local posX = spawnCenter.X + offsetX
+		local posZ = spawnCenter.Z + offsetZ
+		local y = self._mapGenerator:GetGroundHeight(posX, posZ)
+		self:CreateEnemy(enemyId, Vector3.new(posX, y + 3, posZ), spawnCenter, spawnRadius)
 	end)
 end
 
 function EnemyService:RunAI()
-	local config = Enemies.Goblin
 	local context = {
 		getPlayerByUserId = function(userId)
 			return Players:GetPlayerByUserId(userId)
@@ -547,8 +557,16 @@ function EnemyService:RunAI()
 			local key = enemy
 			if not self._attackCooldowns[key] or now - self._attackCooldowns[key] >= enemyConfig.attackCooldown then
 				self._attackCooldowns[key] = now
-				local attack = enemy:GetAttribute("Attack") or enemyConfig.damage
-				self._playerData:Damage(targetPlayer, attack)
+				local attack = enemy:GetAttribute("Attack") or enemyConfig.PhysicalDamage
+				self._playerData:Damage(targetPlayer, attack, enemy, false, enemyConfig.damageType)
+				
+				if enemyConfig.statusEffect then
+					local Framework = require(game:GetService("ReplicatedStorage").Shared.Framework)
+					local BuffService = Framework:GetService("BuffService")
+					if BuffService then
+						BuffService:ApplyEffect(targetPlayer, enemyConfig.statusEffect, 3, enemy, 1)
+					end
+				end
 			end
 		end,
 	}
@@ -557,8 +575,10 @@ function EnemyService:RunAI()
 		if enemy.Parent and enemy:GetAttribute("Health") > 0 then
 			local root = enemy.PrimaryPart
 			local humanoid = enemy:FindFirstChildOfClass("Humanoid")
-			if root and humanoid then
-				EnemyStateMachine.Tick(enemy, humanoid, root, config, context)
+			local enemyId = enemy:GetAttribute("EnemyType") or "Goblin"
+			local enemyConfig = Enemies[enemyId]
+			if root and humanoid and enemyConfig then
+				EnemyStateMachine.Tick(enemy, humanoid, root, enemyConfig, context)
 			end
 		end
 	end

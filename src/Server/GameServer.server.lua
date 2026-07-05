@@ -117,12 +117,24 @@ local coreRemotes = {
 	"SelectClass", "ClassSelected", "EquipItem", "UnequipItem",
 	"OpenQuest", "AcceptQuest", "QuestUpdated", "OpenQuestLog",
 	"OpenShop", "PurchaseItem", "SellItem", "Notification", "LevelUp",
+	"OpenCrafting", "CraftResult", "EnhancementResult", "ApplyEnhancement",
+	"UpgradeEquipment",
 	"PartyInvite", "PartyInviteReceived", "PartyRespondInvite", "PartyLeave",
 	"PartyKick", "PartyUpdated", "PartyInviteResult",
 	"SetPvpMode",
+	"SetResting",
 }
 for _, remoteName in coreRemotes do
 	Framework:GetRemote(remoteName)
+end
+
+local remotesFolder = Framework:GetRemotesFolder()
+for _, remoteName in { "CraftItem", "UpgradeEquipment", "ApplyEnhancement" } do
+	if not remotesFolder:FindFirstChild(remoteName) then
+		local rf = Instance.new("RemoteFunction")
+		rf.Name = remoteName
+		rf.Parent = remotesFolder
+	end
 end
 
 setupWorld()

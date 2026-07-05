@@ -1,4 +1,5 @@
 local RarityConfig = {
+	ORDER = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
 	Common = {
 		id = "Common",
 		name = "Common",
@@ -48,6 +49,31 @@ local RarityConfig = {
 		hasAffix = true,
 	},
 }
+
+function RarityConfig.GetRank(rarityId)
+	rarityId = rarityId or "Common"
+	for rank, id in RarityConfig.ORDER do
+		if id == rarityId then
+			return rank
+		end
+	end
+	return 1
+end
+
+function RarityConfig.GetNextRarity(rarityId)
+	local rank = RarityConfig.GetRank(rarityId)
+	local nextId = RarityConfig.ORDER[rank + 1]
+	return nextId
+end
+
+function RarityConfig.MeetsMinRarity(haveRarity, requiredRarity)
+	return RarityConfig.GetRank(haveRarity or "Common") >= RarityConfig.GetRank(requiredRarity or "Common")
+end
+
+function RarityConfig.GetColor(rarityId)
+	local tier = RarityConfig[rarityId]
+	return tier and tier.color or Color3.fromRGB(200, 200, 200)
+end
 
 -- Returns a random multiplier based on the rarity tier's bounds
 function RarityConfig.RollMultiplier(rarityId)

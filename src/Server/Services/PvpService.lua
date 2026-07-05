@@ -31,6 +31,20 @@ function PvpService:IsHostile(player)
 	return self:GetPvpMode(player) == "Hostile"
 end
 
+function PvpService:IsInSafeZone(player)
+	local character = player.Character
+	if not character then
+		return false
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return false
+	end
+	local pos = root.Position
+	local dist = math.sqrt(pos.X * pos.X + pos.Z * pos.Z)
+	return dist <= PvpConfig.VillageSafeZoneRadius
+end
+
 function PvpService:CanDamagePlayer(attacker, target)
 	if not attacker or not target or attacker == target then
 		return false
@@ -40,17 +54,17 @@ function PvpService:CanDamagePlayer(attacker, target)
 		return false
 	end
 
-	return self:IsHostile(attacker) or self:IsHostile(target)
+	if self:IsInSafeZone(attacker) or self:IsInSafeZone(target) then
+		return false
+	end
+
+	return self:IsHostile(attacker)
 end
 
 function PvpService:IsInCombat(player)
 	local data = self._playerData:GetData(player)
 	if not data or not data.hasSelectedClass then
 		return false
-	end
-
-	if data.hp < data.combatStats.maxHp then
-		return true
 	end
 
 	if data.lastCombatTime and tick() - data.lastCombatTime < PvpConfig.CombatTagSeconds then

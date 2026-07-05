@@ -1507,7 +1507,25 @@ print("Map Generation 100% Complete! The Castle, Paths, and Fixed Trees are read
 
 local MapGeneratorService = {
 	_generated = true,
+	-- Roman marketplace block centers (matches spawnRomanMarketplace in this module).
+	Marketplaces = {
+		{ x = 80, z = 240, name = "EastMarket" },
+		{ x = -80, z = 240, name = "WestMarket" },
+	},
 }
+
+function MapGeneratorService:GetPrimaryMarketplace()
+	return self.Marketplaces[1]
+end
+
+-- Offset from marketplace center: left (west) interior, facing the plaza.
+function MapGeneratorService:GetMarketplaceShopCFrame()
+	local market = self:GetPrimaryMarketplace()
+	local x = market.x - 50
+	local z = market.z + 10
+	local y = self:GetGroundHeight(x, z)
+	return CFrame.new(x, y + 2, z) * CFrame.Angles(0, math.pi / 2, 0)
+end
 
 function MapGeneratorService:Generate()
 	-- Map generates at module load time; this method exists for GameServer compatibility.

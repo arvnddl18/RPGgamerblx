@@ -11,6 +11,8 @@ SkillService._enemyService = nil
 SkillService._inventoryService = nil
 SkillService._combatService = nil
 SkillService._partyService = nil
+SkillService._pvpService = nil
+SkillService._restService = nil
 SkillService._buffService = nil
 SkillService._cooldowns = {}
 SkillService._remotes = nil
@@ -29,6 +31,8 @@ function SkillService:Init()
 	self._inventoryService = Framework:GetService("InventoryService")
 	self._combatService = Framework:GetService("CombatService")
 	self._partyService = Framework:GetService("PartyService")
+	self._pvpService = Framework:GetService("PvpService")
+	self._restService = Framework:GetService("RestService")
 	self._buffService = Framework:GetService("BuffService")
 	self._remotes = Framework:GetRemotesFolder()
 
@@ -109,6 +113,36 @@ function SkillService:FindFriendlyTargets(caster, range)
 	return targets
 end
 
+function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOnly)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root or not self._combatService then
+		return {}
+	end
+
+	local origin = root.Position
+	local look = root.CFrame.LookVector
+	local targets = {}
+
+	for _, otherPlayer in Players:GetPlayers() do
+		if otherPlayer ~= attacker and self._combatService:CanDamagePlayer(attacker, otherPlayer) then
+			local otherCharacter = otherPlayer.Character
+			local otherRoot = otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart")
+			local otherData = self._playerData:GetData(otherPlayer)
+			if otherRoot and otherData and otherData.hp > 0 then
+				local offset = otherRoot.Position - origin
+				local distance = offset.Magnitude
+				if distance <= range then
+					if not coneOnly or offset.Unit:Dot(look) > 0.2 then
+						table.insert(targets, otherPlayer)
+					end
+				end
+			end
+		end
+	end
+
+	return targets
+end
+
 function SkillService:FindMeleeTargets(character, range, coneOnly)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then
@@ -137,7 +171,7 @@ function SkillService:FindMeleeTargets(character, range, coneOnly)
 	return targets
 end
 
-function SkillService:FindNearestTarget(character, range)
+function SkillService:FindNearestDamageTarget(attacker, character, range)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then
 		return nil
@@ -159,18 +193,50 @@ function SkillService:FindNearestTarget(character, range)
 		end
 	end
 
+	if attacker and self._combatService then
+		for _, otherPlayer in Players:GetPlayers() do
+			if otherPlayer ~= attacker and self._combatService:CanDamagePlayer(attacker, otherPlayer) then
+				local otherCharacter = otherPlayer.Character
+				local otherRoot = otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart")
+				local otherData = self._playerData:GetData(otherPlayer)
+				if otherRoot and otherData and otherData.hp > 0 then
+					local distance = (otherRoot.Position - root.Position).Magnitude
+					if distance <= nearestDist then
+						nearestDist = distance
+						nearest = otherPlayer
+					end
+				end
+			end
+		end
+	end
+
 	return nearest
 end
 
-function SkillService:ApplySkillDamage(player, skill, targets)
-	local attackerStats = self:GetAttackerStats(player)
-	local baseDamage = skill.damage or 0
+function SkillService:ResolveDamageType(skill)
+	if skill.skillType == "magic" then
+		return "magic"
+	end
+	return "physical"
+end
 
-	for _, enemy in targets do
-		self._enemyService:DamageEnemy(enemy, baseDamage, attackerStats, player, skill.skillType)
+function SkillService:ApplySkillDamage(player, skill, enemyTargets, playerTargets)
+	local baseDamage = skill.damage or 0
+	local damageType = self:ResolveDamageType(skill)
+
+	for _, enemy in enemyTargets do
+		self._enemyService:DamageEnemy(enemy, baseDamage, self:GetAttackerStats(player), player, damageType)
 
 		if skill.statusEffect and self._buffService then
 			self._buffService:ApplyEffect(enemy, skill.statusEffect, skill.statusDuration or 3, player, skill.statusIntensity)
+		end
+	end
+
+	for _, targetPlayer in playerTargets do
+		self._combatService:DamagePlayer(player, targetPlayer, baseDamage, damageType)
+
+		if skill.statusEffect and self._buffService then
+			self._buffService:ApplyEffect(targetPlayer, skill.statusEffect, skill.statusDuration or 3, player, skill.statusIntensity)
 		end
 	end
 end
@@ -247,30 +313,40 @@ function SkillService:ExecuteSkill(player, skill, slotIndex)
 	end
 
 	local range = skill.range or 10
-	local targets = {}
+	local enemyTargets = {}
+	local playerTargets = {}
 
 	if skill.aoe then
-		targets = self:FindMeleeTargets(character, range, false)
+		enemyTargets = self:FindMeleeTargets(character, range, false)
+		playerTargets = self:FindPlayerDamageTargets(player, character, range, false)
 	elseif skill.skillType == "melee" then
-		targets = self:FindMeleeTargets(character, range, true)
+		enemyTargets = self:FindMeleeTargets(character, range, true)
+		playerTargets = self:FindPlayerDamageTargets(player, character, range, true)
 	elseif skill.skillType == "magic" or skill.skillType == "ranged" then
-		local nearest = self:FindNearestTarget(character, range)
+		local nearest = self:FindNearestDamageTarget(player, character, range)
 		if nearest then
-			targets = { nearest }
+			if typeof(nearest) == "Instance" and nearest:IsA("Player") then
+				playerTargets = { nearest }
+			else
+				enemyTargets = { nearest }
+			end
 		end
 	else
-		targets = self:FindMeleeTargets(character, range, true)
+		enemyTargets = self:FindMeleeTargets(character, range, true)
+		playerTargets = self:FindPlayerDamageTargets(player, character, range, true)
 	end
 
 	if skill.slotType == "autoAttack" and slotIndex == 1 then
-		targets = self:FindMeleeTargets(character, range, true)
+		enemyTargets = self:FindMeleeTargets(character, range, true)
+		playerTargets = self:FindPlayerDamageTargets(player, character, range, true)
 	end
 
-	if #targets == 0 and (skill.damage or 0) > 0 then
+	local totalTargets = #enemyTargets + #playerTargets
+	if totalTargets == 0 and (skill.damage or 0) > 0 then
 		return false
 	end
 
-	self:ApplySkillDamage(player, skill, targets)
+	self:ApplySkillDamage(player, skill, enemyTargets, playerTargets)
 	return true
 end
 
@@ -282,6 +358,10 @@ function SkillService:HandleCastSkill(player, slotIndex)
 	local character = player.Character
 	if character and (character:GetAttribute("IsStunned") or character:GetAttribute("IsSilenced") or character:GetAttribute("IsKnockedDown")) then
 		return
+	end
+
+	if self._restService then
+		self._restService:CancelRest(player, true)
 	end
 
 	slotIndex = math.floor(slotIndex)

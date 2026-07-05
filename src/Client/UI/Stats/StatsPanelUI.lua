@@ -41,6 +41,8 @@ function StatsPanelUI.new(playerGui)
 	self._statLabels = {}
 	self._pvpMode = "Peaceful"
 	self._onSetPvpMode = nil
+	self._flagSecondsRemaining = 0
+	self._countdownThread = nil
 
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "StatsPanelUI"
@@ -68,7 +70,7 @@ function StatsPanelUI.new(playerGui)
 
 	local panel = Instance.new("Frame")
 	panel.Name = "StatsPanel"
-	panel.Size = UDim2.new(0, 240, 0, 380)
+	panel.Size = UDim2.new(0, 240, 0, 440)
 	panel.Position = UDim2.new(1, -256, 0, 60)
 	panel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	panel.BackgroundTransparency = 0.15
@@ -143,7 +145,7 @@ function StatsPanelUI.new(playerGui)
 
 	local pvpLabel = Instance.new("TextLabel")
 	pvpLabel.Size = UDim2.new(1, -16, 0, 18)
-	pvpLabel.Position = UDim2.new(0, 8, 1, -74)
+	pvpLabel.Position = UDim2.new(0, 8, 1, -134)
 	pvpLabel.BackgroundTransparency = 1
 	pvpLabel.Text = "PvP Mode"
 	pvpLabel.TextColor3 = Color3.fromRGB(255, 200, 120)
@@ -152,8 +154,48 @@ function StatsPanelUI.new(playerGui)
 	pvpLabel.TextXAlignment = Enum.TextXAlignment.Left
 	pvpLabel.Parent = panel
 
-	self._peacefulBtn = makeButton(panel, "Peaceful", UDim2.new(0.48, -6, 0, 26), UDim2.new(0, 8, 1, -52), Color3.fromRGB(50, 100, 70))
-	self._hostileBtn = makeButton(panel, "Hostile", UDim2.new(0.48, -6, 0, 26), UDim2.new(0.52, 0, 1, -52), Color3.fromRGB(120, 50, 50))
+	self._peacefulBtn = makeButton(panel, "Peaceful", UDim2.new(0.48, -6, 0, 26), UDim2.new(0, 8, 1, -112), Color3.fromRGB(50, 100, 70))
+	self._hostileBtn = makeButton(panel, "Hostile", UDim2.new(0.48, -6, 0, 26), UDim2.new(0.52, 0, 1, -112), Color3.fromRGB(120, 50, 50))
+
+	local karmaLabel = Instance.new("TextLabel")
+	karmaLabel.Name = "KarmaLabel"
+	karmaLabel.Size = UDim2.new(1, -16, 0, 16)
+	karmaLabel.Position = UDim2.new(0, 8, 1, -78)
+	karmaLabel.BackgroundTransparency = 1
+	karmaLabel.Text = "Karma: Innocent"
+	karmaLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
+	karmaLabel.Font = Enum.Font.Gotham
+	karmaLabel.TextSize = 11
+	karmaLabel.TextXAlignment = Enum.TextXAlignment.Left
+	karmaLabel.Parent = panel
+	self._karmaLabel = karmaLabel
+
+	local pkLabel = Instance.new("TextLabel")
+	pkLabel.Name = "PkLabel"
+	pkLabel.Size = UDim2.new(1, -16, 0, 16)
+	pkLabel.Position = UDim2.new(0, 8, 1, -60)
+	pkLabel.BackgroundTransparency = 1
+	pkLabel.Text = "PK Count: 0"
+	pkLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
+	pkLabel.Font = Enum.Font.Gotham
+	pkLabel.TextSize = 11
+	pkLabel.TextXAlignment = Enum.TextXAlignment.Left
+	pkLabel.Parent = panel
+	self._pkLabel = pkLabel
+
+	local flagLabel = Instance.new("TextLabel")
+	flagLabel.Name = "FlagLabel"
+	flagLabel.Size = UDim2.new(1, -16, 0, 16)
+	flagLabel.Position = UDim2.new(0, 8, 1, -42)
+	flagLabel.BackgroundTransparency = 1
+	flagLabel.Text = ""
+	flagLabel.TextColor3 = Color3.fromRGB(200, 80, 200)
+	flagLabel.Font = Enum.Font.GothamBold
+	flagLabel.TextSize = 11
+	flagLabel.TextXAlignment = Enum.TextXAlignment.Left
+	flagLabel.Visible = false
+	flagLabel.Parent = panel
+	self._flagLabel = flagLabel
 
 	self._peacefulBtn.MouseButton1Click:Connect(function()
 		if self._onSetPvpMode then
@@ -201,6 +243,51 @@ function StatsPanelUI:UpdatePvpButtons(mode)
 		and Color3.fromRGB(120, 50, 50) or Color3.fromRGB(50, 50, 70)
 end
 
+local function formatFlagTime(seconds)
+	local mins = math.floor(seconds / 60)
+	local secs = seconds % 60
+	return string.format("%d:%02d", mins, secs)
+end
+
+function StatsPanelUI:UpdateKarmaDisplay(payload)
+	local karmaPoints = payload.karmaPoints or 0
+	local pkCount = payload.pkCount or 0
+	local karmaState = payload.karmaState or "Innocent"
+	local displayState = karmaState == "Chaotic" and "Outlaw" or "Innocent"
+
+	self._karmaLabel.Text = string.format("Karma: %s (%d pts)", displayState, karmaPoints)
+	self._pkLabel.Text = "PK Count: " .. tostring(pkCount)
+
+	self._flagSecondsRemaining = payload.karmaFlagSecondsRemaining or 0
+	if self._flagSecondsRemaining > 0 then
+		self._flagLabel.Visible = true
+		self._flagLabel.Text = "Outlaw timer: " .. formatFlagTime(self._flagSecondsRemaining)
+	else
+		self._flagLabel.Visible = false
+		self._flagLabel.Text = ""
+	end
+end
+
+function StatsPanelUI:StartFlagCountdown()
+	if self._countdownThread then
+		return
+	end
+	self._countdownThread = task.spawn(function()
+		while self._screenGui.Parent do
+			task.wait(1)
+			if self._flagSecondsRemaining > 0 then
+				self._flagSecondsRemaining -= 1
+				if self._flagSecondsRemaining > 0 then
+					self._flagLabel.Text = "Outlaw timer: " .. formatFlagTime(self._flagSecondsRemaining)
+				else
+					self._flagLabel.Visible = false
+					self._flagLabel.Text = ""
+				end
+			end
+		end
+	end)
+end
+
 function StatsPanelUI:Update(payload, classesConfig)
 	if not payload then
 		return
@@ -235,6 +322,8 @@ function StatsPanelUI:Update(payload, classesConfig)
 	end
 
 	self:UpdatePvpButtons(payload.pvpMode)
+	self:UpdateKarmaDisplay(payload)
+	self:StartFlagCountdown()
 end
 
 return StatsPanelUI

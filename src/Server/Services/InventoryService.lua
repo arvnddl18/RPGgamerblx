@@ -27,7 +27,14 @@ function InventoryService:SetupPickup(part)
 			return
 		end
 
-		if self._playerData:AddItem(player, itemId, 1) then
+		local itemConfig = Items[itemId]
+		local addData = itemId
+		if itemConfig and itemConfig.supportsRarity then
+			local rarity = part:GetAttribute("MaterialRarity") or "Common"
+			addData = { id = itemId, rarity = rarity }
+		end
+
+		if self._playerData:AddItem(player, addData, 1) then
 			if self._questService then
 				self._questService:OnItemCollected(player, itemId, 1)
 			end

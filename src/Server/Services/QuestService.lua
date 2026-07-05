@@ -10,13 +10,14 @@ QuestService._remotes = nil
 function QuestService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
 	self._playerData = Framework:GetService("PlayerDataService")
+	self._karmaService = Framework:GetService("KarmaService")
 	self._remotes = Framework:GetRemotesFolder()
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
 	Framework:GetRemote("OpenQuestLog")
 end
 
 function QuestService:CreateNPC(cframe)
-	local config = Quests.KillGoblins
+	local config = Quests.GoblinMenace
 	local model = Instance.new("Model")
 	model.Name = config.npcName
 
@@ -298,18 +299,23 @@ function QuestService:CompleteQuest(player, config)
 	end
 
 	data.quest.completed = true
-	self._playerData:AddXP(player, config.xpReward or 0)
-	self._playerData:AddCoins(player, config.coinReward or 0)
+	local rewards = config.rewards or {}
+	self._playerData:AddXP(player, rewards.experience or 0)
+	self._playerData:AddCoins(player, rewards.gold or 0)
 
-	if config.itemRewards then
-		for _, reward in config.itemRewards do
-			self._playerData:AddItem(player, reward.itemId, reward.count or 1)
+	if rewards.items then
+		for _, reward in rewards.items do
+			self._playerData:AddItem(player, reward.itemId, reward.quantity or 1)
 		end
 	end
 
 	self._remotes.Notification:FireClient(player, "Quest complete: " .. config.name)
 	self:FireQuestUpdated(player)
 	self._playerData:FireStatsUpdated(player)
+
+	if self._karmaService then
+		self._karmaService:OnQuestCompleted(player)
+	end
 end
 
 function QuestService:AdvanceQuestProgress(player, amount)
@@ -501,13 +507,13 @@ function QuestService:CreateReachZone(zoneId, position, size)
 end
 
 function QuestService:Start()
-	local pos = Vector3.new(50, 0, 237)
+	local pos = Vector3.new(10, 0, 125)
 	local y = self._mapGenerator:GetGroundHeight(pos.X, pos.Z)
-	self:CreateNPC(CFrame.new(pos.X, y + 2, pos.Z) * CFrame.Angles(0, math.pi, 0))
+	self:CreateNPC(CFrame.new(pos.X, y + 2, pos.Z) * CFrame.Angles(0, math.pi * 0.75, 0))
 
-	local herbPos = Vector3.new(80, 0, 200)
+	local herbPos = Vector3.new(-15, 0, 140)
 	local herbY = self._mapGenerator:GetGroundHeight(herbPos.X, herbPos.Z)
-	local _, herbPrompt = self:CreateSimpleNPC("Herb Master", CFrame.new(herbPos.X, herbY + 2, herbPos.Z), "Quest")
+	local _, herbPrompt = self:CreateSimpleNPC("Herb Master", CFrame.new(herbPos.X, herbY + 2, herbPos.Z) * CFrame.Angles(0, math.pi * 0.25, 0), "Quest")
 	herbPrompt.Triggered:Connect(function(player)
 		local data = self._playerData:GetData(player)
 		if not data then return end
@@ -522,9 +528,9 @@ function QuestService:Start()
 		})
 	end)
 
-	local elderPos = Vector3.new(-40, 0, 220)
+	local elderPos = Vector3.new(0, 0, 110)
 	local elderY = self._mapGenerator:GetGroundHeight(elderPos.X, elderPos.Z)
-	local _, elderPrompt = self:CreateSimpleNPC("Village Elder", CFrame.new(elderPos.X, elderY + 2, elderPos.Z), "Talk")
+	local _, elderPrompt = self:CreateSimpleNPC("Village Elder", CFrame.new(elderPos.X, elderY + 2, elderPos.Z) * CFrame.Angles(0, math.pi, 0), "Talk")
 	elderPrompt.Triggered:Connect(function(player)
 		self:OnTalkToNPC(player, "Village Elder")
 		local data = self._playerData:GetData(player)

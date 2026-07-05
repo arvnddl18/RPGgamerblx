@@ -5,12 +5,15 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DashConfig = require(Shared.Config.Dash)
 
 local DashService = {}
+DashService._playerData = nil
+DashService._restService = nil
 DashService._cooldowns = {}
 DashService._remotes = nil
 
 function DashService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
 	self._playerData = Framework:GetService("PlayerDataService")
+	self._restService = Framework:GetService("RestService")
 	self._remotes = Framework:GetRemotesFolder()
 
 	Framework:GetRemote("RequestDash")
@@ -53,6 +56,10 @@ function DashService:ApplyDash(player, direction)
 		direction = root.CFrame.LookVector
 	end
 	direction = direction.Unit
+
+	if self._restService then
+		self._restService:CancelRest(player, true)
+	end
 
 	self._cooldowns[player] = tick() + DashConfig.cooldown
 	self._remotes.DashCooldownUpdated:FireClient(player, DashConfig.cooldown)

@@ -87,6 +87,32 @@ function BuffService:ApplyEffect(target, effectId, duration, instigator, customI
 	return true
 end
 
+function BuffService:GetActiveEffectsSnapshot(target)
+	local effects = self._activeBuffs[target]
+	if not effects then
+		return {}
+	end
+
+	local now = tick()
+	local snapshot = {}
+	for effectId, effect in pairs(effects) do
+		local remaining = effect.duration - (now - effect.startTime)
+		if remaining > 0 then
+			table.insert(snapshot, {
+				id = effectId,
+				remaining = remaining,
+				intensity = effect.intensity or 1,
+			})
+		end
+	end
+
+	table.sort(snapshot, function(a, b)
+		return a.id < b.id
+	end)
+
+	return snapshot
+end
+
 function BuffService:GetActiveStatBonuses(target)
 	local bonuses = {}
 	local effects = self._activeBuffs[target]

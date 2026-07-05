@@ -31,6 +31,7 @@ function ShopService:BuildShopPayload()
 				price = entry.price,
 				sellPrice = Shop.GetSellPrice(entry.price),
 				category = entry.category or item.category or "materials",
+				requiredLevel = entry.requiredLevel,
 			})
 		end
 	end
@@ -307,7 +308,7 @@ function ShopService:CreateNPC(cframe)
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
-	label.Text = "Shop Keeper"
+	label.Text = "Scroll Merchant"
 	label.TextColor3 = Color3.fromRGB(255, 210, 80)
 	label.TextStrokeTransparency = 0.3
 	label.Font = Enum.Font.GothamBold
@@ -316,7 +317,7 @@ function ShopService:CreateNPC(cframe)
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Shop"
-	prompt.ObjectText = "Shop Keeper"
+	prompt.ObjectText = "Scroll Merchant"
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 10
 	prompt.Parent = root
@@ -339,15 +340,10 @@ function ShopService:CreateNPC(cframe)
 	return model
 end
 
-function ShopService:Purchase(player, itemId)
-	local shopEntry = nil
-	for _, entry in Shop.items do
-		if entry.itemId == itemId then
-			shopEntry = entry
-			break
-		end
-	end
+function ShopService:Purchase(player, itemId, quantity)
+	quantity = math.clamp(math.floor(quantity or 1), 1, 99)
 
+	local shopEntry = Shop.FindEntry(itemId)
 	if not shopEntry then
 		return false, "Item not found"
 	end
@@ -357,17 +353,41 @@ function ShopService:Purchase(player, itemId)
 		return false, "Invalid item"
 	end
 
-	if not self._playerData:TakeCoins(player, shopEntry.price) then
+	local data = self._playerData:GetData(player)
+	if not data then
+		return false, "No player data"
+	end
+
+	if shopEntry.requiredLevel and data.level < shopEntry.requiredLevel then
+		return false, "Requires Level " .. shopEntry.requiredLevel
+	end
+
+	local totalCost = shopEntry.price * quantity
+	if not self._playerData:TakeCoins(player, totalCost) then
 		return false, "Not enough coins"
 	end
 
 	if item.type == "weapon" then
+		if quantity > 1 then
+			self._playerData:AddCoins(player, totalCost)
+			return false, "Can only buy one weapon at a time"
+		end
 		self._playerData:SetEquippedWeapon(player, itemId)
 		self._combatService:GiveWeapon(player, itemId)
 		self._remotes.Notification:FireClient(player, "Purchased " .. item.name)
-	elseif item.type == "consumable" or item.type == "material" then
-		self._playerData:AddItem(player, itemId, 1)
-		self._remotes.Notification:FireClient(player, "Purchased " .. item.name)
+	elseif item.type == "scroll" or item.type == "consumable" or item.type == "material" then
+		local addData = itemId
+		if item.type == "material" and item.supportsRarity then
+			addData = { id = itemId, rarity = "Common" }
+		end
+		if not self._playerData:AddItem(player, addData, quantity) then
+			self._playerData:AddCoins(player, totalCost)
+			return false, "Inventory full"
+		end
+		self._remotes.Notification:FireClient(player, "Purchased " .. quantity .. "x " .. item.name)
+	else
+		self._playerData:AddCoins(player, totalCost)
+		return false, "Cannot purchase this item"
 	end
 
 	return true
@@ -404,12 +424,11 @@ function ShopService:Sell(player, itemId, count)
 end
 
 function ShopService:Start()
-	local pos = Vector3.new(-50, 0, 237)
-	local y = self._mapGenerator:GetGroundHeight(pos.X, pos.Z)
-	self:CreateNPC(CFrame.new(pos.X, y + 2, pos.Z) * CFrame.Angles(0, math.pi, 0))
+	local cframe = self._mapGenerator:GetMarketplaceShopCFrame()
+	self:CreateNPC(cframe)
 
-	self._remotes.PurchaseItem.OnServerEvent:Connect(function(player, itemId)
-		local success, message = self:Purchase(player, itemId)
+	self._remotes.PurchaseItem.OnServerEvent:Connect(function(player, itemId, quantity)
+		local success, message = self:Purchase(player, itemId, quantity)
 		if not success and message then
 			self._remotes.Notification:FireClient(player, message)
 		end
