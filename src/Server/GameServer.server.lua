@@ -4,50 +4,12 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Server = ServerScriptService:WaitForChild("Server")
 local Services = Server:WaitForChild("Services")
 
-local PlayerDataService = require(Services.PlayerDataService)
-local CombatService = require(Services.CombatService)
-local EnemyService = require(Services.EnemyService)
-local InventoryService = require(Services.InventoryService)
-local QuestService = require(Services.QuestService)
-local ShopService = require(Services.ShopService)
-local MapGeneratorService = require(Services.MapGeneratorService)
-local EquipmentService = require(Services.EquipmentService)
-
-local REMOTE_NAMES = {
-	"Attack",
-	"StatsUpdated",
-	"InventoryUpdated",
-	"RequestInventory",
-	"UseItem",
-	"OpenQuest",
-	"AcceptQuest",
-	"QuestUpdated",
-	"OpenShop",
-	"PurchaseItem",
-	"Notification",
-}
-
-local function createRemotes()
-	local folder = ReplicatedStorage:FindFirstChild("Remotes")
-	if not folder then
-		folder = Instance.new("Folder")
-		folder.Name = "Remotes"
-		folder.Parent = ReplicatedStorage
-	end
-
-	for _, name in REMOTE_NAMES do
-		if not folder:FindFirstChild(name) then
-			local remote = Instance.new("RemoteEvent")
-			remote.Name = name
-			remote.Parent = folder
-		end
-	end
-
-	return folder
-end
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Framework = require(Shared:WaitForChild("Framework"))
 
 local function setupWorld()
 	-- Run massive map generator
+	local MapGeneratorService = require(Services:WaitForChild("MapGeneratorService"))
 	MapGeneratorService:Generate()
 
 	local world = workspace:FindFirstChild("RPGWorld")
@@ -148,26 +110,33 @@ local function setupWorld()
 	end
 end
 
-local remotes = createRemotes()
 setupWorld()
 
-PlayerDataService:Init(remotes)
-CombatService:Init(PlayerDataService, EnemyService, remotes)
-EnemyService:Init(PlayerDataService, QuestService, InventoryService, MapGeneratorService)
-InventoryService:Init(PlayerDataService, CombatService, remotes)
-QuestService:Init(PlayerDataService, remotes, MapGeneratorService)
-ShopService:Init(PlayerDataService, CombatService, remotes, MapGeneratorService)
-EquipmentService:Init()
+-- 1. Register all services
+for _, module in Services:GetChildren() do
+	if module:IsA("ModuleScript") then
+		local service = require(module)
+		Framework:RegisterService(module.Name, service)
+	end
+end
 
-PlayerDataService:Start()
-CombatService:Start()
-EnemyService:Start()
-InventoryService:Start()
-QuestService:Start()
-ShopService:Start()
-EquipmentService:Start()
+-- 2. Init all services
+for _, service in Framework:GetServices() do
+	if type(service.Init) == "function" then
+		service:Init()
+	end
+end
 
-print("[SimpleRPG] Server started successfully.")
+-- 3. Start all services
+for name, service in Framework:GetServices() do
+	if type(service.Start) == "function" then
+		task.spawn(function()
+			service:Start()
+		end)
+	end
+end
+
+print("[SimpleRPG] Server Framework started successfully.")
 
 -- Fix for players spawning in the void before the map finishes generating
 for _, player in game:GetService("Players"):GetPlayers() do

@@ -9,11 +9,12 @@ ShopService._playerData = nil
 ShopService._combatService = nil
 ShopService._remotes = nil
 
-function ShopService:Init(playerDataService, combatService, remotes, mapGeneratorService)
-	self._playerData = playerDataService
-	self._combatService = combatService
-	self._remotes = remotes
-	self._mapGenerator = mapGeneratorService
+function ShopService:Init()
+	local Framework = require(ReplicatedStorage.Shared.Framework)
+	self._playerData = Framework:GetService("PlayerDataService")
+	self._combatService = Framework:GetService("CombatService")
+	self._remotes = Framework:GetRemotesFolder()
+	self._mapGenerator = Framework:GetService("MapGeneratorService")
 end
 
 function ShopService:CreateNPC(cframe)

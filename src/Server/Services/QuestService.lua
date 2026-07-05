@@ -7,10 +7,11 @@ local QuestService = {}
 QuestService._playerData = nil
 QuestService._remotes = nil
 
-function QuestService:Init(playerDataService, remotes, mapGeneratorService)
-	self._playerData = playerDataService
-	self._remotes = remotes
-	self._mapGenerator = mapGeneratorService
+function QuestService:Init()
+	local Framework = require(ReplicatedStorage.Shared.Framework)
+	self._playerData = Framework:GetService("PlayerDataService")
+	self._remotes = Framework:GetRemotesFolder()
+	self._mapGenerator = Framework:GetService("MapGeneratorService")
 end
 
 function QuestService:CreateNPC(cframe)

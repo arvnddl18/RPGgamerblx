@@ -57,8 +57,9 @@ function PlayerDataService:GetData(player)
 	return self._data[player]
 end
 
-function PlayerDataService:Init(remotes)
-	self._remotes = remotes
+function PlayerDataService:Init()
+	local Framework = require(ReplicatedStorage.Shared.Framework)
+	self._remotes = Framework:GetRemotesFolder()
 end
 
 function PlayerDataService:SetupPlayer(player)

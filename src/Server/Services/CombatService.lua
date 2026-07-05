@@ -13,10 +13,11 @@ CombatService._cooldowns = {}
 local ATTACK_COOLDOWN = 0.6
 local ATTACK_RANGE = 10
 
-function CombatService:Init(playerDataService, enemyService, remotes)
-	self._playerData = playerDataService
-	self._enemyService = enemyService
-	self._remotes = remotes
+function CombatService:Init()
+	local Framework = require(ReplicatedStorage.Shared.Framework)
+	self._playerData = Framework:GetService("PlayerDataService")
+	self._enemyService = Framework:GetService("EnemyService")
+	self._remotes = Framework:GetRemotesFolder()
 end
 
 function CombatService:CreateSwordTool(weaponId)

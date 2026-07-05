@@ -7,10 +7,11 @@ local InventoryService = {}
 InventoryService._playerData = nil
 InventoryService._combatService = nil
 
-function InventoryService:Init(playerDataService, combatService, remotes)
-	self._playerData = playerDataService
-	self._combatService = combatService
-	self._remotes = remotes
+function InventoryService:Init()
+	local Framework = require(ReplicatedStorage.Shared.Framework)
+	self._playerData = Framework:GetService("PlayerDataService")
+	self._combatService = Framework:GetService("CombatService")
+	self._remotes = Framework:GetRemotesFolder()
 end
 
 function InventoryService:SetupPickup(part)

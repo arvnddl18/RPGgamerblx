@@ -27,11 +27,12 @@ local SPAWN_POSITIONS = {
 -- Increased aggro range so enemies actively hunt nearby players
 local ACTIVE_AGGRO_RANGE = 40
 
-function EnemyService:Init(playerDataService, questService, inventoryService, mapGeneratorService)
-	self._playerData = playerDataService
-	self._questService = questService
-	self._inventoryService = inventoryService
-	self._mapGenerator = mapGeneratorService
+function EnemyService:Init()
+	local Framework = require(ReplicatedStorage.Shared.Framework)
+	self._playerData = Framework:GetService("PlayerDataService")
+	self._questService = Framework:GetService("QuestService")
+	self._inventoryService = Framework:GetService("InventoryService")
+	self._mapGenerator = Framework:GetService("MapGeneratorService")
 end
 
 function EnemyService:CreateHealthBar(enemy, maxHealth)
