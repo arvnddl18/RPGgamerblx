@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
@@ -329,6 +331,89 @@ for i, slotData in actionSlots do
 	nameLabel.Parent = slot
 end
 
+-- Evade/Dash Slot (separate from the action bar, positioned to the left)
+local dashSlot = Instance.new("Frame")
+dashSlot.Name = "DashSlot"
+dashSlot.Size = UDim2.new(0, 54, 0, 54)
+dashSlot.Position = UDim2.new(0.5, -230, 1, -73)
+dashSlot.BackgroundColor3 = Color3.fromRGB(30, 50, 70)
+dashSlot.BorderSizePixel = 0
+dashSlot.Parent = screenGui
+
+local dashSlotCorner = Instance.new("UICorner")
+dashSlotCorner.CornerRadius = UDim.new(0, 8)
+dashSlotCorner.Parent = dashSlot
+
+local dashSlotStroke = Instance.new("UIStroke")
+dashSlotStroke.Color = Color3.fromRGB(80, 160, 255)
+dashSlotStroke.Thickness = 2
+dashSlotStroke.Transparency = 0.3
+dashSlotStroke.Parent = dashSlot
+
+-- Icon label (wind/dash symbol)
+local dashIcon = Instance.new("TextLabel")
+dashIcon.Name = "DashIcon"
+dashIcon.Size = UDim2.new(1, 0, 0, 24)
+dashIcon.Position = UDim2.new(0, 0, 0, 4)
+dashIcon.BackgroundTransparency = 1
+dashIcon.Text = "\u{1F4A8}" -- 💨 dash wind emoji
+dashIcon.TextColor3 = Color3.fromRGB(120, 200, 255)
+dashIcon.Font = Enum.Font.GothamBold
+dashIcon.TextSize = 16
+dashIcon.Parent = dashSlot
+
+-- Keybind label
+local dashKeyLabel = Instance.new("TextLabel")
+dashKeyLabel.Name = "DashKeyLabel"
+dashKeyLabel.Size = UDim2.new(1, 0, 0, 12)
+dashKeyLabel.Position = UDim2.new(0, 0, 0, 26)
+dashKeyLabel.BackgroundTransparency = 1
+dashKeyLabel.Text = "LShift"
+dashKeyLabel.TextColor3 = Color3.fromRGB(180, 210, 255)
+dashKeyLabel.Font = Enum.Font.GothamBold
+dashKeyLabel.TextSize = 8
+dashKeyLabel.Parent = dashSlot
+
+-- Name label
+local dashNameLabel = Instance.new("TextLabel")
+dashNameLabel.Name = "DashNameLabel"
+dashNameLabel.Size = UDim2.new(1, 0, 0, 14)
+dashNameLabel.Position = UDim2.new(0, 0, 1, -14)
+dashNameLabel.BackgroundTransparency = 1
+dashNameLabel.Text = "Evade"
+dashNameLabel.TextColor3 = Color3.new(1, 1, 1)
+dashNameLabel.Font = Enum.Font.GothamBold
+dashNameLabel.TextSize = 9
+dashNameLabel.Parent = dashSlot
+
+-- Cooldown overlay (fills from top to bottom as cooldown progresses)
+local dashCooldownOverlay = Instance.new("Frame")
+dashCooldownOverlay.Name = "CooldownOverlay"
+dashCooldownOverlay.Size = UDim2.new(1, 0, 0, 0) -- starts empty (ready)
+dashCooldownOverlay.Position = UDim2.new(0, 0, 0, 0)
+dashCooldownOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+dashCooldownOverlay.BackgroundTransparency = 0.5
+dashCooldownOverlay.BorderSizePixel = 0
+dashCooldownOverlay.ZIndex = 2
+dashCooldownOverlay.Parent = dashSlot
+
+local overlayCooldownCorner = Instance.new("UICorner")
+overlayCooldownCorner.CornerRadius = UDim.new(0, 8)
+overlayCooldownCorner.Parent = dashCooldownOverlay
+
+-- Cooldown countdown text
+local dashCooldownText = Instance.new("TextLabel")
+dashCooldownText.Name = "CooldownText"
+dashCooldownText.Size = UDim2.new(1, 0, 1, 0)
+dashCooldownText.Position = UDim2.new(0, 0, 0, 0)
+dashCooldownText.BackgroundTransparency = 1
+dashCooldownText.Text = ""
+dashCooldownText.TextColor3 = Color3.new(1, 1, 1)
+dashCooldownText.Font = Enum.Font.GothamBold
+dashCooldownText.TextSize = 18
+dashCooldownText.ZIndex = 3
+dashCooldownText.Parent = dashSlot
+
 -- Inventory Button (visible on HUD, positioned to the right of the action bar)
 local inventoryBtn = Instance.new("TextButton")
 inventoryBtn.Name = "InventoryButton"
@@ -507,3 +592,39 @@ end)
 
 updateHud()
 updateQuestTracker()
+
+-- Dash cooldown icon update loop
+RunService.Heartbeat:Connect(function()
+	local character = player.Character
+	if not character then
+		dashCooldownOverlay.Size = UDim2.new(1, 0, 0, 0)
+		dashCooldownText.Text = ""
+		return
+	end
+
+	local cdStart = character:GetAttribute("DashCooldownStart")
+	local cdDuration = character:GetAttribute("DashCooldown")
+
+	if cdStart and cdDuration then
+		local elapsed = tick() - cdStart
+		local remaining = cdDuration - elapsed
+
+		if remaining > 0 then
+			-- Cooldown is active: overlay fills from top proportionally
+			local fraction = remaining / cdDuration
+			dashCooldownOverlay.Size = UDim2.new(1, 0, fraction, 0)
+			dashCooldownText.Text = string.format("%.1f", remaining)
+			dashSlotStroke.Color = Color3.fromRGB(80, 80, 100)
+		else
+			-- Cooldown is ready
+			dashCooldownOverlay.Size = UDim2.new(1, 0, 0, 0)
+			dashCooldownText.Text = ""
+			dashSlotStroke.Color = Color3.fromRGB(80, 160, 255)
+		end
+	else
+		-- Never dashed yet, show as ready
+		dashCooldownOverlay.Size = UDim2.new(1, 0, 0, 0)
+		dashCooldownText.Text = ""
+		dashSlotStroke.Color = Color3.fromRGB(80, 160, 255)
+	end
+end)
