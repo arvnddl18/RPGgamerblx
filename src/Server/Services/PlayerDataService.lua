@@ -43,6 +43,13 @@ local function normalizeInventoryEntry(entry)
 	return entry
 end
 
+local function getRemotes()
+	if not PlayerDataService._remotes then
+		PlayerDataService._remotes = ReplicatedStorage:WaitForChild("Remotes")
+	end
+	return PlayerDataService._remotes
+end
+
 local function fireInventoryUpdated(player, inventory)
 	getRemotes().InventoryUpdated:FireClient(player, inventory)
 end
@@ -76,13 +83,6 @@ local function markSaveDirty(player)
 	if saveService then
 		saveService:MarkDirty(player)
 	end
-end
-
-local function getRemotes()
-	if not PlayerDataService._remotes then
-		PlayerDataService._remotes = ReplicatedStorage:WaitForChild("Remotes")
-	end
-	return PlayerDataService._remotes
 end
 
 local function createEmptyEquipped()
