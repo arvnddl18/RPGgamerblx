@@ -1,0 +1,2107 @@
+<roblox version="4">
+  <Item class="ReplicatedStorage" referent="0">
+    <Properties>
+      <string name="Name">ReplicatedStorage</string>
+    </Properties>
+    <Item class="Folder" referent="1">
+      <Properties>
+        <string name="Name">Shared</string>
+      </Properties>
+      <Item class="Folder" referent="2">
+        <Properties>
+          <string name="Name">Config</string>
+        </Properties>
+        <Item class="ModuleScript" referent="3">
+          <Properties>
+            <string name="Name">Enemies</string>
+            <string name="Source"><![CDATA[local Enemies = {
+	Goblin = {
+		id = "Goblin",
+		name = "Goblin",
+		maxHealth = 50,
+		damage = 8,
+		attackCooldown = 1.5,
+		aggroRange = 40,
+		attackRange = 4,
+		xpReward = 20,
+		coinReward = 10,
+		dropChance = 0.35,
+		dropItem = "Herb",
+		color = Color3.fromRGB(60, 140, 60),
+	},
+}
+
+return Enemies
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="4">
+          <Properties>
+            <string name="Name">Items</string>
+            <string name="Source"><![CDATA[local Items = {
+	Herb = {
+		id = "Herb",
+		name = "Herb",
+		description = "A common herb dropped by goblins.",
+		type = "material",
+		usable = false,
+		color = Color3.fromRGB(80, 180, 80),
+	},
+	HealthPotion = {
+		id = "HealthPotion",
+		name = "Health Potion",
+		description = "Restores 30 HP.",
+		type = "consumable",
+		usable = true,
+		healAmount = 30,
+		color = Color3.fromRGB(220, 50, 80),
+	},
+	IronSword = {
+		id = "IronSword",
+		name = "Iron Sword",
+		description = "A stronger blade.",
+		type = "weapon",
+		usable = false,
+		damage = 25,
+		color = Color3.fromRGB(160, 160, 180),
+	},
+	WoodenSword = {
+		id = "WoodenSword",
+		name = "Wooden Sword",
+		description = "A basic training sword.",
+		type = "weapon",
+		usable = false,
+		damage = 12,
+		color = Color3.fromRGB(139, 90, 43),
+	},
+}
+
+return Items
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="5">
+          <Properties>
+            <string name="Name">Quests</string>
+            <string name="Source"><![CDATA[local Quests = {
+	KillGoblins = {
+		id = "KillGoblins",
+		name = "Goblin Trouble",
+		description = "The village is overrun! Defeat 5 Goblins.",
+		npcName = "Quest Giver",
+		objectiveType = "kill",
+		targetEnemy = "Goblin",
+		requiredKills = 5,
+		xpReward = 100,
+		coinReward = 50,
+	},
+}
+
+return Quests
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="6">
+          <Properties>
+            <string name="Name">Shop</string>
+            <string name="Source"><![CDATA[local Shop = {
+	items = {
+		{
+			itemId = "HealthPotion",
+			price = 25,
+		},
+		{
+			itemId = "IronSword",
+			price = 100,
+		},
+	},
+}
+
+return Shop
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="Folder" referent="7">
+        <Properties>
+          <string name="Name">Util</string>
+        </Properties>
+        <Item class="ModuleScript" referent="8">
+          <Properties>
+            <string name="Name">Signal</string>
+            <string name="Source"><![CDATA[local Signal = {}
+Signal.__index = Signal
+
+function Signal.new()
+	local self = setmetatable({
+		_connections = {},
+	}, Signal)
+	return self
+end
+
+function Signal:Connect(callback)
+	local connection = { callback = callback, connected = true }
+	table.insert(self._connections, connection)
+	return {
+		Disconnect = function()
+			connection.connected = false
+		end,
+	}
+end
+
+function Signal:Fire(...)
+	for _, connection in self._connections do
+		if connection.connected then
+			connection.callback(...)
+		end
+	end
+end
+
+return Signal
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="ServerScriptService" referent="9">
+    <Properties>
+      <string name="Name">ServerScriptService</string>
+    </Properties>
+    <Item class="Folder" referent="10">
+      <Properties>
+        <string name="Name">Server</string>
+      </Properties>
+      <Item class="Script" referent="11">
+        <Properties>
+          <string name="Name">GameServer</string>
+          <token name="RunContext">0</token>
+          <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local Server = ServerScriptService:WaitForChild("Server")
+local Services = Server:WaitForChild("Services")
+
+local PlayerDataService = require(Services.PlayerDataService)
+local CombatService = require(Services.CombatService)
+local EnemyService = require(Services.EnemyService)
+local InventoryService = require(Services.InventoryService)
+local QuestService = require(Services.QuestService)
+local ShopService = require(Services.ShopService)
+
+local REMOTE_NAMES = {
+	"Attack",
+	"StatsUpdated",
+	"InventoryUpdated",
+	"RequestInventory",
+	"UseItem",
+	"OpenQuest",
+	"AcceptQuest",
+	"QuestUpdated",
+	"OpenShop",
+	"PurchaseItem",
+	"Notification",
+}
+
+local function createRemotes()
+	local folder = ReplicatedStorage:FindFirstChild("Remotes")
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "Remotes"
+		folder.Parent = ReplicatedStorage
+	end
+
+	for _, name in REMOTE_NAMES do
+		if not folder:FindFirstChild(name) then
+			local remote = Instance.new("RemoteEvent")
+			remote.Name = name
+			remote.Parent = folder
+		end
+	end
+
+	return folder
+end
+
+local function setupWorld()
+	if workspace:FindFirstChild("RPGWorld") then
+		return
+	end
+
+	local world = Instance.new("Folder")
+	world.Name = "RPGWorld"
+	world.Parent = workspace
+
+	local baseplate = Instance.new("Part")
+	baseplate.Name = "Baseplate"
+	baseplate.Size = Vector3.new(256, 1, 256)
+	baseplate.Position = Vector3.new(0, 0, 0)
+	baseplate.Anchored = true
+	baseplate.Color = Color3.fromRGB(60, 120, 60)
+	baseplate.Material = Enum.Material.Grass
+	baseplate.Parent = world
+
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "SpawnLocation"
+	spawn.Size = Vector3.new(6, 1, 6)
+	spawn.Position = Vector3.new(0, 1, 0)
+	spawn.Anchored = true
+	spawn.Neutral = true
+	spawn.Color = Color3.fromRGB(100, 100, 220)
+	spawn.Parent = world
+
+	local enemiesFolder = Instance.new("Folder")
+	enemiesFolder.Name = "Enemies"
+	enemiesFolder.Parent = workspace
+
+	local npcsFolder = Instance.new("Folder")
+	npcsFolder.Name = "NPCs"
+	npcsFolder.Parent = workspace
+
+	local pickupsFolder = Instance.new("Folder")
+	pickupsFolder.Name = "Pickups"
+	pickupsFolder.Parent = workspace
+
+	-- Remove default baseplate if present
+	local defaultBaseplate = workspace:FindFirstChild("Baseplate")
+	if defaultBaseplate and defaultBaseplate ~= baseplate then
+		defaultBaseplate:Destroy()
+	end
+end
+
+local remotes = createRemotes()
+setupWorld()
+
+PlayerDataService:Init(remotes)
+CombatService:Init(PlayerDataService, EnemyService, remotes)
+EnemyService:Init(PlayerDataService, QuestService, InventoryService)
+InventoryService:Init(PlayerDataService, CombatService, remotes)
+QuestService:Init(PlayerDataService, remotes)
+ShopService:Init(PlayerDataService, CombatService, remotes)
+
+PlayerDataService:Start()
+CombatService:Start()
+EnemyService:Start()
+InventoryService:Start()
+QuestService:Start()
+ShopService:Start()
+
+print("[SimpleRPG] Server started successfully.")
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="Folder" referent="12">
+        <Properties>
+          <string name="Name">Services</string>
+        </Properties>
+        <Item class="ModuleScript" referent="13">
+          <Properties>
+            <string name="Name">CombatService</string>
+            <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Items = require(Shared.Config.Items)
+
+local CombatService = {}
+CombatService._playerData = nil
+CombatService._enemyService = nil
+CombatService._cooldowns = {}
+
+local ATTACK_COOLDOWN = 0.6
+local ATTACK_RANGE = 7
+
+function CombatService:Init(playerDataService, enemyService, remotes)
+	self._playerData = playerDataService
+	self._enemyService = enemyService
+	self._remotes = remotes
+end
+
+function CombatService:CreateSwordTool(weaponId)
+	local weapon = Items[weaponId] or Items.WoodenSword
+	local tool = Instance.new("Tool")
+	tool.Name = weapon.name
+	tool.RequiresHandle = true
+	tool.CanBeDropped = false
+	tool:SetAttribute("WeaponId", weapon.id)
+
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(0.4, 0.4, 3.5)
+	handle.Color = weapon.color
+	handle.Material = Enum.Material.Metal
+	handle.Parent = tool
+
+	return tool
+end
+
+function CombatService:GiveSword(player, weaponId)
+	local data = self._playerData:GetData(player)
+	if not data then
+		return
+	end
+
+	weaponId = weaponId or data.equippedWeapon or "WoodenSword"
+
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	local character = player.Character
+	if not backpack then
+		return
+	end
+
+	for _, child in backpack:GetChildren() do
+		if child:IsA("Tool") and child:GetAttribute("WeaponId") then
+			child:Destroy()
+		end
+	end
+
+	if character then
+		for _, child in character:GetChildren() do
+			if child:IsA("Tool") and child:GetAttribute("WeaponId") then
+				child:Destroy()
+			end
+		end
+	end
+
+	local tool = self:CreateSwordTool(weaponId)
+	tool.Parent = backpack
+end
+
+function CombatService:FindAttackTargets(character)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return {}
+	end
+
+	local origin = root.Position
+	local look = root.CFrame.LookVector
+	local targets = {}
+
+	for _, enemy in CollectionService:GetTagged("Enemy") do
+		if enemy.Parent and enemy:GetAttribute("Health") and enemy:GetAttribute("Health") > 0 then
+			local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart
+			if enemyRoot then
+				local offset = enemyRoot.Position - origin
+				local distance = offset.Magnitude
+				if distance <= ATTACK_RANGE then
+					local direction = offset.Unit
+					if direction:Dot(look) > 0.3 then
+						table.insert(targets, enemy)
+					end
+				end
+			end
+		end
+	end
+
+	return targets
+end
+
+function CombatService:HandleAttack(player)
+	local now = tick()
+	if self._cooldowns[player] and now - self._cooldowns[player] < ATTACK_COOLDOWN then
+		return
+	end
+
+	local character = player.Character
+	if not character then
+		return
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then
+		return
+	end
+
+	self._cooldowns[player] = now
+	local damage = self._playerData:GetWeaponDamage(player)
+	local targets = self:FindAttackTargets(character)
+
+	for _, enemy in targets do
+		self._enemyService:DamageEnemy(enemy, damage, player)
+	end
+end
+
+function CombatService:Start()
+	self._remotes.Attack.OnServerEvent:Connect(function(player)
+		self:HandleAttack(player)
+	end)
+
+	game:GetService("Players").PlayerAdded:Connect(function(player)
+		player.CharacterAdded:Connect(function()
+			task.wait(0.2)
+			self:GiveSword(player)
+		end)
+	end)
+
+	for _, player in game:GetService("Players"):GetPlayers() do
+		if player.Character then
+			self:GiveSword(player)
+		end
+	end
+end
+
+return CombatService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="14">
+          <Properties>
+            <string name="Name">EnemyService</string>
+            <string name="Source"><![CDATA[local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Enemies = require(Shared.Config.Enemies)
+local Items = require(Shared.Config.Items)
+
+local EnemyService = {}
+EnemyService._playerData = nil
+EnemyService._questService = nil
+EnemyService._inventoryService = nil
+EnemyService._enemies = {}
+EnemyService._attackCooldowns = {}
+
+local SPAWN_POSITIONS = {
+	Vector3.new(20, 3, 0),
+	Vector3.new(-20, 3, 0),
+	Vector3.new(0, 3, 20),
+	Vector3.new(0, 3, -20),
+	Vector3.new(15, 3, 15),
+	Vector3.new(-15, 3, 15),
+	Vector3.new(15, 3, -15),
+	Vector3.new(-15, 3, -15),
+}
+
+function EnemyService:Init(playerDataService, questService, inventoryService)
+	self._playerData = playerDataService
+	self._questService = questService
+	self._inventoryService = inventoryService
+end
+
+function EnemyService:CreateHealthBar(enemy, maxHealth)
+	local root = enemy.PrimaryPart
+	if not root then
+		return
+	end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "HealthBar"
+	billboard.Size = UDim2.new(4, 0, 0.5, 0)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = root
+
+	local bg = Instance.new("Frame")
+	bg.Name = "Background"
+	bg.Size = UDim2.new(1, 0, 1, 0)
+	bg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	bg.BorderSizePixel = 0
+	bg.Parent = billboard
+
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.new(1, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+	fill.BorderSizePixel = 0
+	fill.Parent = bg
+end
+
+function EnemyService:UpdateHealthBar(enemy)
+	local health = enemy:GetAttribute("Health") or 0
+	local maxHealth = enemy:GetAttribute("MaxHealth") or 1
+	local root = enemy.PrimaryPart
+	if not root then
+		return
+	end
+
+	local billboard = root:FindFirstChild("HealthBar")
+	if billboard then
+		local fill = billboard.Background.Fill
+		fill.Size = UDim2.new(math.clamp(health / maxHealth, 0, 1), 0, 1, 0)
+	end
+end
+
+function EnemyService:CreateGoblin(position)
+	local config = Enemies.Goblin
+	local model = Instance.new("Model")
+	model.Name = config.name
+
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(2, 3, 2)
+	root.Position = position
+	root.Anchored = false
+	root.CanCollide = true
+	root.Color = config.color
+	root.Material = Enum.Material.SmoothPlastic
+	root.Parent = model
+
+	local humanoid = Instance.new("Humanoid")
+	humanoid.MaxHealth = config.maxHealth
+	humanoid.Health = config.maxHealth
+	humanoid.WalkSpeed = 14
+	humanoid.HipHeight = 1.5
+	humanoid.Parent = model
+
+	model.PrimaryPart = root
+	model:SetAttribute("EnemyType", config.id)
+	model:SetAttribute("Health", config.maxHealth)
+	model:SetAttribute("MaxHealth", config.maxHealth)
+
+	CollectionService:AddTag(model, "Enemy")
+	self:CreateHealthBar(model, config.maxHealth)
+
+	model.Parent = workspace:FindFirstChild("Enemies") or workspace
+	table.insert(self._enemies, model)
+	return model
+end
+
+function EnemyService:SpawnEnemies()
+	local enemiesFolder = workspace:FindFirstChild("Enemies")
+	if not enemiesFolder then
+		enemiesFolder = Instance.new("Folder")
+		enemiesFolder.Name = "Enemies"
+		enemiesFolder.Parent = workspace
+	end
+
+	for _, position in SPAWN_POSITIONS do
+		self:CreateGoblin(position)
+	end
+end
+
+function EnemyService:GetNearestPlayer(position, range)
+	local nearestPlayer = nil
+	local nearestDistance = range
+
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if root and humanoid and humanoid.Health > 0 then
+			local distance = (root.Position - position).Magnitude
+			if distance < nearestDistance then
+				nearestDistance = distance
+				nearestPlayer = player
+			end
+		end
+	end
+
+	return nearestPlayer, nearestDistance
+end
+
+function EnemyService:DamageEnemy(enemy, amount, attacker)
+	if not enemy.Parent then
+		return
+	end
+
+	local health = enemy:GetAttribute("Health") or 0
+	health = math.max(0, health - amount)
+	enemy:SetAttribute("Health", health)
+	self:UpdateHealthBar(enemy)
+
+	if health <= 0 then
+		self:OnEnemyKilled(enemy, attacker)
+	end
+end
+
+function EnemyService:CreatePickup(position, itemId)
+	local item = Items[itemId]
+	if not item then
+		return
+	end
+
+	local part = Instance.new("Part")
+	part.Name = itemId .. "Pickup"
+	part.Size = Vector3.new(1.2, 1.2, 1.2)
+	part.Position = position + Vector3.new(0, 1, 0)
+	part.Anchored = true
+	part.CanCollide = false
+	part.Color = item.color
+	part.Material = Enum.Material.Neon
+	part:SetAttribute("ItemId", itemId)
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Pick up"
+	prompt.ObjectText = item.name
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 8
+	prompt.Parent = part
+
+	local pickupsFolder = workspace:FindFirstChild("Pickups")
+	if not pickupsFolder then
+		pickupsFolder = Instance.new("Folder")
+		pickupsFolder.Name = "Pickups"
+		pickupsFolder.Parent = workspace
+	end
+	part.Parent = pickupsFolder
+	return part
+end
+
+function EnemyService:OnEnemyKilled(enemy, killer)
+	local config = Enemies.Goblin
+	local root = enemy.PrimaryPart
+	local position = root and root.Position or Vector3.new()
+
+	if killer then
+		self._playerData:AddXP(killer, config.xpReward)
+		self._playerData:AddCoins(killer, config.coinReward)
+		if self._questService then
+			self._questService:OnEnemyKilled(killer, config.id)
+		end
+	end
+
+	if math.random() < config.dropChance and root then
+		self:CreatePickup(position, config.dropItem)
+	end
+
+	for i, e in self._enemies do
+		if e == enemy then
+			table.remove(self._enemies, i)
+			break
+		end
+	end
+
+	enemy:Destroy()
+
+	task.delay(5, function()
+		self:CreateGoblin(position)
+	end)
+end
+
+function EnemyService:RunAI()
+	local config = Enemies.Goblin
+
+	for _, enemy in self._enemies do
+		if enemy.Parent and enemy:GetAttribute("Health") > 0 then
+			local root = enemy.PrimaryPart
+			local humanoid = enemy:FindFirstChildOfClass("Humanoid")
+			if root and humanoid then
+				local targetPlayer, distance = self:GetNearestPlayer(root.Position, config.aggroRange)
+				if targetPlayer then
+					local targetChar = targetPlayer.Character
+					local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+					if targetRoot then
+						humanoid:MoveTo(targetRoot.Position)
+
+						if distance <= config.attackRange then
+							local now = tick()
+							local key = enemy
+							if not self._attackCooldowns[key] or now - self._attackCooldowns[key] >= config.attackCooldown then
+								self._attackCooldowns[key] = now
+								self._playerData:Damage(targetPlayer, config.damage)
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+function EnemyService:Start()
+	self:SpawnEnemies()
+
+	task.spawn(function()
+		while true do
+			self:RunAI()
+			task.wait(0.25)
+		end
+	end)
+end
+
+return EnemyService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="15">
+          <Properties>
+            <string name="Name">InventoryService</string>
+            <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Items = require(Shared.Config.Items)
+
+local InventoryService = {}
+InventoryService._playerData = nil
+InventoryService._combatService = nil
+
+function InventoryService:Init(playerDataService, combatService, remotes)
+	self._playerData = playerDataService
+	self._combatService = combatService
+	self._remotes = remotes
+end
+
+function InventoryService:SetupPickup(part)
+	local prompt = part:FindFirstChildOfClass("ProximityPrompt")
+	if not prompt then
+		return
+	end
+
+	prompt.Triggered:Connect(function(player)
+		local itemId = part:GetAttribute("ItemId")
+		if not itemId then
+			return
+		end
+
+		if self._playerData:AddItem(player, itemId, 1) then
+			part:Destroy()
+		end
+	end)
+end
+
+function InventoryService:WatchPickups()
+	local pickupsFolder = workspace:FindFirstChild("Pickups")
+	if pickupsFolder then
+		for _, part in pickupsFolder:GetChildren() do
+			self:SetupPickup(part)
+		end
+		pickupsFolder.ChildAdded:Connect(function(child)
+			self:SetupPickup(child)
+		end)
+	end
+
+	workspace.ChildAdded:Connect(function(child)
+		if child:IsA("BasePart") and child:GetAttribute("ItemId") then
+			self:SetupPickup(child)
+		end
+	end)
+
+	for _, child in workspace:GetChildren() do
+		if child:IsA("BasePart") and child:GetAttribute("ItemId") then
+			self:SetupPickup(child)
+		end
+	end
+end
+
+function InventoryService:UseItem(player, itemId)
+	local item = Items[itemId]
+	if not item or not item.usable then
+		return false
+	end
+
+	if not self._playerData:HasItem(player, itemId, 1) then
+		return false
+	end
+
+	if item.type == "consumable" and item.healAmount then
+		if not self._playerData:RemoveItem(player, itemId, 1) then
+			return false
+		end
+		self._playerData:Heal(player, item.healAmount)
+		self._remotes.Notification:FireClient(player, "Used " .. item.name .. " (+" .. item.healAmount .. " HP)")
+		return true
+	end
+
+	return false
+end
+
+function InventoryService:Start()
+	self._remotes.UseItem.OnServerEvent:Connect(function(player, itemId)
+		self:UseItem(player, itemId)
+	end)
+
+	self._remotes.RequestInventory.OnServerEvent:Connect(function(player)
+		local inventory = self._playerData:GetInventory(player)
+		self._remotes.InventoryUpdated:FireClient(player, inventory)
+	end)
+
+	self:WatchPickups()
+end
+
+return InventoryService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="16">
+          <Properties>
+            <string name="Name">PlayerDataService</string>
+            <string name="Source"><![CDATA[local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Items = require(Shared.Config.Items)
+
+local PlayerDataService = {}
+PlayerDataService._data = {}
+PlayerDataService._remotes = nil
+
+local XP_PER_LEVEL = 100
+local BASE_MAX_HP = 100
+local HP_PER_LEVEL = 10
+
+local function getRemotes()
+	if not PlayerDataService._remotes then
+		PlayerDataService._remotes = ReplicatedStorage:WaitForChild("Remotes")
+	end
+	return PlayerDataService._remotes
+end
+
+local function syncHumanoid(player, data)
+	local character = player.Character
+	if not character then
+		return
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
+	end
+	humanoid.MaxHealth = data.maxHp
+	humanoid.Health = math.clamp(data.hp, 0, data.maxHp)
+end
+
+local function buildStatsPayload(player, data)
+	local leaderstats = player:FindFirstChild("leaderstats")
+	return {
+		hp = data.hp,
+		maxHp = data.maxHp,
+		level = leaderstats and leaderstats.Level.Value or data.level,
+		xp = leaderstats and leaderstats.XP.Value or data.xp,
+		coins = leaderstats and leaderstats.Coins.Value or data.coins,
+		equippedWeapon = data.equippedWeapon,
+		quest = data.quest,
+	}
+end
+
+function PlayerDataService:FireStatsUpdated(player)
+	local data = self._data[player]
+	if not data then
+		return
+	end
+	getRemotes().StatsUpdated:FireClient(player, buildStatsPayload(player, data))
+end
+
+function PlayerDataService:GetData(player)
+	return self._data[player]
+end
+
+function PlayerDataService:Init(remotes)
+	self._remotes = remotes
+end
+
+function PlayerDataService:SetupPlayer(player)
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = player
+
+	local level = Instance.new("IntValue")
+	level.Name = "Level"
+	level.Value = 1
+	level.Parent = leaderstats
+
+	local xp = Instance.new("IntValue")
+	xp.Name = "XP"
+	xp.Value = 0
+	xp.Parent = leaderstats
+
+	local coins = Instance.new("IntValue")
+	coins.Name = "Coins"
+	coins.Value = 0
+	coins.Parent = leaderstats
+
+	self._data[player] = {
+		hp = BASE_MAX_HP,
+		maxHp = BASE_MAX_HP,
+		level = 1,
+		xp = 0,
+		coins = 0,
+		equippedWeapon = "WoodenSword",
+		inventory = {},
+		quest = {
+			id = nil,
+			accepted = false,
+			completed = false,
+			progress = 0,
+		},
+	}
+
+	player.CharacterAdded:Connect(function()
+		task.wait(0.1)
+		syncHumanoid(player, self._data[player])
+		self:FireStatsUpdated(player)
+	end)
+
+	if player.Character then
+		syncHumanoid(player, self._data[player])
+	end
+
+	self:FireStatsUpdated(player)
+end
+
+function PlayerDataService:CleanupPlayer(player)
+	self._data[player] = nil
+end
+
+function PlayerDataService:AddXP(player, amount)
+	local data = self._data[player]
+	if not data then
+		return
+	end
+
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then
+		return
+	end
+
+	data.xp += amount
+	leaderstats.XP.Value = data.xp
+
+	while data.xp >= XP_PER_LEVEL do
+		data.xp -= XP_PER_LEVEL
+		data.level += 1
+		data.maxHp += HP_PER_LEVEL
+		data.hp = data.maxHp
+		leaderstats.Level.Value = data.level
+		leaderstats.XP.Value = data.xp
+		getRemotes().Notification:FireClient(player, "Level Up! You are now level " .. data.level)
+	end
+
+	syncHumanoid(player, data)
+	self:FireStatsUpdated(player)
+end
+
+function PlayerDataService:AddCoins(player, amount)
+	local data = self._data[player]
+	if not data then
+		return
+	end
+
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then
+		return
+	end
+
+	data.coins += amount
+	leaderstats.Coins.Value = data.coins
+	self:FireStatsUpdated(player)
+end
+
+function PlayerDataService:TakeCoins(player, amount)
+	local data = self._data[player]
+	if not data or data.coins < amount then
+		return false
+	end
+
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then
+		return false
+	end
+
+	data.coins -= amount
+	leaderstats.Coins.Value = data.coins
+	self:FireStatsUpdated(player)
+	return true
+end
+
+function PlayerDataService:Damage(player, amount)
+	local data = self._data[player]
+	if not data then
+		return
+	end
+
+	data.hp = math.max(0, data.hp - amount)
+	syncHumanoid(player, data)
+	self:FireStatsUpdated(player)
+
+	if data.hp <= 0 then
+		local character = player.Character
+		if character then
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.Health = 0
+			end
+		end
+	end
+end
+
+function PlayerDataService:Heal(player, amount)
+	local data = self._data[player]
+	if not data then
+		return false
+	end
+
+	data.hp = math.min(data.maxHp, data.hp + amount)
+	syncHumanoid(player, data)
+	self:FireStatsUpdated(player)
+	return true
+end
+
+function PlayerDataService:GetWeaponDamage(player)
+	local data = self._data[player]
+	if not data then
+		return 12
+	end
+
+	local weaponId = data.equippedWeapon or "WoodenSword"
+	local weapon = Items[weaponId]
+	return weapon and weapon.damage or 12
+end
+
+function PlayerDataService:SetEquippedWeapon(player, weaponId)
+	local data = self._data[player]
+	if not data or not Items[weaponId] then
+		return false
+	end
+
+	data.equippedWeapon = weaponId
+	self:FireStatsUpdated(player)
+	return true
+end
+
+function PlayerDataService:GetInventory(player)
+	local data = self._data[player]
+	return data and data.inventory or {}
+end
+
+function PlayerDataService:AddItem(player, itemId, count)
+	local data = self._data[player]
+	if not data or not Items[itemId] then
+		return false
+	end
+
+	count = count or 1
+	for _, entry in data.inventory do
+		if entry.id == itemId then
+			entry.count += count
+			getRemotes().InventoryUpdated:FireClient(player, data.inventory)
+			return true
+		end
+	end
+
+	table.insert(data.inventory, { id = itemId, count = count })
+	getRemotes().InventoryUpdated:FireClient(player, data.inventory)
+	return true
+end
+
+function PlayerDataService:RemoveItem(player, itemId, count)
+	local data = self._data[player]
+	if not data then
+		return false
+	end
+
+	count = count or 1
+	for i, entry in data.inventory do
+		if entry.id == itemId then
+			if entry.count < count then
+				return false
+			end
+			entry.count -= count
+			if entry.count <= 0 then
+				table.remove(data.inventory, i)
+			end
+			getRemotes().InventoryUpdated:FireClient(player, data.inventory)
+			return true
+		end
+	end
+	return false
+end
+
+function PlayerDataService:HasItem(player, itemId, count)
+	local data = self._data[player]
+	if not data then
+		return false
+	end
+
+	count = count or 1
+	for _, entry in data.inventory do
+		if entry.id == itemId and entry.count >= count then
+			return true
+		end
+	end
+	return false
+end
+
+function PlayerDataService:Start()
+	Players.PlayerAdded:Connect(function(player)
+		self:SetupPlayer(player)
+	end)
+
+	Players.PlayerRemoving:Connect(function(player)
+		self:CleanupPlayer(player)
+	end)
+
+	for _, player in Players:GetPlayers() do
+		self:SetupPlayer(player)
+	end
+end
+
+return PlayerDataService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="17">
+          <Properties>
+            <string name="Name">QuestService</string>
+            <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Quests = require(Shared.Config.Quests)
+
+local QuestService = {}
+QuestService._playerData = nil
+QuestService._remotes = nil
+
+function QuestService:Init(playerDataService, remotes)
+	self._playerData = playerDataService
+	self._remotes = remotes
+end
+
+function QuestService:CreateNPC(position)
+	local config = Quests.KillGoblins
+	local model = Instance.new("Model")
+	model.Name = config.npcName
+
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(2, 2, 1)
+	root.Position = position
+	root.Anchored = true
+	root.CanCollide = true
+	root.Color = Color3.fromRGB(80, 120, 200)
+	root.Material = Enum.Material.SmoothPlastic
+	root.Parent = model
+
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Size = Vector3.new(1.5, 1.5, 1.5)
+	head.Color = Color3.fromRGB(220, 180, 140)
+	head.Anchored = true
+	head.CanCollide = false
+	head.CFrame = root.CFrame * CFrame.new(0, 1.75, 0)
+	head.Parent = model
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 120, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = root
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = config.npcName
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextStrokeTransparency = 0.5
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 16
+	label.Parent = billboard
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Talk"
+	prompt.ObjectText = config.npcName
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.Parent = root
+
+	model.PrimaryPart = root
+	local npcsFolder = workspace:FindFirstChild("NPCs")
+	if not npcsFolder then
+		npcsFolder = Instance.new("Folder")
+		npcsFolder.Name = "NPCs"
+		npcsFolder.Parent = workspace
+	end
+	model.Parent = npcsFolder
+
+	prompt.Triggered:Connect(function(player)
+		local data = self._playerData:GetData(player)
+		if not data then
+			return
+		end
+
+		self._remotes.OpenQuest:FireClient(player, {
+			id = config.id,
+			name = config.name,
+			description = config.description,
+			accepted = data.quest.accepted,
+			completed = data.quest.completed,
+			progress = data.quest.progress,
+			required = config.requiredKills,
+		})
+	end)
+
+	return model
+end
+
+function QuestService:AcceptQuest(player, questId)
+	local config = Quests[questId]
+	local data = self._playerData:GetData(player)
+	if not config or not data or data.quest.completed then
+		return false
+	end
+
+	data.quest.id = questId
+	data.quest.accepted = true
+	data.quest.progress = data.quest.progress or 0
+	self._playerData:FireStatsUpdated(player)
+	self:FireQuestUpdated(player)
+	return true
+end
+
+function QuestService:OnEnemyKilled(player, enemyType)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quest.accepted or data.quest.completed then
+		return
+	end
+
+	local config = Quests[data.quest.id]
+	if not config or config.targetEnemy ~= enemyType then
+		return
+	end
+
+	data.quest.progress += 1
+	self:FireQuestUpdated(player)
+
+	if data.quest.progress >= config.requiredKills then
+		data.quest.completed = true
+		self._playerData:AddXP(player, config.xpReward)
+		self._playerData:AddCoins(player, config.coinReward)
+		self._remotes.Notification:FireClient(player, "Quest complete: " .. config.name)
+		self._playerData:FireStatsUpdated(player)
+	end
+end
+
+function QuestService:FireQuestUpdated(player)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quest.id then
+		return
+	end
+
+	local config = Quests[data.quest.id]
+	if not config then
+		return
+	end
+
+	self._remotes.QuestUpdated:FireClient(player, {
+		id = data.quest.id,
+		name = config.name,
+		accepted = data.quest.accepted,
+		completed = data.quest.completed,
+		progress = data.quest.progress,
+		required = config.requiredKills,
+	})
+end
+
+function QuestService:Start()
+	self:CreateNPC(Vector3.new(-30, 3, 0))
+
+	self._remotes.AcceptQuest.OnServerEvent:Connect(function(player, questId)
+		if self:AcceptQuest(player, questId) then
+			self._remotes.Notification:FireClient(player, "Quest accepted!")
+		end
+	end)
+end
+
+return QuestService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="18">
+          <Properties>
+            <string name="Name">ShopService</string>
+            <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Shop = require(Shared.Config.Shop)
+local Items = require(Shared.Config.Items)
+
+local ShopService = {}
+ShopService._playerData = nil
+ShopService._combatService = nil
+ShopService._remotes = nil
+
+function ShopService:Init(playerDataService, combatService, remotes)
+	self._playerData = playerDataService
+	self._combatService = combatService
+	self._remotes = remotes
+end
+
+function ShopService:CreateNPC(position)
+	local model = Instance.new("Model")
+	model.Name = "Shop Keeper"
+
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(2, 2, 1)
+	root.Position = position
+	root.Anchored = true
+	root.CanCollide = true
+	root.Color = Color3.fromRGB(180, 140, 60)
+	root.Material = Enum.Material.SmoothPlastic
+	root.Parent = model
+
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Size = Vector3.new(1.5, 1.5, 1.5)
+	head.Color = Color3.fromRGB(220, 180, 140)
+	head.Anchored = true
+	head.CanCollide = false
+	head.CFrame = root.CFrame * CFrame.new(0, 1.75, 0)
+	head.Parent = model
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 120, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = root
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = "Shop Keeper"
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextStrokeTransparency = 0.5
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 16
+	label.Parent = billboard
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Shop"
+	prompt.ObjectText = "Shop Keeper"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.Parent = root
+
+	model.PrimaryPart = root
+	local npcsFolder = workspace:FindFirstChild("NPCs")
+	if not npcsFolder then
+		npcsFolder = Instance.new("Folder")
+		npcsFolder.Name = "NPCs"
+		npcsFolder.Parent = workspace
+	end
+	model.Parent = npcsFolder
+
+	local shopItems = {}
+	for _, entry in Shop.items do
+		local item = Items[entry.itemId]
+		if item then
+			table.insert(shopItems, {
+				itemId = entry.itemId,
+				name = item.name,
+				description = item.description,
+				price = entry.price,
+			})
+		end
+	end
+
+	prompt.Triggered:Connect(function(player)
+		self._remotes.OpenShop:FireClient(player, shopItems)
+	end)
+
+	return model
+end
+
+function ShopService:Purchase(player, itemId)
+	local shopEntry = nil
+	for _, entry in Shop.items do
+		if entry.itemId == itemId then
+			shopEntry = entry
+			break
+		end
+	end
+
+	if not shopEntry then
+		return false, "Item not found"
+	end
+
+	local item = Items[itemId]
+	if not item then
+		return false, "Invalid item"
+	end
+
+	if not self._playerData:TakeCoins(player, shopEntry.price) then
+		return false, "Not enough coins"
+	end
+
+	if item.type == "weapon" then
+		self._playerData:SetEquippedWeapon(player, itemId)
+		self._combatService:GiveSword(player, itemId)
+		self._remotes.Notification:FireClient(player, "Purchased " .. item.name)
+	elseif item.type == "consumable" or item.type == "material" then
+		self._playerData:AddItem(player, itemId, 1)
+		self._remotes.Notification:FireClient(player, "Purchased " .. item.name)
+	end
+
+	return true
+end
+
+function ShopService:Start()
+	self:CreateNPC(Vector3.new(30, 3, 0))
+
+	self._remotes.PurchaseItem.OnServerEvent:Connect(function(player, itemId)
+		local success, message = self:Purchase(player, itemId)
+		if not success and message then
+			self._remotes.Notification:FireClient(player, message)
+		end
+	end)
+end
+
+return ShopService
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="StarterPlayer" referent="19">
+    <Properties>
+      <string name="Name">StarterPlayer</string>
+    </Properties>
+    <Item class="StarterPlayerScripts" referent="20">
+      <Properties>
+        <string name="Name">StarterPlayerScripts</string>
+      </Properties>
+      <Item class="Folder" referent="21">
+        <Properties>
+          <string name="Name">Client</string>
+        </Properties>
+        <Item class="LocalScript" referent="22">
+          <Properties>
+            <string name="Name">CombatController</string>
+            <string name="Source"><![CDATA[local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+local lastAttack = 0
+local ATTACK_COOLDOWN = 0.6
+
+local function onToolActivated()
+	local now = tick()
+	if now - lastAttack < ATTACK_COOLDOWN then
+		return
+	end
+	lastAttack = now
+	remotes.Attack:FireServer()
+end
+
+local function connectTool(tool)
+	if tool:IsA("Tool") and tool:GetAttribute("WeaponId") then
+		tool.Activated:Connect(onToolActivated)
+	end
+end
+
+local function watchContainer(container)
+	for _, child in container:GetChildren() do
+		connectTool(child)
+	end
+	container.ChildAdded:Connect(connectTool)
+end
+
+local function setupCharacter(character)
+	local backpack = player:WaitForChild("Backpack")
+	watchContainer(backpack)
+	watchContainer(character)
+end
+
+player.CharacterAdded:Connect(setupCharacter)
+if player.Character then
+	setupCharacter(player.Character)
+end
+
+watchContainer(player:WaitForChild("Backpack"))
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="LocalScript" referent="23">
+          <Properties>
+            <string name="Name">InventoryController</string>
+            <string name="Source"><![CDATA[local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Items = require(Shared.Config.Items)
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+local inventory = {}
+local visible = false
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "InventoryUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local panel = Instance.new("Frame")
+panel.Name = "InventoryPanel"
+panel.Size = UDim2.new(0, 320, 0, 280)
+panel.Position = UDim2.new(0.5, -160, 0.5, -140)
+panel.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+panel.BorderSizePixel = 0
+panel.Visible = false
+panel.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = panel
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -20, 0, 36)
+title.Position = UDim2.new(0, 10, 0, 8)
+title.BackgroundTransparency = 1
+title.Text = "Inventory (Press I to close)"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = panel
+
+local listFrame = Instance.new("ScrollingFrame")
+listFrame.Name = "ItemList"
+listFrame.Size = UDim2.new(1, -20, 1, -56)
+listFrame.Position = UDim2.new(0, 10, 0, 48)
+listFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+listFrame.BorderSizePixel = 0
+listFrame.ScrollBarThickness = 6
+listFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+listFrame.Parent = panel
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 6)
+listLayout.Parent = listFrame
+
+local function renderInventory()
+	for _, child in listFrame:GetChildren() do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+
+	if #inventory == 0 then
+		local empty = Instance.new("TextLabel")
+		empty.Size = UDim2.new(1, 0, 0, 40)
+		empty.BackgroundTransparency = 1
+		empty.Text = "No items yet. Defeat goblins for drops!"
+		empty.TextColor3 = Color3.fromRGB(180, 180, 180)
+		empty.Font = Enum.Font.Gotham
+		empty.TextSize = 14
+		empty.Parent = listFrame
+		listFrame.CanvasSize = UDim2.new(0, 0, 0, 50)
+		return
+	end
+
+	for _, entry in inventory do
+		local item = Items[entry.id]
+		if item then
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1, -8, 0, 48)
+			row.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+			row.BorderSizePixel = 0
+			row.Parent = listFrame
+
+			local rowCorner = Instance.new("UICorner")
+			rowCorner.CornerRadius = UDim.new(0, 6)
+			rowCorner.Parent = row
+
+			local icon = Instance.new("Frame")
+			icon.Size = UDim2.new(0, 32, 0, 32)
+			icon.Position = UDim2.new(0, 8, 0.5, -16)
+			icon.BackgroundColor3 = item.color
+			icon.BorderSizePixel = 0
+			icon.Parent = row
+
+			local nameLabel = Instance.new("TextLabel")
+			nameLabel.Size = UDim2.new(1, -120, 0, 22)
+			nameLabel.Position = UDim2.new(0, 48, 0, 6)
+			nameLabel.BackgroundTransparency = 1
+			nameLabel.Text = item.name .. " x" .. entry.count
+			nameLabel.TextColor3 = Color3.new(1, 1, 1)
+			nameLabel.Font = Enum.Font.GothamBold
+			nameLabel.TextSize = 14
+			nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+			nameLabel.Parent = row
+
+			local descLabel = Instance.new("TextLabel")
+			descLabel.Size = UDim2.new(1, -120, 0, 18)
+			descLabel.Position = UDim2.new(0, 48, 0, 26)
+			descLabel.BackgroundTransparency = 1
+			descLabel.Text = item.description
+			descLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+			descLabel.Font = Enum.Font.Gotham
+			descLabel.TextSize = 11
+			descLabel.TextXAlignment = Enum.TextXAlignment.Left
+			descLabel.Parent = row
+
+			if item.usable then
+				local useBtn = Instance.new("TextButton")
+				useBtn.Size = UDim2.new(0, 56, 0, 32)
+				useBtn.Position = UDim2.new(1, -64, 0.5, -16)
+				useBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 80)
+				useBtn.Text = "Use"
+				useBtn.TextColor3 = Color3.new(1, 1, 1)
+				useBtn.Font = Enum.Font.GothamBold
+				useBtn.TextSize = 14
+				useBtn.Parent = row
+
+				local btnCorner = Instance.new("UICorner")
+				btnCorner.CornerRadius = UDim.new(0, 6)
+				btnCorner.Parent = useBtn
+
+				useBtn.MouseButton1Click:Connect(function()
+					remotes.UseItem:FireServer(entry.id)
+				end)
+			end
+		end
+	end
+
+	task.defer(function()
+		listFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 8)
+	end)
+end
+
+local function setVisible(value)
+	visible = value
+	panel.Visible = visible
+	if visible then
+		renderInventory()
+		remotes.RequestInventory:FireServer()
+	end
+end
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.I then
+		setVisible(not visible)
+	end
+end)
+
+remotes.InventoryUpdated.OnClientEvent:Connect(function(newInventory)
+	inventory = newInventory or {}
+	if visible then
+		renderInventory()
+	end
+end)
+
+remotes.RequestInventory:FireServer()
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="LocalScript" referent="24">
+          <Properties>
+            <string name="Name">UIController</string>
+            <string name="Source"><![CDATA[local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+local stats = {
+	hp = 100,
+	maxHp = 100,
+	level = 1,
+	xp = 0,
+	coins = 0,
+}
+
+local quest = {
+	accepted = false,
+	completed = false,
+	progress = 0,
+	required = 5,
+	name = "",
+}
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "RPGHud"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- HUD panel
+local hud = Instance.new("Frame")
+hud.Name = "HUD"
+hud.Size = UDim2.new(0, 220, 0, 120)
+hud.Position = UDim2.new(0, 16, 0, 16)
+hud.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+hud.BackgroundTransparency = 0.2
+hud.BorderSizePixel = 0
+hud.Parent = screenGui
+
+local hudCorner = Instance.new("UICorner")
+hudCorner.CornerRadius = UDim.new(0, 8)
+hudCorner.Parent = hud
+
+local levelLabel = Instance.new("TextLabel")
+levelLabel.Name = "LevelLabel"
+levelLabel.Size = UDim2.new(1, -16, 0, 22)
+levelLabel.Position = UDim2.new(0, 8, 0, 8)
+levelLabel.BackgroundTransparency = 1
+levelLabel.Text = "Level 1"
+levelLabel.TextColor3 = Color3.fromRGB(255, 220, 100)
+levelLabel.Font = Enum.Font.GothamBold
+levelLabel.TextSize = 16
+levelLabel.TextXAlignment = Enum.TextXAlignment.Left
+levelLabel.Parent = hud
+
+local hpBg = Instance.new("Frame")
+hpBg.Size = UDim2.new(1, -16, 0, 18)
+hpBg.Position = UDim2.new(0, 8, 0, 34)
+hpBg.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+hpBg.BorderSizePixel = 0
+hpBg.Parent = hud
+
+local hpFill = Instance.new("Frame")
+hpFill.Name = "HPFill"
+hpFill.Size = UDim2.new(1, 0, 1, 0)
+hpFill.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+hpFill.BorderSizePixel = 0
+hpFill.Parent = hpBg
+
+local hpLabel = Instance.new("TextLabel")
+hpLabel.Size = UDim2.new(1, 0, 1, 0)
+hpLabel.BackgroundTransparency = 1
+hpLabel.Text = "100 / 100 HP"
+hpLabel.TextColor3 = Color3.new(1, 1, 1)
+hpLabel.Font = Enum.Font.GothamBold
+hpLabel.TextSize = 12
+hpLabel.Parent = hpBg
+
+local xpBg = Instance.new("Frame")
+xpBg.Size = UDim2.new(1, -16, 0, 14)
+xpBg.Position = UDim2.new(0, 8, 0, 58)
+xpBg.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+xpBg.BorderSizePixel = 0
+xpBg.Parent = hud
+
+local xpFill = Instance.new("Frame")
+xpFill.Name = "XPFill"
+xpFill.Size = UDim2.new(0, 0, 1, 0)
+xpFill.BackgroundColor3 = Color3.fromRGB(80, 160, 255)
+xpFill.BorderSizePixel = 0
+xpFill.Parent = xpBg
+
+local coinsLabel = Instance.new("TextLabel")
+coinsLabel.Size = UDim2.new(1, -16, 0, 22)
+coinsLabel.Position = UDim2.new(0, 8, 0, 80)
+coinsLabel.BackgroundTransparency = 1
+coinsLabel.Text = "Coins: 0"
+coinsLabel.TextColor3 = Color3.fromRGB(255, 210, 80)
+coinsLabel.Font = Enum.Font.GothamBold
+coinsLabel.TextSize = 14
+coinsLabel.TextXAlignment = Enum.TextXAlignment.Left
+coinsLabel.Parent = hud
+
+-- Quest tracker
+local questTracker = Instance.new("Frame")
+questTracker.Name = "QuestTracker"
+questTracker.Size = UDim2.new(0, 260, 0, 56)
+questTracker.Position = UDim2.new(0.5, -130, 1, -80)
+questTracker.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+questTracker.BackgroundTransparency = 0.25
+questTracker.BorderSizePixel = 0
+questTracker.Visible = false
+questTracker.Parent = screenGui
+
+local questCorner = Instance.new("UICorner")
+questCorner.CornerRadius = UDim.new(0, 8)
+questCorner.Parent = questTracker
+
+local questTitle = Instance.new("TextLabel")
+questTitle.Size = UDim2.new(1, -16, 0, 22)
+questTitle.Position = UDim2.new(0, 8, 0, 6)
+questTitle.BackgroundTransparency = 1
+questTitle.Text = "Quest"
+questTitle.TextColor3 = Color3.new(1, 1, 1)
+questTitle.Font = Enum.Font.GothamBold
+questTitle.TextSize = 14
+questTitle.TextXAlignment = Enum.TextXAlignment.Left
+questTitle.Parent = questTracker
+
+local questProgress = Instance.new("TextLabel")
+questProgress.Size = UDim2.new(1, -16, 0, 20)
+questProgress.Position = UDim2.new(0, 8, 0, 28)
+questProgress.BackgroundTransparency = 1
+questProgress.Text = "Goblins: 0/5"
+questProgress.TextColor3 = Color3.fromRGB(180, 220, 255)
+questProgress.Font = Enum.Font.Gotham
+questProgress.TextSize = 13
+questProgress.TextXAlignment = Enum.TextXAlignment.Left
+questProgress.Parent = questTracker
+
+-- Notification
+local notification = Instance.new("TextLabel")
+notification.Name = "Notification"
+notification.Size = UDim2.new(0, 400, 0, 40)
+notification.Position = UDim2.new(0.5, -200, 0, 60)
+notification.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+notification.BackgroundTransparency = 0.15
+notification.Text = ""
+notification.TextColor3 = Color3.new(1, 1, 1)
+notification.Font = Enum.Font.GothamBold
+notification.TextSize = 16
+notification.Visible = false
+notification.Parent = screenGui
+
+local notifCorner = Instance.new("UICorner")
+notifCorner.CornerRadius = UDim.new(0, 8)
+notifCorner.Parent = notification
+
+-- Quest dialog modal
+local questModal = Instance.new("Frame")
+questModal.Name = "QuestModal"
+questModal.Size = UDim2.new(0, 360, 0, 220)
+questModal.Position = UDim2.new(0.5, -180, 0.5, -110)
+questModal.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+questModal.BorderSizePixel = 0
+questModal.Visible = false
+questModal.Parent = screenGui
+
+local questModalCorner = Instance.new("UICorner")
+questModalCorner.CornerRadius = UDim.new(0, 10)
+questModalCorner.Parent = questModal
+
+local questModalTitle = Instance.new("TextLabel")
+questModalTitle.Size = UDim2.new(1, -20, 0, 32)
+questModalTitle.Position = UDim2.new(0, 10, 0, 12)
+questModalTitle.BackgroundTransparency = 1
+questModalTitle.Text = "Quest"
+questModalTitle.TextColor3 = Color3.new(1, 1, 1)
+questModalTitle.Font = Enum.Font.GothamBold
+questModalTitle.TextSize = 20
+questModalTitle.TextXAlignment = Enum.TextXAlignment.Left
+questModalTitle.Parent = questModal
+
+local questModalDesc = Instance.new("TextLabel")
+questModalDesc.Size = UDim2.new(1, -20, 0, 80)
+questModalDesc.Position = UDim2.new(0, 10, 0, 50)
+questModalDesc.BackgroundTransparency = 1
+questModalDesc.Text = ""
+questModalDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
+questModalDesc.Font = Enum.Font.Gotham
+questModalDesc.TextSize = 14
+questModalDesc.TextWrapped = true
+questModalDesc.TextXAlignment = Enum.TextXAlignment.Left
+questModalDesc.TextYAlignment = Enum.TextYAlignment.Top
+questModalDesc.Parent = questModal
+
+local acceptBtn = Instance.new("TextButton")
+acceptBtn.Size = UDim2.new(0, 120, 0, 36)
+acceptBtn.Position = UDim2.new(0.5, -130, 1, -52)
+acceptBtn.BackgroundColor3 = Color3.fromRGB(60, 140, 80)
+acceptBtn.Text = "Accept"
+acceptBtn.TextColor3 = Color3.new(1, 1, 1)
+acceptBtn.Font = Enum.Font.GothamBold
+acceptBtn.TextSize = 14
+acceptBtn.Parent = questModal
+
+local closeQuestBtn = Instance.new("TextButton")
+closeQuestBtn.Size = UDim2.new(0, 120, 0, 36)
+closeQuestBtn.Position = UDim2.new(0.5, 10, 1, -52)
+closeQuestBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+closeQuestBtn.Text = "Close"
+closeQuestBtn.TextColor3 = Color3.new(1, 1, 1)
+closeQuestBtn.Font = Enum.Font.GothamBold
+closeQuestBtn.TextSize = 14
+closeQuestBtn.Parent = questModal
+
+local currentQuestId = nil
+
+-- Shop modal
+local shopModal = Instance.new("Frame")
+shopModal.Name = "ShopModal"
+shopModal.Size = UDim2.new(0, 380, 0, 260)
+shopModal.Position = UDim2.new(0.5, -190, 0.5, -130)
+shopModal.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+shopModal.BorderSizePixel = 0
+shopModal.Visible = false
+shopModal.Parent = screenGui
+
+local shopCorner = Instance.new("UICorner")
+shopCorner.CornerRadius = UDim.new(0, 10)
+shopCorner.Parent = shopModal
+
+local shopTitle = Instance.new("TextLabel")
+shopTitle.Size = UDim2.new(1, -20, 0, 32)
+shopTitle.Position = UDim2.new(0, 10, 0, 12)
+shopTitle.BackgroundTransparency = 1
+shopTitle.Text = "Shop"
+shopTitle.TextColor3 = Color3.new(1, 1, 1)
+shopTitle.Font = Enum.Font.GothamBold
+shopTitle.TextSize = 20
+shopTitle.TextXAlignment = Enum.TextXAlignment.Left
+shopTitle.Parent = shopModal
+
+local shopList = Instance.new("ScrollingFrame")
+shopList.Size = UDim2.new(1, -20, 1, -100)
+shopList.Position = UDim2.new(0, 10, 0, 50)
+shopList.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+shopList.BorderSizePixel = 0
+shopList.ScrollBarThickness = 6
+shopList.CanvasSize = UDim2.new(0, 0, 0, 0)
+shopList.Parent = shopModal
+
+local shopLayout = Instance.new("UIListLayout")
+shopLayout.Padding = UDim.new(0, 8)
+shopLayout.Parent = shopList
+
+local closeShopBtn = Instance.new("TextButton")
+closeShopBtn.Size = UDim2.new(0, 120, 0, 36)
+closeShopBtn.Position = UDim2.new(0.5, -60, 1, -48)
+closeShopBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+closeShopBtn.Text = "Close"
+closeShopBtn.TextColor3 = Color3.new(1, 1, 1)
+closeShopBtn.Font = Enum.Font.GothamBold
+closeShopBtn.TextSize = 14
+closeShopBtn.Parent = shopModal
+
+local function updateHud()
+	levelLabel.Text = "Level " .. stats.level
+	hpFill.Size = UDim2.new(math.clamp(stats.hp / stats.maxHp, 0, 1), 0, 1, 0)
+	hpLabel.Text = math.floor(stats.hp) .. " / " .. stats.maxHp .. " HP"
+	xpFill.Size = UDim2.new(math.clamp(stats.xp / 100, 0, 1), 0, 1, 0)
+	coinsLabel.Text = "Coins: " .. stats.coins
+end
+
+local function updateQuestTracker()
+	if quest.accepted and not quest.completed then
+		questTracker.Visible = true
+		questTitle.Text = quest.name ~= "" and quest.name or "Active Quest"
+		questProgress.Text = "Goblins: " .. quest.progress .. "/" .. quest.required
+	elseif quest.completed then
+		questTracker.Visible = true
+		questTitle.Text = quest.name ~= "" and quest.name or "Quest"
+		questProgress.Text = "Complete!"
+	else
+		questTracker.Visible = false
+	end
+end
+
+local function showNotification(text)
+	notification.Text = text
+	notification.Visible = true
+	task.delay(3, function()
+		notification.Visible = false
+	end)
+end
+
+local function renderShop(items)
+	for _, child in shopList:GetChildren() do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+
+	for _, item in items do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 56)
+		row.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+		row.BorderSizePixel = 0
+		row.Parent = shopList
+
+		local nameLbl = Instance.new("TextLabel")
+		nameLbl.Size = UDim2.new(1, -100, 0, 22)
+		nameLbl.Position = UDim2.new(0, 10, 0, 8)
+		nameLbl.BackgroundTransparency = 1
+		nameLbl.Text = item.name
+		nameLbl.TextColor3 = Color3.new(1, 1, 1)
+		nameLbl.Font = Enum.Font.GothamBold
+		nameLbl.TextSize = 14
+		nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+		nameLbl.Parent = row
+
+		local priceLbl = Instance.new("TextLabel")
+		priceLbl.Size = UDim2.new(1, -100, 0, 18)
+		priceLbl.Position = UDim2.new(0, 10, 0, 30)
+		priceLbl.BackgroundTransparency = 1
+		priceLbl.Text = item.description
+		priceLbl.TextColor3 = Color3.fromRGB(160, 160, 160)
+		priceLbl.Font = Enum.Font.Gotham
+		priceLbl.TextSize = 11
+		priceLbl.TextXAlignment = Enum.TextXAlignment.Left
+		priceLbl.Parent = row
+
+		local buyBtn = Instance.new("TextButton")
+		buyBtn.Size = UDim2.new(0, 72, 0, 32)
+		buyBtn.Position = UDim2.new(1, -82, 0.5, -16)
+		buyBtn.BackgroundColor3 = Color3.fromRGB(180, 140, 50)
+		buyBtn.Text = item.price .. "c"
+		buyBtn.TextColor3 = Color3.new(1, 1, 1)
+		buyBtn.Font = Enum.Font.GothamBold
+		buyBtn.TextSize = 13
+		buyBtn.Parent = row
+
+		buyBtn.MouseButton1Click:Connect(function()
+			remotes.PurchaseItem:FireServer(item.itemId)
+		end)
+	end
+
+	task.defer(function()
+		shopList.CanvasSize = UDim2.new(0, 0, 0, shopLayout.AbsoluteContentSize.Y + 8)
+	end)
+end
+
+acceptBtn.MouseButton1Click:Connect(function()
+	if currentQuestId then
+		remotes.AcceptQuest:FireServer(currentQuestId)
+		questModal.Visible = false
+	end
+end)
+
+closeQuestBtn.MouseButton1Click:Connect(function()
+	questModal.Visible = false
+end)
+
+closeShopBtn.MouseButton1Click:Connect(function()
+	shopModal.Visible = false
+end)
+
+remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
+	stats = payload
+	if payload.quest then
+		quest.accepted = payload.quest.accepted
+		quest.completed = payload.quest.completed
+		quest.progress = payload.quest.progress or 0
+	end
+	updateHud()
+	updateQuestTracker()
+end)
+
+remotes.QuestUpdated.OnClientEvent:Connect(function(payload)
+	quest.accepted = payload.accepted
+	quest.completed = payload.completed
+	quest.progress = payload.progress
+	quest.required = payload.required
+	quest.name = payload.name
+	updateQuestTracker()
+end)
+
+remotes.OpenQuest.OnClientEvent:Connect(function(payload)
+	currentQuestId = payload.id
+	questModalTitle.Text = payload.name
+	questModalDesc.Text = payload.description .. "\n\nReward: XP + Coins"
+
+	if payload.completed then
+		acceptBtn.Visible = false
+		questModalDesc.Text ..= "\n\n(Status: Complete)"
+	elseif payload.accepted then
+		acceptBtn.Visible = false
+		questModalDesc.Text ..= "\n\n(Status: In progress " .. payload.progress .. "/" .. payload.required .. ")"
+	else
+		acceptBtn.Visible = true
+	end
+
+	questModal.Visible = true
+end)
+
+remotes.OpenShop.OnClientEvent:Connect(function(items)
+	renderShop(items)
+	shopModal.Visible = true
+end)
+
+remotes.Notification.OnClientEvent:Connect(function(text)
+	showNotification(text)
+end)
+
+updateHud()
+updateQuestTracker()
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+  </Item>
+</roblox>
