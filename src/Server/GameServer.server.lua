@@ -25,6 +25,7 @@ local REMOTE_NAMES = {
 	"OpenShop",
 	"PurchaseItem",
 	"Notification",
+	"Dash",
 }
 
 local function createRemotes()
