@@ -323,6 +323,16 @@ function PlayerDataService:FireStatsUpdated(player)
 	end
 	getRemotes().StatsUpdated:FireClient(player, buildStatsPayload(player, data))
 	markSaveDirty(player)
+
+	local ok, Framework = pcall(function()
+		return require(ReplicatedStorage.Shared.Framework)
+	end)
+	if ok then
+		local partyService = Framework:GetService("PartyService")
+		if partyService and partyService.OnMemberStatsChanged then
+			partyService:OnMemberStatsChanged(player)
+		end
+	end
 end
 
 function PlayerDataService:GetData(player)

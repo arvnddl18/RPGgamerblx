@@ -118,6 +118,8 @@ local coreRemotes = {
 	"SelectClass", "ClassSelected", "EquipItem", "UnequipItem",
 	"OpenQuest", "AcceptQuest", "QuestUpdated", "OpenQuestLog",
 	"OpenShop", "PurchaseItem", "SellItem", "Notification", "LevelUp",
+	"PartyInvite", "PartyInviteReceived", "PartyRespondInvite", "PartyLeave",
+	"PartyKick", "PartyUpdated", "PartyInviteResult",
 }
 for _, remoteName in coreRemotes do
 	Framework:GetRemote(remoteName)
