@@ -86,7 +86,33 @@ local function createEmptyData()
 			completed = false,
 			progress = 0,
 		},
+		pvpMode = "Peaceful",
+		lastCombatTime = nil,
 	}
+end
+
+local function getBuffService()
+	if not PlayerDataService._buffService then
+		local ok, Framework = pcall(function()
+			return require(ReplicatedStorage.Shared.Framework)
+		end)
+		if ok then
+			PlayerDataService._buffService = Framework:GetService("BuffService")
+		end
+	end
+	return PlayerDataService._buffService
+end
+
+local function getPvpService()
+	if not PlayerDataService._pvpService then
+		local ok, Framework = pcall(function()
+			return require(ReplicatedStorage.Shared.Framework)
+		end)
+		if ok then
+			PlayerDataService._pvpService = Framework:GetService("PvpService")
+		end
+	end
+	return PlayerDataService._pvpService
 end
 
 local function sumEquipmentBonuses(equipped)
@@ -142,6 +168,8 @@ end
 
 local function buildStatsPayload(player, data)
 	local leaderstats = player:FindFirstChild("leaderstats")
+	local buffService = getBuffService()
+	local shield = buffService and buffService:GetShieldAmount(player) or 0
 	return {
 		classId = data.classId,
 		hasSelectedClass = data.hasSelectedClass,
@@ -159,6 +187,8 @@ local function buildStatsPayload(player, data)
 		equipped = data.equipped,
 		skillLoadout = data.skillLoadout,
 		quest = data.quest,
+		pvpMode = data.pvpMode or "Peaceful",
+		shield = shield,
 	}
 end
 
@@ -183,8 +213,10 @@ function PlayerDataService:RecalculateStats(player)
 	end
 
 	local ok, StatsModule = pcall(require, ReplicatedStorage.Shared.Combat.StatsModule)
+	local buffService = getBuffService()
+	local buffBonuses = buffService and buffService:GetActiveStatBonuses(player) or nil
 	if ok then
-		data.combatStats = StatsModule.CombineStats(combinedBase, equipBonuses, nil, nil)
+		data.combatStats = StatsModule.CombineStats(combinedBase, equipBonuses, buffBonuses, nil)
 	end
 	
 	data.requiredXp = LevelGrowth.GetRequiredXp(data.level)
@@ -210,6 +242,7 @@ function PlayerDataService:ApplyClass(player, classId)
 	data.level = 1
 	data.xp = 0
 	data.coins = 0
+	data.pvpMode = data.pvpMode or "Peaceful"
 	data.equipped = createEmptyEquipped()
 
 	for slot, itemId in classConfig.startingEquipment do
@@ -242,6 +275,7 @@ function PlayerDataService:ApplyClass(player, classId)
 	self:AddItem(player, "ManaPotion", 3)
 
 	syncHumanoid(player, data)
+	player:SetAttribute("PvpMode", data.pvpMode)
 	self:FireStatsUpdated(player)
 	return true
 end
@@ -374,6 +408,7 @@ function PlayerDataService:SetupPlayer(player)
 	coins.Parent = leaderstats
 
 	self._data[player] = createEmptyData()
+	player:SetAttribute("PvpMode", "Peaceful")
 
 	local saveService = getSaveService()
 	if saveService then
@@ -393,6 +428,11 @@ function PlayerDataService:SetupPlayer(player)
 				end)
 			end
 		end
+	end
+
+	local data = self._data[player]
+	if data then
+		player:SetAttribute("PvpMode", data.pvpMode or "Peaceful")
 	end
 
 	player.CharacterAdded:Connect(function()
@@ -518,13 +558,30 @@ function PlayerDataService:TakeCoins(player, amount)
 	return true
 end
 
-function PlayerDataService:Damage(player, amount)
+function PlayerDataService:Damage(player, amount, attacker, skipMitigation)
 	local data = self._data[player]
 	if not data or not data.hasSelectedClass then
 		return
 	end
 
-	local mitigated = math.max(1, amount - math.floor(data.combatStats.defense * 0.5))
+	data.lastCombatTime = tick()
+
+	local buffService = getBuffService()
+	if buffService then
+		amount = buffService:AbsorbDamage(player, amount)
+	end
+
+	if amount <= 0 then
+		self:FireStatsUpdated(player)
+		return
+	end
+
+	local mitigated
+	if skipMitigation then
+		mitigated = math.max(1, amount)
+	else
+		mitigated = math.max(1, amount - math.floor(data.combatStats.defense * 0.5))
+	end
 	data.hp = math.max(0, data.hp - mitigated)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)

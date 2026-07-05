@@ -54,8 +54,16 @@ StatusEffectModule.EffectTypes = {
 	StatBuff = {
 		id = "StatBuff",
 		stackBehavior = "Refresh",
-		-- The specific stats modified are provided at application time
-	}
+	},
+	Blessing = {
+		id = "Blessing",
+		stackBehavior = "Refresh",
+	},
+	DivineShield = {
+		id = "DivineShield",
+		stackBehavior = "Refresh",
+		isShield = true,
+	},
 }
 
 return StatusEffectModule

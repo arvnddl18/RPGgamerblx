@@ -120,6 +120,7 @@ local coreRemotes = {
 	"OpenShop", "PurchaseItem", "SellItem", "Notification", "LevelUp",
 	"PartyInvite", "PartyInviteReceived", "PartyRespondInvite", "PartyLeave",
 	"PartyKick", "PartyUpdated", "PartyInviteResult",
+	"SetPvpMode",
 }
 for _, remoteName in coreRemotes do
 	Framework:GetRemote(remoteName)
