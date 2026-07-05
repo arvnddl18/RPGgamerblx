@@ -4,14 +4,14 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Skills = require(Shared.Config.Skills)
-local Items = require(Shared.Config.Items)
-local DamageCalculator = require(Shared.Combat.DamageCalculator)
 
 local SkillService = {}
 SkillService._playerData = nil
 SkillService._enemyService = nil
 SkillService._inventoryService = nil
 SkillService._combatService = nil
+SkillService._partyService = nil
+SkillService._buffService = nil
 SkillService._cooldowns = {}
 SkillService._remotes = nil
 
@@ -20,12 +20,16 @@ local POTION_SLOTS = {
 	[7] = "ManaPotion",
 }
 
+local MULTI_TARGET_HEAL_SCALE = 0.7
+
 function SkillService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
 	self._playerData = Framework:GetService("PlayerDataService")
 	self._enemyService = Framework:GetService("EnemyService")
 	self._inventoryService = Framework:GetService("InventoryService")
 	self._combatService = Framework:GetService("CombatService")
+	self._partyService = Framework:GetService("PartyService")
+	self._buffService = Framework:GetService("BuffService")
 	self._remotes = Framework:GetRemotesFolder()
 
 	Framework:GetRemote("CastSkill")
@@ -63,6 +67,46 @@ function SkillService:GetAttackerStats(player)
 		return {}
 	end
 	return data.combatStats
+end
+
+function SkillService:FindFriendlyTargets(caster, range)
+	if not self._partyService then
+		return { caster }
+	end
+
+	local character = caster.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return { caster }
+	end
+
+	local candidates = self._partyService:GetPartyMembers(caster)
+	local targets = {}
+
+	for _, member in candidates do
+		if member ~= caster and not self._partyService:AreInSameParty(caster, member) then
+			continue
+		end
+
+		local memberCharacter = member.Character
+		local memberRoot = memberCharacter and memberCharacter:FindFirstChild("HumanoidRootPart")
+		local memberData = self._playerData:GetData(member)
+		if memberRoot and memberData and memberData.hasSelectedClass and memberData.hp > 0 then
+			local distance = (memberRoot.Position - root.Position).Magnitude
+			if distance <= range then
+				table.insert(targets, member)
+			end
+		end
+	end
+
+	if #targets == 0 then
+		local casterData = self._playerData:GetData(caster)
+		if casterData and casterData.hasSelectedClass and casterData.hp > 0 then
+			return { caster }
+		end
+	end
+
+	return targets
 end
 
 function SkillService:FindMeleeTargets(character, range, coneOnly)
@@ -124,15 +168,72 @@ function SkillService:ApplySkillDamage(player, skill, targets)
 
 	for _, enemy in targets do
 		self._enemyService:DamageEnemy(enemy, baseDamage, attackerStats, player, skill.skillType)
-		
-		if skill.statusEffect then
-			local Framework = require(ReplicatedStorage.Shared.Framework)
-			local buffService = Framework:GetService("BuffService")
-			if buffService then
-				buffService:ApplyEffect(enemy, skill.statusEffect, skill.statusDuration or 3, player, skill.statusIntensity)
-			end
+
+		if skill.statusEffect and self._buffService then
+			self._buffService:ApplyEffect(enemy, skill.statusEffect, skill.statusDuration or 3, player, skill.statusIntensity)
 		end
 	end
+end
+
+function SkillService:ApplyFriendlyHeal(caster, skill, targets)
+	local casterStats = self:GetAttackerStats(caster)
+	local healPower = casterStats.healPower or 1
+	local baseHeal = (skill.healAmount or 0) * healPower
+	if baseHeal <= 0 then
+		return
+	end
+
+	local amountPerTarget = baseHeal
+	if #targets > 1 then
+		amountPerTarget *= MULTI_TARGET_HEAL_SCALE
+	end
+
+	for _, target in targets do
+		self._playerData:Heal(target, amountPerTarget)
+	end
+end
+
+function SkillService:ApplyFriendlyBuff(caster, skill, targets)
+	if not skill.statusEffect or not self._buffService then
+		return
+	end
+
+	local extraData = {}
+	if skill.buffStats then
+		extraData.statBonuses = skill.buffStats
+	end
+	if skill.shieldAmount then
+		extraData.shieldAmount = skill.shieldAmount
+	end
+
+	for _, target in targets do
+		self._buffService:ApplyEffect(
+			target,
+			skill.statusEffect,
+			skill.statusDuration or 8,
+			caster,
+			skill.statusIntensity,
+			extraData
+		)
+	end
+end
+
+function SkillService:ExecuteFriendlySkill(player, skill)
+	local range = skill.range or 0
+	local targets = self:FindFriendlyTargets(player, range)
+
+	if skill.skillType == "heal" then
+		if skill.healAmount and skill.healAmount > 0 then
+			self:ApplyFriendlyHeal(player, skill, targets)
+		end
+	elseif skill.skillType == "buff" then
+		self:ApplyFriendlyBuff(player, skill, targets)
+	end
+
+	local targetCount = #targets
+	local suffix = targetCount > 1 and (" (" .. targetCount .. " allies)") or ""
+	self._remotes.Notification:FireClient(player, "Cast " .. skill.name .. suffix)
+	return true
 end
 
 function SkillService:ExecuteSkill(player, skill, slotIndex)
@@ -142,11 +243,7 @@ function SkillService:ExecuteSkill(player, skill, slotIndex)
 	end
 
 	if skill.skillType == "heal" or skill.skillType == "buff" then
-		if skill.healAmount and skill.healAmount > 0 then
-			self._playerData:Heal(player, skill.healAmount)
-		end
-		self._remotes.Notification:FireClient(player, "Cast " .. skill.name)
-		return true
+		return self:ExecuteFriendlySkill(player, skill)
 	end
 
 	local range = skill.range or 10
@@ -169,7 +266,7 @@ function SkillService:ExecuteSkill(player, skill, slotIndex)
 		targets = self:FindMeleeTargets(character, range, true)
 	end
 
-	if #targets == 0 and skill.skillType ~= "heal" and (skill.damage or 0) > 0 then
+	if #targets == 0 and (skill.damage or 0) > 0 then
 		return false
 	end
 
@@ -181,7 +278,7 @@ function SkillService:HandleCastSkill(player, slotIndex)
 	if not self._playerData:HasSelectedClass(player) then
 		return
 	end
-	
+
 	local character = player.Character
 	if character and (character:GetAttribute("IsStunned") or character:GetAttribute("IsSilenced") or character:GetAttribute("IsKnockedDown")) then
 		return
