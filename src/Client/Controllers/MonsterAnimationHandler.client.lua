@@ -19,11 +19,16 @@ local playMonsterAnimRemote = Framework:GetRemote("PlayMonsterAnimation")
 do
 	local preloadIds = {}
 	for _, config in Enemies do
-		if config.walkAnimId then table.insert(preloadIds, config.walkAnimId) end
-		if config.idleAnimId then table.insert(preloadIds, config.idleAnimId) end
-		if config.attackAnims then
-			for _, animId in config.attackAnims do
-				table.insert(preloadIds, animId)
+		if type(config) ~= "table" or not config.id then continue end
+		if config.walkAnimKey then
+			table.insert(preloadIds, Enemies.GetAnimId(config.walkAnimKey))
+		end
+		if config.idleAnimKey then
+			table.insert(preloadIds, Enemies.GetAnimId(config.idleAnimKey))
+		end
+		if config.attackAnimKeys then
+			for _, key in config.attackAnimKeys do
+				table.insert(preloadIds, Enemies.GetAnimId(key))
 			end
 		end
 	end
@@ -95,9 +100,9 @@ local function onAIStateChanged(enemy, newState)
 	if not ctrl then return end
 
 	if MOVING_STATES[newState] then
-		ctrl:PlayWalk(config.walkAnimId)
+		ctrl:PlayWalk(Enemies.GetAnimId(config.walkAnimKey))
 	elseif newState == "Idle" then
-		ctrl:PlayIdle(config.idleAnimId)
+		ctrl:PlayIdle(Enemies.GetAnimId(config.idleAnimKey))
 	end
 	-- "Attack" state is handled by the PlayMonsterAnimation remote;
 	-- we intentionally do nothing here so the action animation plays
@@ -125,7 +130,7 @@ local function setupEnemy(enemy)
 	if config then
 		local ctrl = getAnimController(enemy)
 		if ctrl then
-			ctrl:PlayIdle(config.idleAnimId)
+			ctrl:PlayIdle(Enemies.GetAnimId(config.idleAnimKey))
 		end
 	end
 
@@ -156,20 +161,17 @@ CollectionService:GetInstanceRemovedSignal("Enemy"):Connect(cleanupEnemy)
 -- Attack animation: server broadcasts the chosen animId to all clients
 ---------------------------------------------------------------------------
 
-playMonsterAnimRemote.OnClientEvent:Connect(function(enemy, animId)
+playMonsterAnimRemote.OnClientEvent:Connect(function(enemy, animKey)
 	if not enemy or not enemy.Parent then return end
-	if typeof(animId) ~= "string" then return end
+	if typeof(animKey) ~= "string" then return end
 
 	local ctrl = getAnimController(enemy)
 	if not ctrl then return end
 
-	-- Play the specific attack animation the server selected.
-	-- Action priority overlays any walk/idle that is running.
-	ctrl:PlayActionById(animId)
-
-	-- When the attack track ends, the AIState attribute will have already
-	-- been updated by the next EnemyStateMachine tick (0.25s interval),
-	-- so the walk/idle handler will restore the correct movement animation.
+	local animId = Enemies.GetAnimId(animKey)
+	if animId and animId ~= "" then
+		ctrl:PlayActionById(animId)
+	end
 end)
 
 print("[MonsterAnimationHandler] Started.")

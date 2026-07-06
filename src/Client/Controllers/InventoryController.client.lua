@@ -4,6 +4,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Items = require(Shared.Config.Items)
+local LocalAnimationBuilder = require(Shared.Util.LocalAnimationBuilder)
 local RarityConfig = require(Shared.Config.RarityConfig)
 local EnhancementConfig = require(Shared.Config.EnhancementConfig)
 
@@ -275,6 +276,12 @@ local function renderInventory()
 					useBtn.TextSize = 13
 					useBtn.Parent = row
 					useBtn.MouseButton1Click:Connect(function()
+						local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+						if entry.id == "HealthPotion" then
+							LocalAnimationBuilder.DrinkHealthPotion(humanoid)
+						elseif entry.id == "ManaPotion" then
+							LocalAnimationBuilder.DrinkManaPotion(humanoid)
+						end
 						remotes.UseItem:FireServer(entry.id)
 					end)
 					buttonOffset -= 58

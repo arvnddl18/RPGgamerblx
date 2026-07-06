@@ -384,11 +384,18 @@ function SkillService:HandleCastSkill(player, slotIndex)
 		return
 	end
 
+	-- Check level requirement — block casting skills the player hasn't unlocked
+	local data = self._playerData:GetData(player)
+	local requiredLevel = skill.requiredLevel or 1
+	if not data or data.level < requiredLevel then
+		self._remotes.Notification:FireClient(player, "Requires Level " .. requiredLevel .. "!")
+		return
+	end
+
 	if self:IsOnCooldown(player, skillId) then
 		return
 	end
 
-	local data = self._playerData:GetData(player)
 	if skill.manaCost and skill.manaCost > 0 then
 		if not data or data.mana < skill.manaCost then
 			self._remotes.Notification:FireClient(player, "Not enough Mana!")

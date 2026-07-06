@@ -563,11 +563,11 @@ function EnemyService:RunAI()
 				self._attackCooldowns[key] = now
 
 				-- Pick a random attack animation and broadcast to all clients
-				local attackAnims = enemyConfig.attackAnims
-				local animId = attackAnims and #attackAnims > 0
-					and attackAnims[math.random(#attackAnims)] or nil
-				if animId and self._playMonsterAnimRemote then
-					self._playMonsterAnimRemote:FireAllClients(enemy, animId)
+				local attackKeys = enemyConfig.attackAnimKeys
+				local animKey = attackKeys and #attackKeys > 0
+					and attackKeys[math.random(#attackKeys)] or nil
+				if animKey and self._playMonsterAnimRemote then
+					self._playMonsterAnimRemote:FireAllClients(enemy, animKey)
 				end
 
 				-- Delay damage by attackHitTime so it syncs with the animation hit moment

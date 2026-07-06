@@ -4,14 +4,17 @@ local UserInputService = game:GetService("UserInputService")
 
 local SkillBarUI = require(script.Parent.Parent.UI.SkillBar.SkillBarUI)
 local AnimationController = require(ReplicatedStorage.Shared.Util.AnimationController)
+local LocalAnimationBuilder = require(ReplicatedStorage.Shared.Util.LocalAnimationBuilder)
 local Skills = require(ReplicatedStorage.Shared.Config.Skills)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local hasSelectedClass = false
+local playerLevel = 1
 local skillBar = SkillBarUI.new(player:WaitForChild("PlayerGui"))
 local currentLoadout = {} -- slotIndex → skillId
+local localCooldowns = {} -- skillId → tick() when cooldown expires
 local animCtrl = nil -- AnimationController for the current character
 local comboResetTimer = nil -- thread that resets the auto-attack combo
 
@@ -92,15 +95,42 @@ end
 -- Skill casting
 ---------------------------------------------------------------------------
 
+local POTION_SLOTS = {
+	[6] = { id = "HealthPotion", drink = LocalAnimationBuilder.DrinkHealthPotion },
+	[7] = { id = "ManaPotion", drink = LocalAnimationBuilder.DrinkManaPotion },
+}
+
 local function castSlot(slotIndex)
 	if not hasSelectedClass then
 		return
 	end
 
-	-- Play the animation immediately for responsiveness.
-	-- The server validates and applies damage after castTime.
-	playSkillAnimation(slotIndex)
+	local potion = POTION_SLOTS[slotIndex]
+	if potion then
+		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		potion.drink(humanoid)
+		remotes.CastSkill:FireServer(slotIndex)
+		return
+	end
 
+	local skillId = currentLoadout[slotIndex]
+	if not skillId then return end
+
+	local skillConfig = Skills[skillId]
+	if not skillConfig then return end
+
+	local now = tick()
+	if localCooldowns[skillId] and now < localCooldowns[skillId] then
+		return
+	end
+
+	local requiredLevel = skillConfig.requiredLevel or 1
+	if playerLevel < requiredLevel then
+		return
+	end
+
+	localCooldowns[skillId] = now + (skillConfig.cooldown or 0)
+	playSkillAnimation(slotIndex)
 	remotes.CastSkill:FireServer(slotIndex)
 end
 
@@ -150,6 +180,10 @@ remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	end
 	if payload.mana ~= nil then
 		skillBar:SetMana(payload.mana)
+	end
+	if payload.level ~= nil then
+		playerLevel = payload.level
+		skillBar:SetLevel(payload.level)
 	end
 end)
 

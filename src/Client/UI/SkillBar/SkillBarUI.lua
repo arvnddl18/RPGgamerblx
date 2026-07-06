@@ -15,6 +15,7 @@ function SkillBarUI.new(playerGui)
 	self._slots = {}
 	self._cooldownEnds = {}
 	self._mana = 0
+	self._playerLevel = 1
 	self._hasSelectedClass = false
 
 	local screenGui = Instance.new("ScreenGui")
@@ -120,6 +121,18 @@ function SkillBarUI.new(playerGui)
 		grayOverlay.ZIndex = 1
 		grayOverlay.Parent = slotFrame
 
+		local lockLabel = Instance.new("TextLabel")
+		lockLabel.Name = "LockLabel"
+		lockLabel.Size = UDim2.new(1, 0, 1, 0)
+		lockLabel.BackgroundTransparency = 1
+		lockLabel.Text = ""
+		lockLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+		lockLabel.Font = Enum.Font.GothamBold
+		lockLabel.TextSize = 10
+		lockLabel.ZIndex = 2
+		lockLabel.Visible = false
+		lockLabel.Parent = slotFrame
+
 		self._slots[i] = {
 			frame = slotFrame,
 			icon = icon,
@@ -127,8 +140,10 @@ function SkillBarUI.new(playerGui)
 			cooldownOverlay = cooldownOverlay,
 			cdLabel = cdLabel,
 			grayOverlay = grayOverlay,
+			lockLabel = lockLabel,
 			skillId = nil,
 			manaCost = 0,
+			requiredLevel = 1,
 		}
 	end
 
@@ -161,6 +176,9 @@ function SkillBarUI:UpdateLoadout(skillLoadout)
 			slot.nameLabel.Text = name
 			slot.icon.BackgroundColor3 = color
 			slot.manaCost = manaCost
+			-- Store the required level from the skill config
+			local skillConfig = Skills[skillId]
+			slot.requiredLevel = skillConfig and skillConfig.requiredLevel or 1
 		end
 	end
 	self:RefreshAvailability()
@@ -168,6 +186,11 @@ end
 
 function SkillBarUI:SetMana(mana)
 	self._mana = mana
+	self:RefreshAvailability()
+end
+
+function SkillBarUI:SetLevel(level)
+	self._playerLevel = level or 1
 	self:RefreshAvailability()
 end
 
@@ -180,8 +203,17 @@ function SkillBarUI:RefreshAvailability()
 	for i = 1, 7 do
 		local slot = self._slots[i]
 		local onCooldown = slot.skillId and self._cooldownEnds[slot.skillId] and tick() < self._cooldownEnds[slot.skillId]
+		local locked = slot.requiredLevel > self._playerLevel
 		local notEnoughMana = slot.manaCost > 0 and self._mana < slot.manaCost
-		slot.grayOverlay.Visible = not onCooldown and notEnoughMana and self._hasSelectedClass
+
+		if locked and self._hasSelectedClass then
+			slot.grayOverlay.Visible = true
+			slot.lockLabel.Visible = true
+			slot.lockLabel.Text = "Lv." .. slot.requiredLevel
+		else
+			slot.lockLabel.Visible = false
+			slot.grayOverlay.Visible = not onCooldown and notEnoughMana and self._hasSelectedClass
+		end
 	end
 end
 

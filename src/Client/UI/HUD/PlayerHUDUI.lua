@@ -184,12 +184,58 @@ function PlayerHUDUI:CreateStatusBadge(effect)
 end
 
 function PlayerHUDUI:UpdateStatusEffects(effects)
-	self:ClearStatusEntries()
-	self._activeEffects = effects or {}
+	local incoming = effects or {}
 
-	for _, effect in self._activeEffects do
-		self:CreateStatusBadge(effect)
+	-- Build lookup of incoming effects by id
+	local incomingById = {}
+	for _, effect in incoming do
+		incomingById[effect.id] = effect
 	end
+
+	-- Build lookup of existing entries by effect id
+	local existingById = {}
+	for i, entry in self._statusEntries do
+		existingById[entry.effect.id] = i
+	end
+
+	-- Remove entries that are no longer present (iterate backwards to safely remove)
+	for i = #self._statusEntries, 1, -1 do
+		local entry = self._statusEntries[i]
+		if not incomingById[entry.effect.id] then
+			if entry.frame then
+				entry.frame:Destroy()
+			end
+			table.remove(self._statusEntries, i)
+		end
+	end
+
+	-- Update existing entries and add new ones
+	for _, effect in incoming do
+		local existingIdx = nil
+		for i, entry in self._statusEntries do
+			if entry.effect.id == effect.id then
+				existingIdx = i
+				break
+			end
+		end
+
+		if existingIdx then
+			-- Update the existing badge's timer and data
+			local entry = self._statusEntries[existingIdx]
+			entry.effect.remaining = effect.remaining
+			entry.effect.intensity = effect.intensity
+			local stacks = effect.intensity and effect.intensity > 1 and (" x" .. math.floor(effect.intensity)) or ""
+			entry.stacksSuffix = stacks
+			if entry.timeLabel then
+				entry.timeLabel.Text = math.ceil(effect.remaining) .. "s" .. stacks
+			end
+		else
+			-- Create a new badge for this effect
+			self:CreateStatusBadge(effect)
+		end
+	end
+
+	self._activeEffects = incoming
 
 	local hasEffects = #self._activeEffects > 0
 	local hasShield = self._shieldBar.bg.Visible

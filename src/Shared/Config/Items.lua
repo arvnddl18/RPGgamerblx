@@ -1,3 +1,4 @@
+-- weaponSkin: style = grip/visual profile (sword|staff|bow|mace|spear), toolHold = class hold anim
 local Items = {
 	Herb = {
 		id = "Herb",
@@ -133,6 +134,7 @@ local Items = {
 		damage = 25,
 		statBonuses = { PhysicalDamage = 5 },
 		color = Color3.fromRGB(160, 160, 180),
+		weaponSkin = { style = "sword", toolHold = "Warrior" },
 	},
 	WoodenSword = {
 		id = "WoodenSword",
@@ -146,6 +148,7 @@ local Items = {
 		damage = 12,
 		statBonuses = { PhysicalDamage = 2 },
 		color = Color3.fromRGB(139, 90, 43),
+		weaponSkin = { style = "sword", toolHold = "Warrior" },
 	},
 
 	WarriorSword = {
@@ -159,6 +162,7 @@ local Items = {
 		damage = 15,
 		statBonuses = { PhysicalDamage = 5, PhysicalResistance = 1 },
 		color = Color3.fromRGB(180, 60, 60),
+		weaponSkin = { style = "sword", toolHold = "Warrior" },
 	},
 	WarriorHelm = {
 		id = "WarriorHelm",
@@ -227,6 +231,7 @@ local Items = {
 		damage = 8,
 		statBonuses = { MagicalDamage = 8 },
 		color = Color3.fromRGB(80, 100, 220),
+		weaponSkin = { style = "staff", toolHold = "Mage" },
 	},
 	MageHood = {
 		id = "MageHood",
@@ -295,6 +300,7 @@ local Items = {
 		damage = 12,
 		statBonuses = { PhysicalDamage = 4 },
 		color = Color3.fromRGB(60, 160, 80),
+		weaponSkin = { style = "bow", toolHold = "Archer" },
 	},
 	ArcherCap = {
 		id = "ArcherCap",
@@ -363,6 +369,7 @@ local Items = {
 		damage = 10,
 		statBonuses = { MagicalDamage = 4 },
 		color = Color3.fromRGB(220, 200, 80),
+		weaponSkin = { style = "mace", toolHold = "Priest" },
 	},
 	PriestHood = {
 		id = "PriestHood",
@@ -431,12 +438,7 @@ local Items = {
 		damage = 14,
 		statBonuses = { PhysicalDamage = 5 },
 		color = Color3.fromRGB(140, 80, 200),
-		animations = {
-			attack = {
-				"rbxassetid://10468688463",
-				"rbxassetid://10468688204"
-			}
-		},
+		weaponSkin = { style = "spear", toolHold = "Kavalier" },
 	},
 	KavalierHelm = {
 		id = "KavalierHelm",

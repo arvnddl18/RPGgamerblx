@@ -3,7 +3,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Items = require(Shared.Config.Items)
+local SkinToolBuilder = require(Shared.Util.LocalSkinToolBuilder)
 local DamageCalculator = require(Shared.Combat.DamageCalculator)
 
 local CombatService = {}
@@ -26,38 +26,7 @@ function CombatService:Init()
 end
 
 function CombatService:CreateWeaponTool(weaponId)
-	local weapon = Items[weaponId]
-	if not weapon then
-		return nil
-	end
-
-	local tool = Instance.new("Tool")
-	tool.Name = weapon.name
-	tool.RequiresHandle = true
-	tool.CanBeDropped = false
-	tool:SetAttribute("WeaponId", weapon.id)
-
-	local handle = Instance.new("Part")
-	handle.Name = "Handle"
-
-	local weaponType = weapon.type
-	if weaponType == "weapon" and weapon.id:find("Staff") then
-		handle.Size = Vector3.new(0.35, 0.35, 4.5)
-	elseif weaponType == "weapon" and weapon.id:find("Bow") then
-		handle.Size = Vector3.new(0.3, 2.5, 0.3)
-	elseif weaponType == "weapon" and weapon.id:find("Spear") then
-		handle.Size = Vector3.new(0.35, 0.35, 5.0)
-	elseif weaponType == "weapon" and weapon.id:find("Mace") then
-		handle.Size = Vector3.new(0.6, 0.6, 2.5)
-	else
-		handle.Size = Vector3.new(0.4, 0.4, 3.5)
-	end
-
-	handle.Color = weapon.color
-	handle.Material = Enum.Material.Metal
-	handle.Parent = tool
-
-	return tool
+	return SkinToolBuilder.BuildWeaponTool(weaponId)
 end
 
 function CombatService:GiveWeapon(player, weaponId)
