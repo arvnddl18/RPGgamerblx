@@ -1,0 +1,52 @@
+-- ⚠️ DEPRECATED — This module is superseded by AnimationController.
+-- Use ReplicatedStorage.Shared.Util.AnimationController instead.
+-- AttackAnimations module
+-- Handles playing auto-attack animations on the client.
+
+local AttackAnimations = {}
+
+-- Default attack animation IDs by tool type
+local DEFAULT_ANIMATION_ID = "rbxassetid://522635514"
+
+-- Track active animation per character to avoid stacking
+local activeTracks = {}
+
+function AttackAnimations.play(character, tool)
+	if not character then return end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if not animator then return end
+
+	-- Determine animation ID from tool attribute or use default
+	local animId = tool and tool:GetAttribute("AttackAnimationId") or DEFAULT_ANIMATION_ID
+
+	-- Create or reuse the Animation instance
+	local animation = Instance.new("Animation")
+	animation.AnimationId = animId
+
+	-- Stop any previously playing attack track for this character
+	local oldTrack = activeTracks[character]
+	if oldTrack and oldTrack.IsPlaying then
+		oldTrack:Stop(0.1)
+	end
+
+	-- Load and play the new track
+	local track = animator:LoadAnimation(animation)
+	activeTracks[character] = track
+
+	track.Priority = Enum.AnimationPriority.Action
+	track:Play()
+
+	-- Clean up after the animation finishes
+	track.Stopped:Once(function()
+		if activeTracks[character] == track then
+			activeTracks[character] = nil
+		end
+		animation:Destroy()
+	end)
+end
+
+return AttackAnimations

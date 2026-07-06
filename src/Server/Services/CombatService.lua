@@ -67,6 +67,9 @@ function CombatService:GiveWeapon(player, weaponId)
 	end
 
 	weaponId = weaponId or data.equippedWeapon
+	if type(weaponId) == "table" then
+		weaponId = weaponId.id
+	end
 	if not weaponId then
 		return
 	end

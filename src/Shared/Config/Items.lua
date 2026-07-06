@@ -431,6 +431,12 @@ local Items = {
 		damage = 14,
 		statBonuses = { PhysicalDamage = 5 },
 		color = Color3.fromRGB(140, 80, 200),
+		animations = {
+			attack = {
+				"rbxassetid://10468688463",
+				"rbxassetid://10468688204"
+			}
+		},
 	},
 	KavalierHelm = {
 		id = "KavalierHelm",

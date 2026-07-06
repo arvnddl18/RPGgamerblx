@@ -397,13 +397,39 @@ function SkillService:HandleCastSkill(player, slotIndex)
 		self._playerData:SpendMana(player, skill.manaCost)
 	end
 
-	local success = self:ExecuteSkill(player, skill, slotIndex)
-	if not success and skill.manaCost and skill.manaCost > 0 then
-		self._playerData:RestoreMana(player, skill.manaCost)
-		return
+	-- Set cooldown immediately to prevent spam during the cast window.
+	self:SetCooldown(player, skillId, skill.cooldown or 1)
+
+	-- Delay damage application by castTime so it syncs with the client-side
+	-- cast animation.  The client plays the animation at t=0; the server
+	-- applies the effect at t=castTime, matching the hit-marker frame.
+	local castTime = skill.castTime or 0
+
+	local function executeAndFinalize()
+		-- Re-validate: player may have died or disconnected during the cast
+		if not player.Parent then
+			return
+		end
+		local character = player.Character
+		if not character then
+			return
+		end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if not humanoid or humanoid.Health <= 0 then
+			return
+		end
+
+		local success = self:ExecuteSkill(player, skill, slotIndex)
+		if not success and skill.manaCost and skill.manaCost > 0 then
+			self._playerData:RestoreMana(player, skill.manaCost)
+		end
 	end
 
-	self:SetCooldown(player, skillId, skill.cooldown or 1)
+	if castTime > 0 then
+		task.delay(castTime, executeAndFinalize)
+	else
+		executeAndFinalize()
+	end
 end
 
 function SkillService:Start()

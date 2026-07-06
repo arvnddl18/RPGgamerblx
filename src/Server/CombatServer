@@ -1,0 +1,387 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Classes = require(Shared.Config.Classes)
+local Skills = require(Shared.Config.Skills)
+local Enemies = require(Shared.Config.Enemies)
+local StatsModule = require(Shared.Combat.StatsModule)
+local DamageCalculator = require(Shared.Combat.DamageCalculator)
+
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+-- Per-player session data
+local sessions = {}
+
+-- XP required for each level (simple curve)
+local function xpForLevel(level)
+	return level * 100 + (level - 1) * 50
+end
+
+-- Build the 7-slot skill loadout for a class
+local function buildSkillLoadout(classConfig)
+	local skills = classConfig.skills
+	return {
+		skills.autoAttack,
+		skills.skill1,
+		skills.skill2,
+		skills.skill3,
+		skills.ultimate,
+		"HealthPotion",
+		"ManaPotion",
+	}
+end
+
+-- Build the stats payload to send to the client
+local function buildStatsPayload(player)
+	local session = sessions[player]
+	if not session then
+		return { hasSelectedClass = false }
+	end
+
+	return {
+		hasSelectedClass = true,
+		classId = session.classId,
+		level = session.level,
+		xp = session.xp,
+		requiredXp = xpForLevel(session.level),
+		hp = session.hp,
+		maxHp = session.combatStats.maxHp,
+		mana = session.mana,
+		maxMana = session.combatStats.maxMana,
+		shield = session.shield or 0,
+		combatStats = session.combatStats,
+		skillLoadout = session.skillLoadout,
+		pvpMode = session.pvpMode or "Peaceful",
+		karmaPoints = session.karmaPoints or 0,
+		pkCount = session.pkCount or 0,
+		karmaState = session.karmaState or "Innocent",
+		karmaFlagSecondsRemaining = session.karmaFlagSecondsRemaining or 0,
+	}
+end
+
+-- Send stats update to a player
+local function sendStatsUpdate(player)
+	local payload = buildStatsPayload(player)
+	remotes.StatsUpdated:FireClient(player, payload)
+end
+
+-- Get enemy stats for DamageCalculator
+local function getEnemyStats(enemyModel)
+	return {
+		defense = enemyModel:GetAttribute("PhysicalResistance") or 0,
+		magicalResistance = enemyModel:GetAttribute("MagicalResistance") or 0,
+		evasion = enemyModel:GetAttribute("Evasion") or 0,
+		critReduction = enemyModel:GetAttribute("CritReduction") or 0,
+		maxHp = enemyModel:GetAttribute("MaxHealth") or 100,
+		hp = enemyModel:GetAttribute("Health") or 100,
+	}
+end
+
+-- Find all enemy models in range of a position
+local function getEnemiesInRange(centerPos, range)
+	local enemiesFolder = Workspace:FindFirstChild("Enemies")
+	if not enemiesFolder then return {} end
+
+	local result = {}
+	for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+		if enemy:IsA("Model") and enemy.PrimaryPart then
+			local enemyPos = enemy:GetPivot().Position
+			local distance = (enemyPos - centerPos).Magnitude
+			if distance <= range then
+				table.insert(result, { model = enemy, distance = distance })
+			end
+		end
+	end
+	table.sort(result, function(a, b)
+		return a.distance < b.distance
+	end)
+	return result
+end
+
+-- Apply damage to an enemy and handle death
+local function damageEnemy(player, enemyModel, damage)
+	if not enemyModel or not enemyModel.Parent then return end
+
+	local humanoid = enemyModel:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then return end
+
+	humanoid:TakeDamage(damage)
+
+	local currentHealth = humanoid.Health
+	enemyModel:SetAttribute("Health", currentHealth)
+
+	if currentHealth <= 0 then
+		-- Enemy died: grant XP and coins
+		local session = sessions[player]
+		if session then
+			local enemyType = enemyModel:GetAttribute("EnemyType")
+			local enemyConfig = Enemies[enemyType]
+			if enemyConfig then
+				session.xp = session.xp + (enemyConfig.xpReward or 10)
+				session.coins = (session.coins or 0) + (enemyConfig.coinReward or 5)
+
+				-- Check level up
+				while session.xp >= xpForLevel(session.level) do
+					session.xp = session.xp - xpForLevel(session.level)
+				session.level = session.level + 1
+				-- Increase max HP and mana on level up
+				session.combatStats.maxHp = session.combatStats.maxHp + 10
+				session.combatStats.maxMana = session.combatStats.maxMana + 5
+				session.hp = session.combatStats.maxHp
+				session.mana = session.combatStats.maxMana
+				end
+				sendStatsUpdate(player)
+			end
+		end
+
+		-- Schedule respawn after 5 seconds
+		local enemyType = enemyModel:GetAttribute("EnemyType")
+		local spawnX = enemyModel:GetAttribute("SpawnX")
+		local spawnY = enemyModel:GetAttribute("SpawnY")
+		local spawnZ = enemyModel:GetAttribute("SpawnZ")
+		local maxHealth = enemyModel:GetAttribute("MaxHealth")
+
+		task.delay(5, function()
+			if enemyModel and enemyModel.Parent then
+				local hp = enemyModel:FindFirstChildOfClass("Humanoid")
+				if hp then
+				hp.Health = maxHealth or 50
+				end
+				enemyModel:SetAttribute("Health", maxHealth or 50)
+				enemyModel:SetAttribute("AIState", "Idle")
+				if spawnX and spawnY and spawnZ then
+				enemyModel:PivotTo(CFrame.new(spawnX, spawnY, spawnZ))
+				end
+			end
+		end)
+	end
+end
+
+-- Handle class selection
+local function onSelectClass(player, classId)
+	if sessions[player] and sessions[player].hasSelectedClass then
+		return -- Already selected
+	end
+
+	local classConfig = Classes[classId]
+	if not classConfig then
+		warn("Invalid class selected: " .. tostring(classId))
+		return
+	end
+
+	-- Build combat stats from class base stats
+	local combatStats = StatsModule.CombineStats(classConfig.baseStats, nil, nil, nil)
+
+	local session = {
+		hasSelectedClass = true,
+		classId = classId,
+		level = 1,
+		xp = 0,
+		hp = combatStats.maxHp,
+		maxHp = combatStats.maxHp,
+		mana = combatStats.maxMana,
+		maxMana = combatStats.maxMana,
+		shield = 0,
+		combatStats = combatStats,
+		skillLoadout = buildSkillLoadout(classConfig),
+		cooldowns = {},
+		pvpMode = "Peaceful",
+		coins = 0,
+	}
+	sessions[player] = session
+
+	-- Set character walk speed based on class
+	local character = player.Character
+	if character then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = combatStats.movementSpeed
+			humanoid.MaxHealth = combatStats.maxHp
+			humanoid.Health = combatStats.maxHp
+		end
+	end
+
+	remotes.ClassSelected:FireClient(player)
+	sendStatsUpdate(player)
+end
+
+-- Handle skill casting
+local function onCastSkill(player, slotIndex)
+	local session = sessions[player]
+	if not session or not session.hasSelectedClass then return end
+
+	local character = player.Character
+	if not character then return end
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local skillId = session.skillLoadout[slotIndex]
+	if not skillId then return end
+
+	-- Handle potions (slots 6 and 7)
+	if skillId == "HealthPotion" then
+		local healAmount = 50
+		session.hp = math.min(session.hp + healAmount, session.combatStats.maxHp)
+		sendStatsUpdate(player)
+		return
+	elseif skillId == "ManaPotion" then
+		local manaAmount = 30
+		session.mana = math.min(session.mana + manaAmount, session.combatStats.maxMana)
+		sendStatsUpdate(player)
+		return
+	end
+
+	-- Look up the skill config
+	local skillConfig = Skills[skillId]
+	if not skillConfig then return end
+
+	-- Check cooldown
+	local now = tick()
+	if session.cooldowns[skillId] and now < session.cooldowns[skillId] then
+		return
+	end
+
+	-- Check mana
+	local manaCost = skillConfig.manaCost or 0
+	if session.mana < manaCost then
+		return
+	end
+
+	-- Deduct mana
+	session.mana = session.mana - manaCost
+
+	-- Start cooldown
+	local cooldown = skillConfig.cooldown or 1
+	session.cooldowns[skillId] = now + cooldown
+	remotes.SkillCooldownUpdated:FireClient(player, skillId, cooldown)
+
+	-- Handle skill type
+	local skillType = skillConfig.skillType
+	local range = skillConfig.range or 10
+	local damage = skillConfig.damage or 0
+	local damageType = skillConfig.skillType == "magic" and "magic" or "physical"
+
+	local playerPos = hrp.Position
+
+	if skillType == "heal" then
+		-- Heal skill
+		local healAmount = (skillConfig.healAmount or 20) * (session.combatStats.healPower or 1.0)
+		session.hp = math.min(session.hp + healAmount, session.combatStats.maxHp)
+		sendStatsUpdate(player)
+		return
+	end
+
+	if skillConfig.aoe then
+		-- AoE: damage all enemies in range
+		local enemies = getEnemiesInRange(playerPos, range)
+		for _, enemyData in ipairs(enemies) do
+			local enemyStats = getEnemyStats(enemyData.model)
+			local result = DamageCalculator.ComputeHit(damage, session.combatStats, enemyStats, damageType)
+			if not result.isMiss and result.damage > 0 then
+				damageEnemy(player, enemyData.model, result.damage)
+			end
+		end
+	else
+		-- Single target: damage closest enemy in range
+		local enemies = getEnemiesInRange(playerPos, range)
+		if #enemies > 0 then
+			local target = enemies[1]
+			local enemyStats = getEnemyStats(target.model)
+			local result = DamageCalculator.ComputeHit(damage, session.combatStats, enemyStats, damageType)
+			if not result.isMiss and result.damage > 0 then
+				damageEnemy(player, target.model, result.damage)
+			end
+		end
+	end
+
+	sendStatsUpdate(player)
+end
+
+-- Connect remotes
+remotes.SelectClass.OnServerEvent:Connect(onSelectClass)
+remotes.CastSkill.OnServerEvent:Connect(onCastSkill)
+
+-- Handle PvP mode toggle
+remotes.SetPvpMode.OnServerEvent:Connect(function(player, mode)
+	local session = sessions[player]
+	if not session then return end
+	session.pvpMode = mode
+	sendStatsUpdate(player)
+end)
+
+-- HP/Mana regeneration loop
+task.spawn(function()
+	while true do
+		task.wait(1)
+		for player, session in pairs(sessions) do
+			if session.hasSelectedClass then
+				local changed = false
+				-- HP regen
+				if session.hp < session.combatStats.maxHp then
+					session.hp = math.min(session.hp + (session.combatStats.hpRegen or 1), session.combatStats.maxHp)
+					changed = true
+				end
+				-- Mana regen
+				if session.mana < session.combatStats.maxMana then
+					session.mana = math.min(session.mana + (session.combatStats.manaRegen or 1), session.combatStats.maxMana)
+					changed = true
+				end
+				if changed then
+					sendStatsUpdate(player)
+				end
+			end
+		end
+	end
+end)
+
+-- Sync player Humanoid health with session HP when taking damage from enemies
+local function onCharacterAdded(player, character)
+	local humanoid = character:WaitForChild("Humanoid", 5)
+	if not humanoid then return end
+
+	humanoid.HealthChanged:Connect(function(newHealth)
+		local session = sessions[player]
+		if session and session.hasSelectedClass then
+			session.hp = newHealth
+			sendStatsUpdate(player)
+		end
+	end)
+end
+
+-- Handle players joining
+local function onPlayerAdded(player)
+	-- Send initial stats (no class selected yet)
+	sendStatsUpdate(player)
+
+	player.CharacterAdded:Connect(function(character)
+		onCharacterAdded(player, character)
+		-- If they already have a class, set walk speed and max HP
+		local session = sessions[player]
+		if session and session.hasSelectedClass then
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.WalkSpeed = session.combatStats.movementSpeed
+				humanoid.MaxHealth = session.combatStats.maxHp
+				humanoid.Health = session.hp
+			end
+		end
+	end)
+
+	-- Handle character if already exists
+	if player.Character then
+		onCharacterAdded(player, player.Character)
+	end
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+for _, player in ipairs(Players:GetPlayers()) do
+	onPlayerAdded(player)
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	sessions[player] = nil
+end)
+
+print("[CombatServer] Server-side combat system initialized")

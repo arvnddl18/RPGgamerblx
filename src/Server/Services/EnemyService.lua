@@ -14,6 +14,8 @@ local EnemyService = {}
 EnemyService._playerData = nil
 EnemyService._questService = nil
 EnemyService._inventoryService = nil
+EnemyService._framework = nil
+EnemyService._playMonsterAnimRemote = nil
 EnemyService._enemies = {}
 EnemyService._attackCooldowns = {}
 
@@ -52,11 +54,13 @@ local ACTIVE_AGGRO_RANGE = 40
 
 function EnemyService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
+	self._framework = Framework
 	self._playerData = Framework:GetService("PlayerDataService")
 	self._questService = Framework:GetService("QuestService")
 	self._inventoryService = Framework:GetService("InventoryService")
 	self._karmaService = Framework:GetService("KarmaService")
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
+	self._playMonsterAnimRemote = Framework:GetRemote("PlayMonsterAnimation")
 end
 
 function EnemyService:CreateHealthBar(enemy, maxHealth)
@@ -557,16 +561,32 @@ function EnemyService:RunAI()
 			local key = enemy
 			if not self._attackCooldowns[key] or now - self._attackCooldowns[key] >= enemyConfig.attackCooldown then
 				self._attackCooldowns[key] = now
-				local attack = enemy:GetAttribute("Attack") or enemyConfig.PhysicalDamage
-				self._playerData:Damage(targetPlayer, attack, enemy, false, enemyConfig.damageType)
-				
-				if enemyConfig.statusEffect then
-					local Framework = require(game:GetService("ReplicatedStorage").Shared.Framework)
-					local BuffService = Framework:GetService("BuffService")
-					if BuffService then
-						BuffService:ApplyEffect(targetPlayer, enemyConfig.statusEffect, 3, enemy, 1)
-					end
+
+				-- Pick a random attack animation and broadcast to all clients
+				local attackAnims = enemyConfig.attackAnims
+				local animId = attackAnims and #attackAnims > 0
+					and attackAnims[math.random(#attackAnims)] or nil
+				if animId and self._playMonsterAnimRemote then
+					self._playMonsterAnimRemote:FireAllClients(enemy, animId)
 				end
+
+				-- Delay damage by attackHitTime so it syncs with the animation hit moment
+				local hitTime = enemyConfig.attackHitTime or 0.3
+				task.delay(hitTime, function()
+					-- Guard: enemy or target may have been removed during the delay
+					if not enemy.Parent then return end
+					if not targetPlayer.Parent then return end
+
+					local attack = enemy:GetAttribute("Attack") or enemyConfig.PhysicalDamage
+					self._playerData:Damage(targetPlayer, attack, enemy, false, enemyConfig.damageType)
+
+					if enemyConfig.statusEffect then
+						local BuffService = self._framework:GetService("BuffService")
+						if BuffService then
+							BuffService:ApplyEffect(targetPlayer, enemyConfig.statusEffect, 3, enemy, 1)
+						end
+					end
+				end)
 			end
 		end,
 	}

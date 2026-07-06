@@ -1,3 +1,11 @@
+-- ⚠️ ANIMATION IDs ARE PLACEHOLDERS — Replace each rbxassetid://9XXXXXXX with your actual uploaded animation ID.
+-- Warrior auto-attack combo: 90000001–90000005 | skill casts: 90000006–90000009
+-- Mage    auto-attack combo: 90000011–90000015 | skill casts: 90000016–90000019 | projectile: 90000010
+-- Archer  auto-attack combo: 90000021–90000025 | skill casts: 90000026–90000029 | projectile: 90000020
+-- Priest  auto-attack combo: 90000031–90000035 | skill casts: 90000036–90000039
+-- Kavalier auto-attack combo: 90000041–90000045 | skill casts: 90000046–90000049 | projectile: 90000040
+-- Player walk/idle: 90000051–90000060
+
 local Skills = {
 	Warrior_AutoAttack = {
 		id = "Warrior_AutoAttack",
@@ -10,6 +18,16 @@ local Skills = {
 		healAmount = 0,
 		range = 10,
 		skillType = "melee",
+		comboAnims = {
+			"rbxassetid://4524724749",
+			"rbxassetid://4524724749",
+			"rbxassetid://4524724749",
+			"rbxassetid://4524724749",
+			"rbxassetid://4524724749",
+		},
+		comboAdvance = "sequential",
+		castTime = 0.3,
+		hitAnimMarker = "Hit",
 	},
 	Warrior_Slash = {
 		id = "Warrior_Slash",
@@ -20,6 +38,9 @@ local Skills = {
 		damage = 25,
 		range = 10,
 		skillType = "melee",
+		castAnimId = "rbxassetid://90000006",
+		castTime = 0.5,
+		hitAnimMarker = "Hit",
 	},
 	Warrior_Charge = {
 		id = "Warrior_Charge",
@@ -30,6 +51,9 @@ local Skills = {
 		damage = 35,
 		range = 14,
 		skillType = "melee",
+		castAnimId = "rbxassetid://90000007",
+		castTime = 0.6,
+		hitAnimMarker = "Hit",
 	},
 	Warrior_Whirlwind = {
 		id = "Warrior_Whirlwind",
@@ -41,6 +65,9 @@ local Skills = {
 		range = 8,
 		skillType = "melee",
 		aoe = true,
+		castAnimId = "rbxassetid://90000008",
+		castTime = 0.7,
+		hitAnimMarker = "Hit",
 	},
 	Warrior_Berserk = {
 		id = "Warrior_Berserk",
@@ -51,6 +78,9 @@ local Skills = {
 		damage = 50,
 		range = 10,
 		skillType = "melee",
+		castAnimId = "rbxassetid://90000009",
+		castTime = 1.0,
+		hitAnimMarker = "Hit",
 	},
 	Mage_AutoAttack = {
 		id = "Mage_AutoAttack",
@@ -62,6 +92,17 @@ local Skills = {
 		damage = 8,
 		range = 40,
 		skillType = "magic",
+		comboAnims = {
+			"rbxassetid://90000011",
+			"rbxassetid://90000012",
+			"rbxassetid://90000013",
+			"rbxassetid://90000014",
+			"rbxassetid://90000015",
+		},
+		comboAdvance = "sequential",
+		castTime = 0.4,
+		projectileId = "rbxassetid://90000010",
+		projectileSpeed = 80,
 	},
 	Mage_Fireball = {
 		id = "Mage_Fireball",
@@ -72,6 +113,10 @@ local Skills = {
 		damage = 30,
 		range = 45,
 		skillType = "magic",
+		castAnimId = "rbxassetid://90000016",
+		castTime = 0.6,
+		projectileId = "rbxassetid://90000010",
+		projectileSpeed = 60,
 	},
 	Mage_IceSpike = {
 		id = "Mage_IceSpike",
@@ -82,6 +127,10 @@ local Skills = {
 		damage = 28,
 		range = 40,
 		skillType = "magic",
+		castAnimId = "rbxassetid://90000017",
+		castTime = 0.7,
+		projectileId = "rbxassetid://90000010",
+		projectileSpeed = 70,
 	},
 	Mage_LightningStorm = {
 		id = "Mage_LightningStorm",
@@ -93,8 +142,10 @@ local Skills = {
 		range = 30,
 		skillType = "magic",
 		aoe = true,
+		castAnimId = "rbxassetid://90000018",
+		castTime = 0.8,
 	},
-		Mage_Meteor = {
+	Mage_Meteor = {
 		id = "Mage_Meteor",
 		name = "Meteor",
 		description = "Summon a devastating meteor from the sky.",
@@ -103,6 +154,10 @@ local Skills = {
 		damage = 80,
 		range = 50,
 		skillType = "magic",
+		castAnimId = "rbxassetid://90000019",
+		castTime = 1.2,
+		projectileId = "rbxassetid://90000010",
+		projectileSpeed = 40,
 	},
 	Archer_AutoAttack = {
 		id = "Archer_AutoAttack",
@@ -114,6 +169,17 @@ local Skills = {
 		damage = 10,
 		range = 50,
 		skillType = "ranged",
+		comboAnims = {
+			"rbxassetid://90000021",
+			"rbxassetid://90000022",
+			"rbxassetid://90000023",
+			"rbxassetid://90000024",
+			"rbxassetid://90000025",
+		},
+		comboAdvance = "sequential",
+		castTime = 0.3,
+		projectileId = "rbxassetid://90000020",
+		projectileSpeed = 120,
 	},
 	Archer_MultiShot = {
 		id = "Archer_MultiShot",
@@ -124,6 +190,10 @@ local Skills = {
 		damage = 18,
 		range = 45,
 		skillType = "ranged",
+		castAnimId = "rbxassetid://90000026",
+		castTime = 0.5,
+		projectileId = "rbxassetid://90000020",
+		projectileSpeed = 100,
 	},
 	Archer_PiercingArrow = {
 		id = "Archer_PiercingArrow",
@@ -134,6 +204,10 @@ local Skills = {
 		damage = 32,
 		range = 55,
 		skillType = "ranged",
+		castAnimId = "rbxassetid://90000027",
+		castTime = 0.6,
+		projectileId = "rbxassetid://90000020",
+		projectileSpeed = 150,
 	},
 	Archer_RainOfArrows = {
 		id = "Archer_RainOfArrows",
@@ -145,8 +219,10 @@ local Skills = {
 		range = 40,
 		skillType = "ranged",
 		aoe = true,
+		castAnimId = "rbxassetid://90000028",
+		castTime = 0.8,
 	},
-		Archer_SniperShot = {
+	Archer_SniperShot = {
 		id = "Archer_SniperShot",
 		name = "Sniper Shot",
 		description = "A precise shot that deals massive damage.",
@@ -155,6 +231,10 @@ local Skills = {
 		damage = 90,
 		range = 80,
 		skillType = "ranged",
+		castAnimId = "rbxassetid://90000029",
+		castTime = 1.0,
+		projectileId = "rbxassetid://90000020",
+		projectileSpeed = 200,
 	},
 	Priest_AutoAttack = {
 		id = "Priest_AutoAttack",
@@ -166,6 +246,16 @@ local Skills = {
 		damage = 8,
 		range = 12,
 		skillType = "magic",
+		comboAnims = {
+			"rbxassetid://90000031",
+			"rbxassetid://90000032",
+			"rbxassetid://90000033",
+			"rbxassetid://90000034",
+			"rbxassetid://90000035",
+		},
+		comboAdvance = "sequential",
+		castTime = 0.4,
+		hitAnimMarker = "Hit",
 	},
 	Priest_Heal = {
 		id = "Priest_Heal",
@@ -176,6 +266,8 @@ local Skills = {
 		healAmount = 40,
 		range = 20,
 		skillType = "heal",
+		castAnimId = "rbxassetid://90000036",
+		castTime = 0.5,
 	},
 	Priest_Blessing = {
 		id = "Priest_Blessing",
@@ -188,6 +280,8 @@ local Skills = {
 		statusEffect = "Blessing",
 		statusDuration = 8,
 		buffStats = { defense = 8 },
+		castAnimId = "rbxassetid://90000037",
+		castTime = 0.6,
 	},
 	Priest_HolyNova = {
 		id = "Priest_HolyNova",
@@ -199,8 +293,11 @@ local Skills = {
 		range = 12,
 		skillType = "magic",
 		aoe = true,
+		castAnimId = "rbxassetid://90000038",
+		castTime = 0.6,
+		hitAnimMarker = "Hit",
 	},
-		Priest_DivineProtection = {
+	Priest_DivineProtection = {
 		id = "Priest_DivineProtection",
 		name = "Divine Protection",
 		description = "Shield yourself and nearby party members with divine power.",
@@ -211,6 +308,8 @@ local Skills = {
 		skillType = "buff",
 		statusEffect = "DivineShield",
 		statusDuration = 10,
+		castAnimId = "rbxassetid://90000039",
+		castTime = 0.8,
 	},
 	Kavalier_AutoAttack = {
 		id = "Kavalier_AutoAttack",
@@ -222,6 +321,16 @@ local Skills = {
 		damage = 12,
 		range = 12,
 		skillType = "melee",
+		comboAnims = {
+			"rbxassetid://4524724749",
+			"rbxassetid://90000042",
+			"rbxassetid://90000043",
+			"rbxassetid://90000044",
+			"rbxassetid://90000045",
+		},
+		comboAdvance = "sequential",
+		castTime = 0.3,
+		hitAnimMarker = "Hit",
 	},
 	Kavalier_DashStrike = {
 		id = "Kavalier_DashStrike",
@@ -232,6 +341,9 @@ local Skills = {
 		damage = 38,
 		range = 16,
 		skillType = "melee",
+		castAnimId = "rbxassetid://90000046",
+		castTime = 0.5,
+		hitAnimMarker = "Hit",
 	},
 	Kavalier_SpearThrow = {
 		id = "Kavalier_SpearThrow",
@@ -242,6 +354,10 @@ local Skills = {
 		damage = 30,
 		range = 45,
 		skillType = "ranged",
+		castAnimId = "rbxassetid://90000047",
+		castTime = 0.6,
+		projectileId = "rbxassetid://90000040",
+		projectileSpeed = 90,
 	},
 	Kavalier_LanceSpin = {
 		id = "Kavalier_LanceSpin",
@@ -253,8 +369,11 @@ local Skills = {
 		range = 10,
 		skillType = "melee",
 		aoe = true,
+		castAnimId = "rbxassetid://90000048",
+		castTime = 0.7,
+		hitAnimMarker = "Hit",
 	},
-		Kavalier_DragonCharge = {
+	Kavalier_DragonCharge = {
 		id = "Kavalier_DragonCharge",
 		name = "Dragon Charge",
 		description = "Charge like a dragon, devastating all in your path.",
@@ -263,6 +382,9 @@ local Skills = {
 		damage = 65,
 		range = 20,
 		skillType = "melee",
+		castAnimId = "rbxassetid://90000049",
+		castTime = 1.0,
+		hitAnimMarker = "Hit",
 	},
 }
 

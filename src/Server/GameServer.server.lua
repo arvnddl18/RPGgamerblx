@@ -122,6 +122,7 @@ local coreRemotes = {
 	"PartyKick", "PartyUpdated", "PartyInviteResult",
 	"SetPvpMode",
 	"SetResting",
+	"PlayMonsterAnimation",
 }
 for _, remoteName in coreRemotes do
 	Framework:GetRemote(remoteName)

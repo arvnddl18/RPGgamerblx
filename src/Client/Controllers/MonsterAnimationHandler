@@ -1,0 +1,175 @@
+-- MonsterAnimationHandler
+-- Client-side LocalScript that handles all monster animations.
+-- Listens for PlayMonsterAnimation remote for attack animations,
+-- and monitors AIState attribute changes for walk/idle transitions.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+
+local AnimationController = require(ReplicatedStorage.Shared.Util.AnimationController)
+local Enemies = require(ReplicatedStorage.Shared.Config.Enemies)
+local Framework = require(ReplicatedStorage.Shared.Framework)
+
+local playMonsterAnimRemote = Framework:GetRemote("PlayMonsterAnimation")
+
+---------------------------------------------------------------------------
+-- Preload all monster animation IDs at startup
+---------------------------------------------------------------------------
+
+do
+	local preloadIds = {}
+	for _, config in Enemies do
+		if config.walkAnimId then table.insert(preloadIds, config.walkAnimId) end
+		if config.idleAnimId then table.insert(preloadIds, config.idleAnimId) end
+		if config.attackAnims then
+			for _, animId in config.attackAnims do
+				table.insert(preloadIds, animId)
+			end
+		end
+	end
+	AnimationController.PreloadAnimations(preloadIds)
+end
+
+---------------------------------------------------------------------------
+-- State tracking
+---------------------------------------------------------------------------
+
+-- AnimationController instances keyed by enemy model
+local enemyAnimControllers = {}
+
+-- Attribute/ancestry connections keyed by enemy model for cleanup
+local enemyConnections = {}
+
+-- AI states where the monster is moving (play walk animation)
+local MOVING_STATES = {
+	Chase = true,
+	Patrol = true,
+	ReturnHome = true,
+}
+
+---------------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------------
+
+--- Get or create an AnimationController for the given enemy.
+--- Returns nil if the enemy has no Humanoid.
+local function getAnimController(enemy)
+	if enemyAnimControllers[enemy] then
+		return enemyAnimControllers[enemy]
+	end
+
+	local humanoid = enemy:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return nil
+	end
+
+	local ctrl = AnimationController.new(humanoid)
+	enemyAnimControllers[enemy] = ctrl
+	return ctrl
+end
+
+--- Disconnect all stored connections and destroy the AnimationController.
+local function cleanupEnemy(enemy)
+	local ctrl = enemyAnimControllers[enemy]
+	if ctrl then
+		ctrl:Destroy()
+		enemyAnimControllers[enemy] = nil
+	end
+
+	local conns = enemyConnections[enemy]
+	if conns then
+		for _, conn in conns do
+			conn:Disconnect()
+		end
+		enemyConnections[enemy] = nil
+	end
+end
+
+--- Respond to AIState attribute changes by switching walk/idle animations.
+local function onAIStateChanged(enemy, newState)
+	local enemyId = enemy:GetAttribute("EnemyType")
+	local config = Enemies[enemyId]
+	if not config then return end
+
+	local ctrl = getAnimController(enemy)
+	if not ctrl then return end
+
+	if MOVING_STATES[newState] then
+		ctrl:PlayWalk(config.walkAnimId)
+	elseif newState == "Idle" then
+		ctrl:PlayIdle(config.idleAnimId)
+	end
+	-- "Attack" state is handled by the PlayMonsterAnimation remote;
+	-- we intentionally do nothing here so the action animation plays
+	-- on top of whatever movement animation is running.
+end
+
+---------------------------------------------------------------------------
+-- Enemy setup / teardown
+---------------------------------------------------------------------------
+
+local function setupEnemy(enemy)
+	local connections = {}
+
+	-- Monitor AIState changes for walk/idle transitions
+	table.insert(connections,
+		enemy:GetAttributeChangedSignal("AIState"):Connect(function()
+			local state = enemy:GetAttribute("AIState")
+			onAIStateChanged(enemy, state)
+		end)
+	)
+
+	-- Play initial idle animation if the enemy starts in Idle state
+	local enemyId = enemy:GetAttribute("EnemyType")
+	local config = Enemies[enemyId]
+	if config then
+		local ctrl = getAnimController(enemy)
+		if ctrl then
+			ctrl:PlayIdle(config.idleAnimId)
+		end
+	end
+
+	-- Cleanup when the enemy is removed from the DataModel
+	table.insert(connections,
+		enemy.AncestryChanged:Connect(function(_, newParent)
+			if newParent == nil then
+				cleanupEnemy(enemy)
+			end
+		end)
+	)
+
+	enemyConnections[enemy] = connections
+end
+
+---------------------------------------------------------------------------
+-- CollectionService: handle existing and future enemies
+---------------------------------------------------------------------------
+
+for _, enemy in CollectionService:GetTagged("Enemy") do
+	setupEnemy(enemy)
+end
+
+CollectionService:GetInstanceAddedSignal("Enemy"):Connect(setupEnemy)
+CollectionService:GetInstanceRemovedSignal("Enemy"):Connect(cleanupEnemy)
+
+---------------------------------------------------------------------------
+-- Attack animation: server broadcasts the chosen animId to all clients
+---------------------------------------------------------------------------
+
+playMonsterAnimRemote.OnClientEvent:Connect(function(enemy, animId)
+	if not enemy or not enemy.Parent then return end
+	if typeof(animId) ~= "string" then return end
+
+	local ctrl = getAnimController(enemy)
+	if not ctrl then return end
+
+	-- Play the specific attack animation the server selected.
+	-- Action priority overlays any walk/idle that is running.
+	ctrl:PlayActionById(animId)
+
+	-- When the attack track ends, the AIState attribute will have already
+	-- been updated by the next EnemyStateMachine tick (0.25s interval),
+	-- so the walk/idle handler will restore the correct movement animation.
+end)
+
+print("[MonsterAnimationHandler] Started.")
