@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DashConfig = require(Shared.Config.Dash)
+local SkillVfxConfig = require(Shared.Config.SkillVfxConfig)
 
 local DashService = {}
 DashService._playerData = nil
@@ -18,6 +19,7 @@ function DashService:Init()
 
 	Framework:GetRemote("RequestDash")
 	Framework:GetRemote("DashCooldownUpdated")
+	Framework:GetRemote("PlaySkillVfx")
 end
 
 function DashService:IsOnCooldown(player)
@@ -62,6 +64,8 @@ function DashService:ApplyDash(player, direction)
 	end
 
 	character:SetAttribute("IsDashing", true)
+
+	self._remotes.PlaySkillVfx:FireAllClients(player, SkillVfxConfig.DashVfx)
 
 	self._cooldowns[player] = tick() + DashConfig.cooldown
 	self._remotes.DashCooldownUpdated:FireClient(player, DashConfig.cooldown)

@@ -1,0 +1,10 @@
+﻿{
+  "className": "ImageLabel",
+  "properties": {
+    "BackgroundTransparency": 1,
+    "Size": [[0, 0], [0, 0]],
+    "Image": {
+      "$path": "MageStaff_Normal.png"
+    }
+  }
+}

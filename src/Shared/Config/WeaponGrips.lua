@@ -1,6 +1,6 @@
 local WeaponGrips = {}
 
-WeaponGrips.GRIP_VERSION = 5
+WeaponGrips.GRIP_VERSION = 6
 
 -- Tip extends -Z from handle. Yaw -90 aligns -Z to character forward.
 local function fwd(y, pitch, yaw, roll)
@@ -12,17 +12,17 @@ WeaponGrips.Styles = {
 	sword = {
 		idle = fwd(-0.25, -95, -90, 0),
 		attack = fwd(-0.2, -80, -90, 8),
-		handleSize = Vector3.new(0.5, 0.5, 1.0),
+		handleSize = Vector3.new(0.25, 0.25, 0.5),
 	},
 	staff = {
 		idle = fwd(-0.35, -70, -90, 0),
 		attack = fwd(-0.25, -55, -90, -10),
-		handleSize = Vector3.new(0.5, 0.5, 1.2),
+		handleSize = Vector3.new(0.25, 0.25, 0.6),
 	},
 	bow = {
 		idle = CFrame.new(0, 0, 0),
 		attack = CFrame.new(0, 0, 0),
-		handleSize = Vector3.new(0.4, 0.4, 0.6),
+		handleSize = Vector3.new(0.2, 0.2, 0.4),
 		leftHandAttach = true,
 		leftC0 = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-90), 0, 0),
 		leftC1 = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(-90), 0),

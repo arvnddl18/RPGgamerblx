@@ -2,15 +2,11 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local FastTravelUI = require(script.Parent.Parent.UI.FastTravel.FastTravelUI)
-local FastTravelWorldMapUI = require(script.Parent.Parent.UI.FastTravel.FastTravelWorldMapUI)
-local FastTravelMiniMapUI = require(script.Parent.Parent.UI.FastTravel.FastTravelMiniMapUI)
-local FastTravelConfirmationUI = require(script.Parent.Parent.UI.FastTravel.FastTravelConfirmationUI)
-local FastTravelFadeUI = require(script.Parent.Parent.UI.FastTravel.FastTravelFadeUI)
-
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local FastTravelConfig = require(Shared.Config.FastTravel)
 local FastTravelUtil = require(Shared.Util.FastTravelUtil)
+
+local UI_ROOT = script.Parent.Parent.UI.FastTravel
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -22,12 +18,27 @@ local currentPortalId = nil
 local pendingDestinationId = nil
 local lastPositionUpdate = 0
 
-local playerGui = player:WaitForChild("PlayerGui")
-local mainUI = FastTravelUI.new(playerGui)
-local worldMapUI = FastTravelWorldMapUI.new(playerGui)
-local miniMapUI = FastTravelMiniMapUI.new(playerGui)
-local confirmUI = FastTravelConfirmationUI.new(playerGui)
-local fadeUI = FastTravelFadeUI.new(playerGui)
+local ui = {}
+local wired = {
+	main = false,
+	worldMap = false,
+	miniMap = false,
+	confirm = false,
+}
+
+local function getUI(name)
+	if ui[name] then
+		return ui[name]
+	end
+
+	local module = UI_ROOT:FindFirstChild(name)
+	if not module then
+		return nil
+	end
+
+	ui[name] = require(module).new(player:WaitForChild("PlayerGui"))
+	return ui[name]
+end
 
 local function getNearestLocationIdByPosition(position)
 	local nearestId = nil
@@ -96,22 +107,39 @@ local function getDisplayName(locationId)
 end
 
 local function syncUIState()
-	mainUI:SetUnlocked(unlockedLocations)
-	mainUI:SetPlayerLevel(playerLevel)
-	mainUI:SetCurrentLocation(currentPortalId)
-
-	worldMapUI:SetUnlocked(unlockedLocations)
-	worldMapUI:SetPlayerLevel(playerLevel)
-	worldMapUI:SetCurrentLocation(currentPortalId)
-
-	miniMapUI:SetUnlocked(unlockedLocations)
+	if ui.FastTravelUI then
+		ui.FastTravelUI:SetUnlocked(unlockedLocations)
+		ui.FastTravelUI:SetPlayerLevel(playerLevel)
+		ui.FastTravelUI:SetCurrentLocation(currentPortalId)
+	end
+	if ui.FastTravelWorldMapUI then
+		ui.FastTravelWorldMapUI:SetUnlocked(unlockedLocations)
+		ui.FastTravelWorldMapUI:SetPlayerLevel(playerLevel)
+		ui.FastTravelWorldMapUI:SetCurrentLocation(currentPortalId)
+	end
+	if ui.FastTravelMiniMapUI then
+		ui.FastTravelMiniMapUI:SetUnlocked(unlockedLocations)
+	end
 end
 
 local function closeAllPanels()
-	mainUI:SetVisible(false)
-	worldMapUI:SetVisible(false)
-	confirmUI:SetVisible(false)
+	if ui.FastTravelUI then
+		ui.FastTravelUI:SetVisible(false)
+	end
+	if ui.FastTravelWorldMapUI then
+		ui.FastTravelWorldMapUI:SetVisible(false)
+	end
+	if ui.FastTravelConfirmationUI then
+		ui.FastTravelConfirmationUI:SetVisible(false)
+	end
 end
+
+local ensureConfirmWired
+local ensureWorldMapWired
+local ensureMainWired
+local ensureMiniMapWired
+local promptTravel
+local openWorldMap
 
 local function requestTravel(destinationId)
 	if not currentPortalId then
@@ -138,13 +166,93 @@ local function canTravelTo(destinationId)
 	return true
 end
 
-local function promptTravel(destinationId)
+ensureConfirmWired = function()
+	if wired.confirm then
+		return getUI("FastTravelConfirmationUI")
+	end
+	wired.confirm = true
+
+	local confirmUI = getUI("FastTravelConfirmationUI")
+	confirmUI:OnConfirm(function()
+		if pendingDestinationId then
+			requestTravel(pendingDestinationId)
+			pendingDestinationId = nil
+		end
+	end)
+	confirmUI:OnCancel(function()
+		pendingDestinationId = nil
+	end)
+	return confirmUI
+end
+
+promptTravel = function(destinationId)
 	if not canTravelTo(destinationId) then
 		return
 	end
 	pendingDestinationId = destinationId
+	local confirmUI = ensureConfirmWired()
 	confirmUI:SetDestination(getDisplayName(destinationId))
 	confirmUI:SetVisible(true)
+end
+
+ensureWorldMapWired = function()
+	if wired.worldMap then
+		return getUI("FastTravelWorldMapUI")
+	end
+	wired.worldMap = true
+
+	local worldMapUI = getUI("FastTravelWorldMapUI")
+
+	worldMapUI:OnTravel(promptTravel)
+	worldMapUI:OnSelect(function(locationId)
+		if wired.main then
+			getUI("FastTravelUI"):SelectLocation(locationId, true)
+		end
+	end)
+	worldMapUI:OnClose(function()
+		worldMapUI:SetVisible(false)
+	end)
+	return worldMapUI
+end
+
+ensureMainWired = function()
+	if wired.main then
+		return getUI("FastTravelUI")
+	end
+	wired.main = true
+
+	local mainUI = getUI("FastTravelUI")
+	mainUI:OnTravel(promptTravel)
+	mainUI:OnCancel(closeAllPanels)
+	mainUI:OnSelect(function(locationId)
+		ensureWorldMapWired():SelectLocation(locationId)
+	end)
+	if wired.worldMap then
+		getUI("FastTravelWorldMapUI"):OnSelect(function(locationId)
+			mainUI:SelectLocation(locationId, true)
+		end)
+	end
+
+	return mainUI
+end
+
+openWorldMap = function()
+	if not hasSelectedClass then
+		return
+	end
+
+	currentPortalId = getNearestPortalId()
+	syncUIState()
+	ensureWorldMapWired():SetVisible(true)
+end
+
+ensureMiniMapWired = function()
+	local miniMapUI = getUI("FastTravelMiniMapUI")
+	miniMapUI:OnOpenMap(openWorldMap)
+	if not wired.miniMap then
+		wired.miniMap = true
+	end
+	return miniMapUI
 end
 
 local function openFastTravel(fromPortalId)
@@ -153,52 +261,22 @@ local function openFastTravel(fromPortalId)
 	end
 
 	currentPortalId = fromPortalId or getNearestPortalId()
-	if currentPortalId then
-		remotes.FastTravelVisit:FireServer(currentPortalId)
-	end
 
-	syncUIState()
+	local mainUI = ensureMainWired()
+	mainUI:SetCurrentLocation(currentPortalId)
+	mainUI:SetPlayerLevel(playerLevel)
+	mainUI:SetUnlocked(unlockedLocations)
 	mainUI:SetVisible(true)
 	if currentPortalId then
-		mainUI:SelectLocation(currentPortalId)
+		mainUI:SelectLocation(currentPortalId, true)
+	end
+
+	if currentPortalId then
+		task.defer(function()
+			remotes.FastTravelVisit:FireServer(currentPortalId)
+		end)
 	end
 end
-
-local function openWorldMap()
-	if not hasSelectedClass then
-		return
-	end
-
-	currentPortalId = getNearestPortalId()
-	syncUIState()
-	worldMapUI:SetVisible(true)
-end
-
-mainUI:OnTravel(promptTravel)
-mainUI:OnCancel(closeAllPanels)
-mainUI:OnSelect(function(locationId)
-	worldMapUI:SelectLocation(locationId)
-end)
-
-worldMapUI:OnTravel(promptTravel)
-worldMapUI:OnSelect(function(locationId)
-	mainUI:SelectLocation(locationId)
-end)
-worldMapUI:OnClose(function()
-	worldMapUI:SetVisible(false)
-end)
-
-miniMapUI:OnOpenMap(openWorldMap)
-
-confirmUI:OnConfirm(function()
-	if pendingDestinationId then
-		requestTravel(pendingDestinationId)
-		pendingDestinationId = nil
-	end
-end)
-confirmUI:OnCancel(function()
-	pendingDestinationId = nil
-end)
 
 remotes.FastTravelStateUpdated.OnClientEvent:Connect(function(state)
 	if type(state) ~= "table" then
@@ -210,23 +288,25 @@ remotes.FastTravelStateUpdated.OnClientEvent:Connect(function(state)
 end)
 
 remotes.FastTravelBegin.OnClientEvent:Connect(function()
-	fadeUI:FadeOut(0.4)
+	getUI("FastTravelFadeUI"):FadeOut(0.4)
 end)
 
 remotes.FastTravelComplete.OnClientEvent:Connect(function()
-	fadeUI:FadeIn(0.4)
+	getUI("FastTravelFadeUI"):FadeIn(0.4)
 	currentPortalId = getNearestPortalId()
 	syncUIState()
 end)
 
 remotes.FastTravelResult.OnClientEvent:Connect(function(_success, _message)
-	-- Notifications are fired server-side via Notification remote.
 end)
 
 remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	hasSelectedClass = payload.hasSelectedClass == true
 	playerLevel = payload.level or playerLevel
-	miniMapUI:SetVisible(hasSelectedClass)
+	if hasSelectedClass then
+		ensureMiniMapWired():SetVisible(true)
+		task.defer(ensureMainWired)
+	end
 	syncUIState()
 end)
 
@@ -281,15 +361,18 @@ RunService.Heartbeat:Connect(function()
 		return
 	end
 
-	miniMapUI:SetPlayerPosition(root.Position)
-	if worldMapUI:IsVisible() then
-		worldMapUI:SetPlayerPosition(root.Position)
+	if ui.FastTravelMiniMapUI then
+		ui.FastTravelMiniMapUI:SetPlayerPosition(root.Position)
+	end
+	if ui.FastTravelWorldMapUI and ui.FastTravelWorldMapUI:IsVisible() then
+		ui.FastTravelWorldMapUI:SetPlayerPosition(root.Position)
 	end
 
 	local nearId = getNearestPortalId()
 	if nearId and nearId ~= currentPortalId then
 		currentPortalId = nearId
-		if mainUI:IsVisible() or worldMapUI:IsVisible() then
+		if (ui.FastTravelUI and ui.FastTravelUI:IsVisible())
+			or (ui.FastTravelWorldMapUI and ui.FastTravelWorldMapUI:IsVisible()) then
 			syncUIState()
 		end
 	end

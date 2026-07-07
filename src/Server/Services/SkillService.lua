@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Skills = require(Shared.Config.Skills)
+local SkillVfxConfig = require(Shared.Config.SkillVfxConfig)
 
 local SkillService = {}
 SkillService._playerData = nil
@@ -406,6 +407,11 @@ function SkillService:HandleCastSkill(player, slotIndex)
 
 	-- Set cooldown immediately to prevent spam during the cast window.
 	self:SetCooldown(player, skillId, skill.cooldown or 1)
+
+	local vfxKey = SkillVfxConfig.GetForSkill(skillId)
+	if vfxKey then
+		self._remotes.PlaySkillVfx:FireAllClients(player, vfxKey)
+	end
 
 	-- Delay damage application by castTime so it syncs with the client-side
 	-- cast animation.  The client plays the animation at t=0; the server

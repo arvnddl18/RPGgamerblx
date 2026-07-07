@@ -507,13 +507,9 @@ function QuestService:CreateReachZone(zoneId, position, size)
 end
 
 function QuestService:Start()
-	local pos = Vector3.new(10, 0, 125)
-	local y = self._mapGenerator:GetGroundHeight(pos.X, pos.Z)
-	self:CreateNPC(CFrame.new(pos.X, y + 2, pos.Z) * CFrame.Angles(0, math.pi * 0.75, 0))
+	self:CreateNPC(self._mapGenerator:GetMarketplaceNpcCFrame("QuestGiver"))
 
-	local herbPos = Vector3.new(-15, 0, 140)
-	local herbY = self._mapGenerator:GetGroundHeight(herbPos.X, herbPos.Z)
-	local _, herbPrompt = self:CreateSimpleNPC("Herb Master", CFrame.new(herbPos.X, herbY + 2, herbPos.Z) * CFrame.Angles(0, math.pi * 0.25, 0), "Quest")
+	local _, herbPrompt = self:CreateSimpleNPC("Herb Master", self._mapGenerator:GetMarketplaceNpcCFrame("HerbMaster"), "Quest")
 	herbPrompt.Triggered:Connect(function(player)
 		local data = self._playerData:GetData(player)
 		if not data then return end
@@ -528,9 +524,7 @@ function QuestService:Start()
 		})
 	end)
 
-	local elderPos = Vector3.new(0, 0, 110)
-	local elderY = self._mapGenerator:GetGroundHeight(elderPos.X, elderPos.Z)
-	local _, elderPrompt = self:CreateSimpleNPC("Village Elder", CFrame.new(elderPos.X, elderY + 2, elderPos.Z) * CFrame.Angles(0, math.pi, 0), "Talk")
+	local _, elderPrompt = self:CreateSimpleNPC("Village Elder", self._mapGenerator:GetMarketplaceNpcCFrame("VillageElder"), "Talk")
 	elderPrompt.Triggered:Connect(function(player)
 		self:OnTalkToNPC(player, "Village Elder")
 		local data = self._playerData:GetData(player)
@@ -551,11 +545,7 @@ function QuestService:Start()
 	local monumentY = self._mapGenerator:GetGroundHeight(monumentPos.X, monumentPos.Z)
 	self:CreateReachZone("QuestMonumentZone", Vector3.new(monumentPos.X, monumentY + 4, monumentPos.Z), Vector3.new(24, 10, 24))
 
-	local _, scoutPrompt = self:CreateSimpleNPC(
-		"Scout",
-		CFrame.new(monumentPos.X - 8, monumentY + 2, monumentPos.Z),
-		"Quest"
-	)
+	local _, scoutPrompt = self:CreateSimpleNPC("Scout", self._mapGenerator:GetMarketplaceNpcCFrame("Scout"), "Quest")
 	scoutPrompt.Triggered:Connect(function(player)
 		local data = self._playerData:GetData(player)
 		if not data then
