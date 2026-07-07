@@ -1045,21 +1045,68 @@ end
 function AnimationBuilder.GetWarriorAuto1()
 	return registerSequence("WarriorAuto1", {
 		createKeyframe(0.00, {
-			-- Raise weapon high
-			LowerTorso    = CFrame.Angles(0, math.rad(-20), 0),
-			RightUpperArm = CFrame.Angles(math.rad(150), math.rad(30), math.rad(20)),
-			LeftUpperArm  = CFrame.Angles(math.rad(120), math.rad(-30), math.rad(-20)),
+			-- Windup: weapon raised high overhead with a deep wrist cock, torso coils hard and leans back,
+			-- weight rocks onto the back leg (front leg light/forward) to load a lunging step into the hit;
+			-- left hand stays compact near the hip as a counterbalance, not mirroring the swing
+			LowerTorso    = CFrame.Angles(math.rad(-28), math.rad(-32), math.rad(-8)),
+			UpperTorso    = CFrame.Angles(math.rad(-18), math.rad(-22), 0),
+			Head          = CFrame.Angles(math.rad(-28), math.rad(-15), math.rad(-5)),
+			RightUpperArm = CFrame.Angles(math.rad(175), math.rad(28), math.rad(20)),
+			RightLowerArm = CFrame.Angles(math.rad(-30), 0, math.rad(5)),
+			RightHand     = CFrame.Angles(math.rad(30), math.rad(-35), math.rad(-35)),
+			LeftUpperArm  = CFrame.Angles(math.rad(25), math.rad(15), math.rad(-40)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-75), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(10), 0, math.rad(15)),
+			RightUpperLeg = CFrame.Angles(math.rad(-28), 0, math.rad(8)),
+			LeftUpperLeg  = CFrame.Angles(math.rad(18), 0, math.rad(-8)),
+			RightLowerLeg = CFrame.Angles(math.rad(15), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(35), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(-15), 0, math.rad(5)),
+			LeftFoot      = CFrame.Angles(math.rad(10), 0, math.rad(-8)),
 		}),
 		(function()
 			local kf = createKeyframe(0.35, {
-				-- Downward chop
-				LowerTorso    = CFrame.Angles(math.rad(20), math.rad(20), 0),
-				RightUpperArm = CFrame.Angles(math.rad(20), math.rad(-20), math.rad(10)),
-				LeftUpperArm  = CFrame.Angles(math.rad(10), math.rad(20), math.rad(-10)),
+				-- Hit: hips lead and whip forward into a lunge, weight slams onto the front leg, back leg
+				-- extends and drags; right arm nearly straightens and chops down across the body with a hard
+				-- wrist snap so the edge leads through contact; left arm counter-swings back, tight and compact
+				LowerTorso    = CFrame.Angles(math.rad(45), math.rad(42), math.rad(8)),
+				UpperTorso    = CFrame.Angles(math.rad(22), math.rad(20), 0),
+				Head          = CFrame.Angles(math.rad(25), math.rad(15), 0),
+				RightUpperArm = CFrame.Angles(math.rad(5), math.rad(-28), math.rad(18)),
+				RightLowerArm = CFrame.Angles(math.rad(-5), 0, math.rad(-5)),
+				RightHand     = CFrame.Angles(math.rad(-45), math.rad(50), math.rad(45)),
+				LeftUpperArm  = CFrame.Angles(math.rad(-40), math.rad(-15), math.rad(25)),
+				LeftLowerArm  = CFrame.Angles(math.rad(-55), 0, 0),
+				LeftHand      = CFrame.Angles(math.rad(-15), 0, math.rad(-10)),
+				RightUpperLeg = CFrame.Angles(math.rad(32), 0, 0),
+				LeftUpperLeg  = CFrame.Angles(math.rad(-22), 0, 0),
+				RightLowerLeg = CFrame.Angles(math.rad(40), 0, 0),
+				LeftLowerLeg  = CFrame.Angles(math.rad(10), 0, 0),
+				RightFoot     = CFrame.Angles(math.rad(15), 0, math.rad(-5)),
+				LeftFoot      = CFrame.Angles(math.rad(-25), 0, math.rad(20)),
 			})
 			addMarker(kf, "Hit")
 			return kf
 		end)(),
+		createKeyframe(0.55, {
+			-- Follow-through: the blade overshoots down-left past contact, torso keeps rotating and dips
+			-- into the swing, back leg drags/pivots off the momentum before the recoil back to neutral
+			LowerTorso    = CFrame.Angles(math.rad(50), math.rad(55), math.rad(8)),
+			UpperTorso    = CFrame.Angles(math.rad(28), math.rad(28), 0),
+			Head          = CFrame.Angles(math.rad(18), math.rad(28), 0),
+			RightUpperArm = CFrame.Angles(math.rad(-25), math.rad(-38), math.rad(15)),
+			RightLowerArm = CFrame.Angles(math.rad(-15), 0, math.rad(-5)),
+			RightHand     = CFrame.Angles(math.rad(-55), math.rad(65), math.rad(25)),
+			LeftUpperArm  = CFrame.Angles(math.rad(-25), math.rad(-20), math.rad(20)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-45), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(-20), 0, math.rad(-15)),
+			RightUpperLeg = CFrame.Angles(math.rad(15), 0, 0),
+			LeftUpperLeg  = CFrame.Angles(math.rad(-10), 0, 0),
+			RightLowerLeg = CFrame.Angles(math.rad(30), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(15), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(10), 0, math.rad(-5)),
+			LeftFoot      = CFrame.Angles(math.rad(-30), 0, math.rad(30)),
+		}),
 		createKeyframe(0.70, {})
 	})
 end
@@ -1067,21 +1114,68 @@ end
 function AnimationBuilder.GetWarriorAuto2()
 	return registerSequence("WarriorAuto2", {
 		createKeyframe(0.00, {
-			-- Low crouch, weapon back right
-			LowerTorso    = CFrame.Angles(math.rad(10), math.rad(-30), 0),
-			RightUpperArm = CFrame.Angles(math.rad(-20), math.rad(40), math.rad(20)),
-			LeftUpperArm  = CFrame.Angles(math.rad(-10), math.rad(-20), math.rad(-20)),
+			-- Windup: right arm coils low-right with the weapon tucked tight, elbow bent hard and wrist
+			-- cocked deep; torso counter-twists and leans away to store energy; weight rocks back onto the
+			-- trailing leg, ready to drive forward into the rising diagonal cut
+			LowerTorso    = CFrame.Angles(math.rad(18), math.rad(-42), math.rad(-12)),
+			UpperTorso    = CFrame.Angles(math.rad(-12), math.rad(-22), 0),
+			Head          = CFrame.Angles(math.rad(12), math.rad(-25), 0),
+			RightUpperArm = CFrame.Angles(math.rad(-35), math.rad(35), math.rad(25)),
+			RightLowerArm = CFrame.Angles(math.rad(-50), 0, math.rad(-5)),
+			RightHand     = CFrame.Angles(math.rad(30), math.rad(-40), math.rad(-20)),
+			LeftUpperArm  = CFrame.Angles(math.rad(18), math.rad(-12), math.rad(-25)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-60), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(10), 0, math.rad(10)),
+			RightUpperLeg = CFrame.Angles(math.rad(-25), 0, math.rad(12)),
+			LeftUpperLeg  = CFrame.Angles(math.rad(8), 0, math.rad(-8)),
+			RightLowerLeg = CFrame.Angles(math.rad(12), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(32), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(-12), 0, math.rad(5)),
+			LeftFoot      = CFrame.Angles(math.rad(8), 0, math.rad(-8)),
 		}),
 		(function()
 			local kf = createKeyframe(0.35, {
-				-- Upward diagonal slash
-				LowerTorso    = CFrame.Angles(math.rad(-10), math.rad(40), 0),
-				RightUpperArm = CFrame.Angles(math.rad(120), math.rad(-20), math.rad(-10)),
-				LeftUpperArm  = CFrame.Angles(math.rad(90), math.rad(20), math.rad(10)),
+				-- Hit: hips uncoil hard and drive the body forward, front leg plants into a lunge; right arm
+				-- rises in a fast straightening diagonal arc to upper-left, wrist rolling through the cut at
+				-- full extension; left arm stays compact and swings the opposite way for balance
+				LowerTorso    = CFrame.Angles(math.rad(-25), math.rad(55), math.rad(12)),
+				UpperTorso    = CFrame.Angles(math.rad(-18), math.rad(26), 0),
+				Head          = CFrame.Angles(math.rad(-18), math.rad(18), 0),
+				RightUpperArm = CFrame.Angles(math.rad(155), math.rad(-18), math.rad(-12)),
+				RightLowerArm = CFrame.Angles(math.rad(-10), 0, math.rad(5)),
+				RightHand     = CFrame.Angles(math.rad(-40), math.rad(55), math.rad(30)),
+				LeftUpperArm  = CFrame.Angles(math.rad(-25), math.rad(18), math.rad(18)),
+				LeftLowerArm  = CFrame.Angles(math.rad(-45), 0, 0),
+				LeftHand      = CFrame.Angles(math.rad(-10), 0, math.rad(-10)),
+				RightUpperLeg = CFrame.Angles(math.rad(18), 0, 0),
+				LeftUpperLeg  = CFrame.Angles(math.rad(-25), 0, 0),
+				RightLowerLeg = CFrame.Angles(math.rad(38), 0, 0),
+				LeftLowerLeg  = CFrame.Angles(math.rad(10), 0, 0),
+				RightFoot     = CFrame.Angles(math.rad(12), 0, math.rad(-5)),
+				LeftFoot      = CFrame.Angles(math.rad(-25), 0, math.rad(22)),
 			})
 			addMarker(kf, "Hit")
 			return kf
 		end)(),
+		createKeyframe(0.55, {
+			-- Follow-through: the blade keeps rising past contact, chest opens up and torso overturns
+			-- before settling back; trailing leg drags with the momentum
+			LowerTorso    = CFrame.Angles(math.rad(-38), math.rad(65), math.rad(12)),
+			UpperTorso    = CFrame.Angles(math.rad(-24), math.rad(32), 0),
+			Head          = CFrame.Angles(math.rad(-24), math.rad(24), 0),
+			RightUpperArm = CFrame.Angles(math.rad(175), math.rad(-12), math.rad(-18)),
+			RightLowerArm = CFrame.Angles(math.rad(-18), 0, math.rad(5)),
+			RightHand     = CFrame.Angles(math.rad(-45), math.rad(70), math.rad(30)),
+			LeftUpperArm  = CFrame.Angles(math.rad(-18), math.rad(12), math.rad(12)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-38), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(-15), 0, math.rad(-10)),
+			RightUpperLeg = CFrame.Angles(math.rad(25), 0, 0),
+			LeftUpperLeg  = CFrame.Angles(math.rad(-30), 0, 0),
+			RightLowerLeg = CFrame.Angles(math.rad(28), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(15), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(8), 0, math.rad(-5)),
+			LeftFoot      = CFrame.Angles(math.rad(-30), 0, math.rad(32)),
+		}),
 		createKeyframe(0.70, {})
 	})
 end
@@ -1089,21 +1183,68 @@ end
 function AnimationBuilder.GetWarriorAuto3()
 	return registerSequence("WarriorAuto3", {
 		createKeyframe(0.00, {
-			-- Twisted right
-			LowerTorso    = CFrame.Angles(0, math.rad(-50), 0),
-			RightUpperArm = CFrame.Angles(math.rad(40), math.rad(60), math.rad(30)),
-			LeftUpperArm  = CFrame.Angles(math.rad(30), math.rad(30), math.rad(-20)),
+			-- Windup: torso winds up hard to the right, right arm draws the weapon far back behind the
+			-- shoulder with a deep coil; left hand held as a compact guard across the chest; weight rocks
+			-- back onto the trailing leg to set up a full horizontal sweep and step-through
+			LowerTorso    = CFrame.Angles(math.rad(8), math.rad(-78), math.rad(-12)),
+			UpperTorso    = CFrame.Angles(math.rad(-8), math.rad(-26), 0),
+			Head          = CFrame.Angles(0, math.rad(-38), math.rad(-5)),
+			RightUpperArm = CFrame.Angles(math.rad(55), math.rad(85), math.rad(35)),
+			RightLowerArm = CFrame.Angles(math.rad(-35), 0, math.rad(5)),
+			RightHand     = CFrame.Angles(0, math.rad(-40), math.rad(-30)),
+			LeftUpperArm  = CFrame.Angles(math.rad(22), math.rad(-25), math.rad(-18)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-78), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(5), 0, math.rad(10)),
+			RightUpperLeg = CFrame.Angles(math.rad(-15), 0, math.rad(12)),
+			LeftUpperLeg  = CFrame.Angles(math.rad(15), 0, math.rad(-12)),
+			RightLowerLeg = CFrame.Angles(math.rad(15), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(35), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(-15), 0, math.rad(8)),
+			LeftFoot      = CFrame.Angles(math.rad(10), 0, math.rad(-10)),
 		}),
 		(function()
 			local kf = createKeyframe(0.35, {
-				-- Horizontal right-to-left
-				LowerTorso    = CFrame.Angles(0, math.rad(50), 0),
-				RightUpperArm = CFrame.Angles(math.rad(40), math.rad(-60), math.rad(30)),
-				LeftUpperArm  = CFrame.Angles(math.rad(30), math.rad(-30), math.rad(-20)),
+				-- Hit: torso whips hard left and the body steps through the swing; right arm sweeps across
+				-- the body and extends to full reach, wrist snapping to align the edge at the last instant;
+				-- left arm stays tucked, rotating slightly opposite for counterbalance
+				LowerTorso    = CFrame.Angles(math.rad(-8), math.rad(78), math.rad(12)),
+				UpperTorso    = CFrame.Angles(math.rad(8), math.rad(32), 0),
+				Head          = CFrame.Angles(0, math.rad(38), math.rad(5)),
+				RightUpperArm = CFrame.Angles(math.rad(55), math.rad(-85), math.rad(35)),
+				RightLowerArm = CFrame.Angles(math.rad(-8), 0, math.rad(-5)),
+				RightHand     = CFrame.Angles(0, math.rad(55), math.rad(35)),
+				LeftUpperArm  = CFrame.Angles(math.rad(18), math.rad(25), math.rad(-18)),
+				LeftLowerArm  = CFrame.Angles(math.rad(-65), 0, 0),
+				LeftHand      = CFrame.Angles(math.rad(-5), 0, math.rad(-10)),
+				RightUpperLeg = CFrame.Angles(math.rad(15), 0, math.rad(-15)),
+				LeftUpperLeg  = CFrame.Angles(math.rad(-15), 0, math.rad(15)),
+				RightLowerLeg = CFrame.Angles(math.rad(35), 0, 0),
+				LeftLowerLeg  = CFrame.Angles(math.rad(8), 0, 0),
+				RightFoot     = CFrame.Angles(math.rad(15), 0, math.rad(-10)),
+				LeftFoot      = CFrame.Angles(math.rad(-30), 0, math.rad(35)),
 			})
 			addMarker(kf, "Hit")
 			return kf
 		end)(),
+		createKeyframe(0.55, {
+			-- Follow-through: the blade overshoots hard left, torso keeps rotating past the hit, back foot
+			-- drags/pivots and the whole body commits to the swing before it can recover
+			LowerTorso    = CFrame.Angles(math.rad(-15), math.rad(95), math.rad(12)),
+			UpperTorso    = CFrame.Angles(math.rad(15), math.rad(38), 0),
+			Head          = CFrame.Angles(0, math.rad(45), math.rad(8)),
+			RightUpperArm = CFrame.Angles(math.rad(48), math.rad(-100), math.rad(28)),
+			RightLowerArm = CFrame.Angles(math.rad(-18), 0, math.rad(-5)),
+			RightHand     = CFrame.Angles(0, math.rad(70), math.rad(45)),
+			LeftUpperArm  = CFrame.Angles(math.rad(10), math.rad(32), math.rad(-12)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-58), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(-8), 0, math.rad(-15)),
+			RightUpperLeg = CFrame.Angles(math.rad(20), 0, math.rad(-20)),
+			LeftUpperLeg  = CFrame.Angles(math.rad(-20), 0, math.rad(20)),
+			RightLowerLeg = CFrame.Angles(math.rad(25), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(12), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(10), 0, math.rad(-8)),
+			LeftFoot      = CFrame.Angles(math.rad(-38), 0, math.rad(45)),
+		}),
 		createKeyframe(0.70, {})
 	})
 end
@@ -1111,21 +1252,66 @@ end
 function AnimationBuilder.GetWarriorAuto4()
 	return registerSequence("WarriorAuto4", {
 		createKeyframe(0.00, {
-			-- Twisted left
-			LowerTorso    = CFrame.Angles(0, math.rad(50), 0),
-			RightUpperArm = CFrame.Angles(math.rad(40), math.rad(-60), math.rad(30)),
-			LeftUpperArm  = CFrame.Angles(math.rad(30), math.rad(-30), math.rad(-20)),
+			-- Windup: continues naturally from Auto3's finish - weapon already out to the left, torso
+			-- wound left and body leaning into that commitment, ready to reverse the whole swing back right
+			LowerTorso    = CFrame.Angles(math.rad(-8), math.rad(78), math.rad(12)),
+			UpperTorso    = CFrame.Angles(math.rad(8), math.rad(32), 0),
+			Head          = CFrame.Angles(0, math.rad(38), math.rad(5)),
+			RightUpperArm = CFrame.Angles(math.rad(55), math.rad(-85), math.rad(35)),
+			RightLowerArm = CFrame.Angles(math.rad(-18), 0, math.rad(-5)),
+			RightHand     = CFrame.Angles(0, math.rad(40), math.rad(30)),
+			LeftUpperArm  = CFrame.Angles(math.rad(18), math.rad(25), math.rad(-18)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-65), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(-5), 0, math.rad(-10)),
+			RightUpperLeg = CFrame.Angles(math.rad(15), 0, math.rad(-15)),
+			LeftUpperLeg  = CFrame.Angles(math.rad(-15), 0, math.rad(15)),
+			RightLowerLeg = CFrame.Angles(math.rad(18), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(20), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(-8), 0, math.rad(-8)),
+			LeftFoot      = CFrame.Angles(math.rad(-8), 0, math.rad(10)),
 		}),
 		(function()
 			local kf = createKeyframe(0.35, {
-				-- Horizontal left-to-right
-				LowerTorso    = CFrame.Angles(0, math.rad(-50), 0),
-				RightUpperArm = CFrame.Angles(math.rad(40), math.rad(60), math.rad(30)),
-				LeftUpperArm  = CFrame.Angles(math.rad(30), math.rad(30), math.rad(-20)),
+				-- Hit: torso whips hard right and the stance reverses through, right arm reverses back
+				-- across the body to full reach on the right side with a sharp wrist snap through contact
+				LowerTorso    = CFrame.Angles(math.rad(8), math.rad(-78), math.rad(-12)),
+				UpperTorso    = CFrame.Angles(math.rad(-8), math.rad(-26), 0),
+				Head          = CFrame.Angles(0, math.rad(-38), math.rad(-5)),
+				RightUpperArm = CFrame.Angles(math.rad(55), math.rad(85), math.rad(35)),
+				RightLowerArm = CFrame.Angles(math.rad(-8), 0, math.rad(5)),
+				RightHand     = CFrame.Angles(0, math.rad(-55), math.rad(-35)),
+				LeftUpperArm  = CFrame.Angles(math.rad(22), math.rad(-25), math.rad(-18)),
+				LeftLowerArm  = CFrame.Angles(math.rad(-78), 0, 0),
+				LeftHand      = CFrame.Angles(math.rad(5), 0, math.rad(10)),
+				RightUpperLeg = CFrame.Angles(math.rad(-15), 0, math.rad(12)),
+				LeftUpperLeg  = CFrame.Angles(math.rad(15), 0, math.rad(-12)),
+				RightLowerLeg = CFrame.Angles(math.rad(10), 0, 0),
+				LeftLowerLeg  = CFrame.Angles(math.rad(38), 0, 0),
+				RightFoot     = CFrame.Angles(math.rad(-25), 0, math.rad(-22)),
+				LeftFoot      = CFrame.Angles(math.rad(15), 0, math.rad(-5)),
 			})
 			addMarker(kf, "Hit")
 			return kf
 		end)(),
+		createKeyframe(0.55, {
+			-- Follow-through: the blade overshoots hard right, torso keeps rotating past the hit, back foot
+			-- drags/pivots the opposite way from Auto3 to sell the reversed momentum
+			LowerTorso    = CFrame.Angles(math.rad(15), math.rad(-95), math.rad(-12)),
+			UpperTorso    = CFrame.Angles(math.rad(-15), math.rad(-38), 0),
+			Head          = CFrame.Angles(0, math.rad(-45), math.rad(-8)),
+			RightUpperArm = CFrame.Angles(math.rad(48), math.rad(100), math.rad(28)),
+			RightLowerArm = CFrame.Angles(math.rad(-18), 0, math.rad(5)),
+			RightHand     = CFrame.Angles(0, math.rad(-70), math.rad(-45)),
+			LeftUpperArm  = CFrame.Angles(math.rad(28), math.rad(-32), math.rad(-12)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-68), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(8), 0, math.rad(15)),
+			RightUpperLeg = CFrame.Angles(math.rad(-20), 0, math.rad(20)),
+			LeftUpperLeg  = CFrame.Angles(math.rad(20), 0, math.rad(-20)),
+			RightLowerLeg = CFrame.Angles(math.rad(15), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(28), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(-38), 0, math.rad(-45)),
+			LeftFoot      = CFrame.Angles(math.rad(10), 0, math.rad(-8)),
+		}),
 		createKeyframe(0.70, {})
 	})
 end
@@ -1133,25 +1319,68 @@ end
 function AnimationBuilder.GetWarriorAuto5()
 	return registerSequence("WarriorAuto5", {
 		createKeyframe(0.00, {
-			-- Prep jump
-			LowerTorso    = CFrame.Angles(math.rad(-20), 0, 0),
-			RightUpperArm = CFrame.Angles(math.rad(160), 0, math.rad(20)),
-			LeftUpperArm  = CFrame.Angles(math.rad(160), 0, math.rad(-20)),
-			RightUpperLeg = CFrame.Angles(math.rad(-40), 0, 0),
-			LeftUpperLeg  = CFrame.Angles(math.rad(-40), 0, 0),
+			-- Prep jump: legs load deep into a full crouch, spine curls forward slightly to gather power,
+			-- right arm alone raises the weapon straight overhead with the wrist cocked back hard, left arm
+			-- swings back freely as a natural jump counterbalance (not gripping anything)
+			LowerTorso    = CFrame.Angles(math.rad(-32), 0, math.rad(-5)),
+			UpperTorso    = CFrame.Angles(math.rad(-20), 0, 0),
+			Head          = CFrame.Angles(math.rad(-32), 0, 0),
+			RightUpperArm = CFrame.Angles(math.rad(180), 0, math.rad(18)),
+			RightLowerArm = CFrame.Angles(math.rad(-15), 0, 0),
+			RightHand     = CFrame.Angles(math.rad(25), math.rad(10), math.rad(15)),
+			LeftUpperArm  = CFrame.Angles(math.rad(-30), 0, math.rad(-25)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-35), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(-10), 0, 0),
+			RightUpperLeg = CFrame.Angles(math.rad(-55), 0, 0),
+			LeftUpperLeg  = CFrame.Angles(math.rad(-55), 0, 0),
+			RightLowerLeg = CFrame.Angles(math.rad(45), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(45), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(20), 0, 0),
+			LeftFoot      = CFrame.Angles(math.rad(20), 0, 0),
 		}),
 		(function()
 			local kf = createKeyframe(0.35, {
-				-- Jumping heavy slam
-				LowerTorso    = CFrame.Angles(math.rad(30), 0, 0),
-				RightUpperArm = CFrame.Angles(math.rad(-10), 0, math.rad(10)),
-				LeftUpperArm  = CFrame.Angles(math.rad(-10), 0, math.rad(-10)),
-				RightUpperLeg = CFrame.Angles(math.rad(20), 0, 0),
-				LeftUpperLeg  = CFrame.Angles(math.rad(20), 0, 0),
+				-- Hit: airborne slam at the peak of extension, right arm drives the weapon straight down
+				-- with a hard wrist snap at full extension; left arm swings forward hard with the momentum
+				-- (like a natural running/jumping arm swing) and the whole spine whips forward with the blow
+				LowerTorso    = CFrame.Angles(math.rad(55), 0, math.rad(5)),
+				UpperTorso    = CFrame.Angles(math.rad(28), 0, 0),
+				Head          = CFrame.Angles(math.rad(40), 0, 0),
+				RightUpperArm = CFrame.Angles(math.rad(-10), 0, math.rad(12)),
+				RightLowerArm = CFrame.Angles(0, 0, 0),
+				RightHand     = CFrame.Angles(math.rad(-40), math.rad(-15), math.rad(-20)),
+				LeftUpperArm  = CFrame.Angles(math.rad(75), 0, math.rad(-18)),
+				LeftLowerArm  = CFrame.Angles(math.rad(-15), 0, 0),
+				LeftHand      = CFrame.Angles(math.rad(10), 0, 0),
+				RightUpperLeg = CFrame.Angles(math.rad(35), 0, 0),
+				LeftUpperLeg  = CFrame.Angles(math.rad(35), 0, 0),
+				RightLowerLeg = CFrame.Angles(math.rad(15), 0, 0),
+				LeftLowerLeg  = CFrame.Angles(math.rad(15), 0, 0),
+				RightFoot     = CFrame.Angles(math.rad(-15), 0, 0),
+				LeftFoot      = CFrame.Angles(math.rad(-15), 0, 0),
 			})
 			addMarker(kf, "Hit")
 			return kf
 		end)(),
+		createKeyframe(0.55, {
+			-- Follow-through: knees bend even deeper to absorb the landing shock, weapon still buried low,
+			-- head down and shoulders rounded from the force of impact
+			LowerTorso    = CFrame.Angles(math.rad(38), 0, math.rad(5)),
+			UpperTorso    = CFrame.Angles(math.rad(20), 0, 0),
+			Head          = CFrame.Angles(math.rad(25), 0, 0),
+			RightUpperArm = CFrame.Angles(math.rad(-20), 0, math.rad(12)),
+			RightLowerArm = CFrame.Angles(math.rad(-15), 0, 0),
+			RightHand     = CFrame.Angles(math.rad(-45), math.rad(-20), math.rad(-25)),
+			LeftUpperArm  = CFrame.Angles(math.rad(35), 0, math.rad(-12)),
+			LeftLowerArm  = CFrame.Angles(math.rad(-30), 0, 0),
+			LeftHand      = CFrame.Angles(math.rad(5), 0, 0),
+			RightUpperLeg = CFrame.Angles(math.rad(42), 0, 0),
+			LeftUpperLeg  = CFrame.Angles(math.rad(42), 0, 0),
+			RightLowerLeg = CFrame.Angles(math.rad(50), 0, 0),
+			LeftLowerLeg  = CFrame.Angles(math.rad(50), 0, 0),
+			RightFoot     = CFrame.Angles(math.rad(25), 0, 0),
+			LeftFoot      = CFrame.Angles(math.rad(25), 0, 0),
+		}),
 		createKeyframe(0.70, {})
 	})
 end
