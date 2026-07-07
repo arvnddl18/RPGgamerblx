@@ -35,6 +35,11 @@ function TargetingController:GetIgnoreList()
 	if character then
 		table.insert(ignore, character)
 	end
+	-- Also ignore the enemies folder so the raycast hits the ground
+	local enemies = workspace:FindFirstChild("Enemies")
+	if enemies then
+		table.insert(ignore, enemies)
+	end
 	return ignore
 end
 
@@ -56,8 +61,15 @@ function TargetingController:BuildTargetData(skill, character)
 			range,
 			self:GetIgnoreList()
 		)
-		targetData.groundPosition = groundPos
-		targetData.direction = (groundPos - root.Position).Unit
+
+		if groundPos then
+			targetData.groundPosition = groundPos
+			local offset = groundPos - root.Position
+			local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+			if flatOffset.Magnitude > 0.001 then
+				targetData.direction = flatOffset.Unit
+			end
+		end
 	end
 
 	return targetData
@@ -69,30 +81,29 @@ function TargetingController:UpdatePreview(skill, character)
 		return
 	end
 
-	local range = skill.range or 10
-	local showRange = skill.showRangeIndicator ~= false
-	local showAoe = skill.showAoeIndicator == true
-		or skill.targetType == SkillConfig.TargetTypes.Ground
-		or skill.targetType == SkillConfig.TargetTypes.Circle
-
-	self._indicator:Show(showRange, showAoe)
-	self._indicator:SetRangeRing(root.Position, range)
-
-	local isValid = true
-	if skill.targetType == SkillConfig.TargetTypes.Ground then
-		local groundPos = TargetingUtil.GetMouseGroundPosition(
-			self._mouse,
-			root.Position,
-			range,
-			self:GetIgnoreList()
-		)
-		isValid = TargetingUtil.IsValidTargetPosition(root.Position, groundPos, range)
-		self._indicator:SetAoeDisc(groundPos, skill.aoeRadius or range)
-	elseif showAoe then
-		self._indicator:SetAoeDisc(root.Position, skill.aoeRadius or range)
+	local targetData = self:BuildTargetData(skill, character)
+	if not targetData then
+		return
 	end
 
-	self._indicator:SetValid(isValid)
+	local range = skill.range or 10
+	local isValid = true
+
+	if skill.targetType == SkillConfig.TargetTypes.Ground and targetData.groundPosition then
+		isValid = TargetingUtil.IsValidTargetPosition(root.Position, targetData.groundPosition, range)
+		if not TargetingUtil.IsInFront(root.Position, root.CFrame.LookVector, targetData.groundPosition) then
+			isValid = false
+		end
+	end
+
+	self._indicator:Update(
+		skill,
+		root.CFrame,
+		targetData.groundPosition or root.Position,
+		targetData.direction,
+		isValid,
+		self:GetIgnoreList()
+	)
 end
 
 function TargetingController:BeginPreview(skill, castTime)

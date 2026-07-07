@@ -97,9 +97,10 @@ function SkillService:ValidateTargetData(player, skill, targetData)
 		if not TargetingUtil.IsValidTargetPosition(root.Position, sanitized.groundPosition, range) then
 			return nil
 		end
+		if not TargetingUtil.IsInFront(root.Position, root.CFrame.LookVector, sanitized.groundPosition) then
+			return nil
+		end
 		sanitized.groundPosition = TargetingUtil.ClampGroundPosition(root.Position, sanitized.groundPosition, range)
-	elseif sanitized.direction then
-		sanitized.direction = sanitized.direction.Unit
 	else
 		sanitized.direction = root.CFrame.LookVector
 	end
@@ -162,6 +163,10 @@ function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOn
 
 	local origin = root.Position
 	local look = lookVector or root.CFrame.LookVector
+	local flatLook = Vector3.new(look.X, 0, look.Z)
+	if flatLook.Magnitude > 0 then
+		flatLook = flatLook.Unit
+	end
 	local targets = {}
 
 	for _, otherPlayer in Players:GetPlayers() do
@@ -171,9 +176,10 @@ function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOn
 			local otherData = self._playerData:GetData(otherPlayer)
 			if otherRoot and otherData and otherData.hp > 0 then
 				local offset = otherRoot.Position - origin
-				local distance = offset.Magnitude
-				if distance <= range then
-					if not coneOnly or offset.Unit:Dot(look) > TargetingUtil.GetConeDotThreshold() then
+				local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+				local flatDistance = flatOffset.Magnitude
+				if flatDistance <= range then
+					if not coneOnly or (flatDistance > 0 and flatOffset.Unit:Dot(flatLook) >= TargetingUtil.GetConeDotThreshold()) then
 						table.insert(targets, otherPlayer)
 					end
 				end
@@ -192,6 +198,10 @@ function SkillService:FindMeleeTargets(character, range, coneOnly, lookVector)
 
 	local origin = root.Position
 	local look = lookVector or root.CFrame.LookVector
+	local flatLook = Vector3.new(look.X, 0, look.Z)
+	if flatLook.Magnitude > 0 then
+		flatLook = flatLook.Unit
+	end
 	local targets = {}
 
 	for _, enemy in CollectionService:GetTagged("Enemy") do
@@ -199,9 +209,10 @@ function SkillService:FindMeleeTargets(character, range, coneOnly, lookVector)
 			local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart
 			if enemyRoot then
 				local offset = enemyRoot.Position - origin
-				local distance = offset.Magnitude
-				if distance <= range then
-					if not coneOnly or offset.Unit:Dot(look) > TargetingUtil.GetConeDotThreshold() then
+				local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+				local flatDistance = flatOffset.Magnitude
+				if flatDistance <= range then
+					if not coneOnly or (flatDistance > 0 and flatOffset.Unit:Dot(flatLook) >= TargetingUtil.GetConeDotThreshold()) then
 						table.insert(targets, enemy)
 					end
 				end
@@ -225,10 +236,13 @@ function SkillService:FindNearestDamageTarget(attacker, character, range)
 		if enemy.Parent and (enemy:GetAttribute("Health") or 0) > 0 then
 			local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart
 			if enemyRoot then
-				local distance = (enemyRoot.Position - root.Position).Magnitude
-				if distance <= nearestDist then
-					nearestDist = distance
-					nearest = enemy
+				local offset = enemyRoot.Position - root.Position
+				local flatDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+				if flatDistance <= nearestDist then
+					if TargetingUtil.IsInFront(root.Position, root.CFrame.LookVector, enemyRoot.Position) then
+						nearestDist = flatDistance
+						nearest = enemy
+					end
 				end
 			end
 		end
@@ -241,10 +255,13 @@ function SkillService:FindNearestDamageTarget(attacker, character, range)
 				local otherRoot = otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart")
 				local otherData = self._playerData:GetData(otherPlayer)
 				if otherRoot and otherData and otherData.hp > 0 then
-					local distance = (otherRoot.Position - root.Position).Magnitude
-					if distance <= nearestDist then
-						nearestDist = distance
-						nearest = otherPlayer
+					local offset = otherRoot.Position - root.Position
+					local flatDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+					if flatDistance <= nearestDist then
+						if TargetingUtil.IsInFront(root.Position, root.CFrame.LookVector, otherRoot.Position) then
+							nearestDist = flatDistance
+							nearest = otherPlayer
+						end
 					end
 				end
 			end
@@ -388,18 +405,30 @@ function SkillService:ResolveTargets(player, skill, targetData)
 			return otherPlayer ~= player and self._combatService:CanDamagePlayer(player, otherPlayer)
 		end)
 	elseif targetType == SkillConfig.TargetTypes.Single then
+		local primaryTarget = nil
 		if targetData and targetData.targetUserId then
 			local targetPlayer = Players:GetPlayerByUserId(targetData.targetUserId)
 			if targetPlayer and self._combatService:CanDamagePlayer(player, targetPlayer) then
-				playerTargets = { targetPlayer }
+				primaryTarget = targetPlayer
 			end
 		else
-			local nearest = self:FindNearestDamageTarget(player, character, range)
-			if nearest then
-				if typeof(nearest) == "Instance" and nearest:IsA("Player") then
-					playerTargets = { nearest }
+			primaryTarget = self:FindNearestDamageTarget(player, character, range)
+		end
+
+		if primaryTarget then
+			if skill.aoeRadius and skill.aoeRadius > 0 then
+				local targetRoot = primaryTarget:FindFirstChild("HumanoidRootPart") or primaryTarget.PrimaryPart
+				if targetRoot then
+					enemyTargets = TargetingUtil.GetTargetsInRadius(targetRoot.Position, skill.aoeRadius)
+					playerTargets = TargetingUtil.GetPlayersInRadius(targetRoot.Position, skill.aoeRadius, function(otherPlayer)
+						return otherPlayer ~= player and self._combatService:CanDamagePlayer(player, otherPlayer)
+					end)
+				end
+			else
+				if typeof(primaryTarget) == "Instance" and primaryTarget:IsA("Player") then
+					playerTargets = { primaryTarget }
 				else
-					enemyTargets = { nearest }
+					enemyTargets = { primaryTarget }
 				end
 			end
 		end
@@ -408,10 +437,7 @@ function SkillService:ResolveTargets(player, skill, targetData)
 		playerTargets = self:FindPlayerDamageTargets(player, character, range, true, lookVector)
 	end
 
-	if skill.slotType == "autoAttack" then
-		enemyTargets = self:FindMeleeTargets(character, range, true, lookVector)
-		playerTargets = self:FindPlayerDamageTargets(player, character, range, true, lookVector)
-	end
+
 
 	return enemyTargets, playerTargets
 end
@@ -491,7 +517,7 @@ function SkillService:HandleCastSkill(player, slotIndex, targetData)
 	end
 
 	local validatedTargetData = self:ValidateTargetData(player, skill, targetData)
-	if skill.targetType == SkillConfig.TargetTypes.Ground and not validatedTargetData then
+	if not validatedTargetData then
 		if skill.manaCost and skill.manaCost > 0 then
 			self._playerData:RestoreMana(player, skill.manaCost)
 		end

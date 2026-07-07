@@ -620,7 +620,7 @@ function EnemyService:RunAI()
 			local root = enemy.PrimaryPart
 			local humanoid = enemy:FindFirstChildOfClass("Humanoid")
 			local enemyId = enemy:GetAttribute("EnemyType") or "Goblin"
-			local enemyConfig = Enemies[enemyId]
+			local enemyConfig = MonsterConfig.Get(enemyId)
 			if root and humanoid and enemyConfig then
 				EnemyStateMachine.Tick(enemy, humanoid, root, enemyConfig, context)
 			end

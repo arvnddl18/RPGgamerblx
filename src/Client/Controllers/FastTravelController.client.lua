@@ -243,7 +243,11 @@ openWorldMap = function()
 
 	currentPortalId = getNearestPortalId()
 	syncUIState()
-	ensureWorldMapWired():SetVisible(true)
+	local worldMapUI = ensureWorldMapWired()
+	worldMapUI:SetVisible(true)
+	if currentPortalId then
+		worldMapUI:SelectLocation(currentPortalId)
+	end
 end
 
 ensureMiniMapWired = function()

@@ -1,5 +1,7 @@
 local SaveService = {}
 
+local RunService = game:GetService("RunService")
+
 SaveService._storeName = "SimpleRPG_PlayerData_v1"
 SaveService._store = nil
 SaveService._playerData = nil
@@ -39,7 +41,7 @@ function SaveService:LoadPlayer(player)
 end
 
 function SaveService:SavePlayer(player)
-	if not self._store then
+	if not self._store or RunService:IsStudio() then
 		return
 	end
 

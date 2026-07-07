@@ -1,5 +1,12 @@
 local FastTravel = {
 	MapBounds = {
+		minX = -1760,
+		maxX = 1760,
+		minZ = -1760,
+		maxZ = 1760,
+	},
+
+	MiniMapBounds = {
 		minX = -800,
 		maxX = 800,
 		minZ = -800,

@@ -15,7 +15,7 @@ local SkillConfig = {
 	Defaults = {
 		range = 10,
 		aoeRadius = 0,
-		coneAngle = 60,
+		coneAngle = 180,
 		castTime = 0,
 		cooldown = 1,
 		manaCost = 0,
@@ -44,10 +44,10 @@ function SkillConfig.ApplyDefaults(skill)
 			merged.targetType = merged.aoe and SkillConfig.TargetTypes.PartyCircle or SkillConfig.TargetTypes.Self
 		elseif merged.aoe then
 			merged.targetType = SkillConfig.TargetTypes.Circle
-		elseif merged.skillType == "melee" or merged.slotType == "autoAttack" then
-			merged.targetType = SkillConfig.TargetTypes.Cone
 		elseif merged.skillType == "magic" or merged.skillType == "ranged" then
 			merged.targetType = SkillConfig.TargetTypes.Single
+		elseif merged.skillType == "melee" or merged.slotType == "autoAttack" then
+			merged.targetType = SkillConfig.TargetTypes.Cone
 		else
 			merged.targetType = SkillConfig.TargetTypes.Cone
 		end
@@ -64,6 +64,12 @@ function SkillConfig.ApplyDefaults(skill)
 
 	if merged.targetType == SkillConfig.TargetTypes.Circle or merged.targetType == SkillConfig.TargetTypes.PartyCircle then
 		merged.showAoeIndicator = merged.showAoeIndicator ~= false
+	end
+
+	if merged.targetType == SkillConfig.TargetTypes.Single and (merged.aoeRadius or 0) > 0 then
+		if skill == nil or skill.showAoeIndicator == nil then
+			merged.showAoeIndicator = true
+		end
 	end
 
 	return merged

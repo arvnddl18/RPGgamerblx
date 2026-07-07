@@ -23,6 +23,17 @@ function TargetingUtil.ClampGroundPosition(casterPos, targetPos, maxRange)
 	return casterPos + flatOffset
 end
 
+function TargetingUtil.IsInFront(origin, lookVector, targetPos)
+	local offset = targetPos - origin
+	local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+	local flatLook = Vector3.new(lookVector.X, 0, lookVector.Z)
+	if flatOffset.Magnitude > 0 and flatLook.Magnitude > 0 then
+		-- Dot product > 0 means the target is in the 180-degree forward arc
+		return flatOffset.Unit:Dot(flatLook.Unit) > 0
+	end
+	return true -- If overlapping exactly, allow it
+end
+
 function TargetingUtil.IsValidTargetPosition(casterPos, targetPos, maxRange)
 	if not casterPos or not targetPos then
 		return false
@@ -71,8 +82,9 @@ function TargetingUtil.GetTargetsInRadius(origin, radius, filterFn)
 		if enemy.Parent and (enemy:GetAttribute("Health") or 0) > 0 then
 			local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart
 			if enemyRoot then
-				local distance = (enemyRoot.Position - origin).Magnitude
-				if distance <= radius and (not filterFn or filterFn(enemy)) then
+				local offset = enemyRoot.Position - origin
+				local flatDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+				if flatDistance <= radius and (not filterFn or filterFn(enemy)) then
 					table.insert(targets, enemy)
 				end
 			end
@@ -87,8 +99,9 @@ function TargetingUtil.GetPlayersInRadius(origin, radius, filterFn)
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
 		if root then
-			local distance = (root.Position - origin).Magnitude
-			if distance <= radius and (not filterFn or filterFn(player)) then
+			local offset = root.Position - origin
+			local flatDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+			if flatDistance <= radius and (not filterFn or filterFn(player)) then
 				table.insert(targets, player)
 			end
 		end
@@ -110,10 +123,10 @@ function TargetingUtil.GetTargetsInCone(origin, lookVector, range, angleDegrees,
 			local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart
 			if enemyRoot then
 				local offset = enemyRoot.Position - origin
-				local distance = offset.Magnitude
-				if distance <= range then
-					local flatOffset = Vector3.new(offset.X, 0, offset.Z)
-					if flatOffset.Magnitude > 0 then
+				local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+				local flatDistance = flatOffset.Magnitude
+				if flatDistance <= range then
+					if flatDistance > 0 then
 						local dot = flatOffset.Unit:Dot(flatLook)
 						local angle = math.acos(math.clamp(dot, -1, 1))
 						if angle <= halfAngle and (not filterFn or filterFn(enemy)) then
@@ -142,10 +155,10 @@ function TargetingUtil.GetPlayersInCone(origin, lookVector, range, angleDegrees,
 		local root = character and character:FindFirstChild("HumanoidRootPart")
 		if root then
 			local offset = root.Position - origin
-			local distance = offset.Magnitude
-			if distance <= range then
-				local flatOffset = Vector3.new(offset.X, 0, offset.Z)
-				if flatOffset.Magnitude > 0 then
+			local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+			local flatDistance = flatOffset.Magnitude
+			if flatDistance <= range then
+				if flatDistance > 0 then
 					local dot = flatOffset.Unit:Dot(flatLook)
 					local angle = math.acos(math.clamp(dot, -1, 1))
 					if angle <= halfAngle and (not filterFn or filterFn(player)) then

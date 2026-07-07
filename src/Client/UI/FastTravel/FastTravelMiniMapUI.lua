@@ -8,11 +8,16 @@ local FastTravelUtil = require(Shared.Util.FastTravelUtil)
 local FastTravelMiniMapUI = {}
 FastTravelMiniMapUI.__index = FastTravelMiniMapUI
 
+local MINIMAP_SIZE = 156
+local MINIMAP_MARGIN = 12
+
 function FastTravelMiniMapUI.new(playerGui)
 	local self = setmetatable({}, FastTravelMiniMapUI)
 	self._onOpenMap = nil
 	self._unlocked = {}
 	self._playerPosition = Vector3.zero
+	self._baseSize = MINIMAP_SIZE
+	self._basePosition = UDim2.new(1, -(MINIMAP_SIZE + MINIMAP_MARGIN), 0, MINIMAP_MARGIN)
 
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "FastTravelMiniMapUI"
@@ -23,8 +28,8 @@ function FastTravelMiniMapUI.new(playerGui)
 
 	local container = Instance.new("TextButton")
 	container.Name = "MiniMapButton"
-	container.Size = UDim2.new(0, 88, 0, 88)
-	container.Position = UDim2.new(1, -100, 0, 58)
+	container.Size = UDim2.fromOffset(MINIMAP_SIZE, MINIMAP_SIZE)
+	container.Position = self._basePosition
 	container.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	container.Text = ""
 	container.AutoButtonColor = false
@@ -33,7 +38,7 @@ function FastTravelMiniMapUI.new(playerGui)
 	self._container = container
 
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(1, 0)
+	corner.CornerRadius = UDim.new(0, 10)
 	corner.Parent = container
 
 	local stroke = Instance.new("UIStroke")
@@ -42,18 +47,19 @@ function FastTravelMiniMapUI.new(playerGui)
 	stroke.Parent = container
 
 	local mapBg = Instance.new("Frame")
-	mapBg.Size = UDim2.new(1, -12, 1, -12)
-	mapBg.Position = UDim2.new(0, 6, 0, 6)
+	mapBg.Size = UDim2.new(1, -8, 1, -8)
+	mapBg.Position = UDim2.fromOffset(4, 4)
 	mapBg.BackgroundColor3 = Color3.fromRGB(30, 45, 35)
 	mapBg.BorderSizePixel = 0
 	mapBg.Active = false
+	mapBg.ClipsDescendants = true
 	mapBg.Parent = container
 	local mapCorner = Instance.new("UICorner")
-	mapCorner.CornerRadius = UDim.new(1, 0)
+	mapCorner.CornerRadius = UDim.new(0, 8)
 	mapCorner.Parent = mapBg
 
 	self._playerDot = Instance.new("Frame")
-	self._playerDot.Size = UDim2.new(0, 8, 0, 8)
+	self._playerDot.Size = UDim2.fromOffset(10, 10)
 	self._playerDot.AnchorPoint = Vector2.new(0.5, 0.5)
 	self._playerDot.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
 	self._playerDot.BorderSizePixel = 0
@@ -63,6 +69,10 @@ function FastTravelMiniMapUI.new(playerGui)
 	local dotCorner = Instance.new("UICorner")
 	dotCorner.CornerRadius = UDim.new(1, 0)
 	dotCorner.Parent = self._playerDot
+	local dotStroke = Instance.new("UIStroke")
+	dotStroke.Color = Color3.fromRGB(12, 28, 18)
+	dotStroke.Thickness = 1.5
+	dotStroke.Parent = self._playerDot
 
 	self._markerLayer = Instance.new("Frame")
 	self._markerLayer.Size = UDim2.fromScale(1, 1)
@@ -73,13 +83,13 @@ function FastTravelMiniMapUI.new(playerGui)
 	self._markersBuilt = false
 
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 0, 14)
-	label.Position = UDim2.new(0, 0, 1, 2)
+	label.Size = UDim2.new(1, 0, 0, 16)
+	label.Position = UDim2.new(0, 0, 1, 4)
 	label.BackgroundTransparency = 1
 	label.Text = "Map"
 	label.TextColor3 = Color3.fromRGB(200, 200, 210)
 	label.Font = Enum.Font.GothamBold
-	label.TextSize = 10
+	label.TextSize = 11
 	label.Active = false
 	label.Parent = container
 
@@ -92,17 +102,20 @@ function FastTravelMiniMapUI.new(playerGui)
 	container.MouseButton1Click:Connect(openMap)
 	container.Activated:Connect(openMap)
 
+	local hoverSize = MINIMAP_SIZE + 8
+	local hoverPosition = UDim2.new(1, -(hoverSize + MINIMAP_MARGIN), 0, MINIMAP_MARGIN - 4)
+
 	container.MouseEnter:Connect(function()
 		TweenService:Create(container, TweenInfo.new(0.15), {
-			Size = UDim2.new(0, 94, 0, 94),
-			Position = UDim2.new(1, -103, 0, 55),
+			Size = UDim2.fromOffset(hoverSize, hoverSize),
+			Position = hoverPosition,
 		}):Play()
 	end)
 
 	container.MouseLeave:Connect(function()
 		TweenService:Create(container, TweenInfo.new(0.15), {
-			Size = UDim2.new(0, 88, 0, 88),
-			Position = UDim2.new(1, -100, 0, 58),
+			Size = UDim2.fromOffset(MINIMAP_SIZE, MINIMAP_SIZE),
+			Position = self._basePosition,
 		}):Play()
 	end)
 
@@ -111,10 +124,10 @@ end
 
 function FastTravelMiniMapUI:_buildMarkers()
 	for id, location in FastTravelUtil.GetEnabledLocations(FastTravelConfig) do
-		local x, z = FastTravelUtil.WorldToMapPercent(location.position, FastTravelConfig.MapBounds)
+		local x, z = FastTravelUtil.WorldToMapPercent(location.position, FastTravelConfig.MiniMapBounds)
 		local dot = Instance.new("Frame")
 		dot.Name = id
-		dot.Size = UDim2.new(0, 5, 0, 5)
+		dot.Size = UDim2.fromOffset(6, 6)
 		dot.AnchorPoint = Vector2.new(0.5, 0.5)
 		dot.Position = UDim2.fromScale(x, z)
 		dot.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
@@ -158,7 +171,7 @@ end
 
 function FastTravelMiniMapUI:SetPlayerPosition(position)
 	self._playerPosition = position or Vector3.zero
-	local x, z = FastTravelUtil.WorldToMapPercent(self._playerPosition, FastTravelConfig.MapBounds)
+	local x, z = FastTravelUtil.WorldToMapPercent(self._playerPosition, FastTravelConfig.MiniMapBounds)
 	self._playerDot.Position = UDim2.fromScale(x, z)
 end
 
