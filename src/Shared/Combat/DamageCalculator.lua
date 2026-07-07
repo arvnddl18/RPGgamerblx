@@ -1,8 +1,10 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local CombatConfig = require(Shared.Config.CombatConfig)
+
 local DamageCalculator = {}
 
--- Constant for diminishing returns curve on resistance
--- e.g. 100 resistance = 50% damage reduction
-local RESISTANCE_HALF_LIFE = 100 
+local RESISTANCE_HALF_LIFE = CombatConfig.resistanceHalfLife
 
 -- Resolves an attack between an attacker's stats and a target's stats.
 -- Returns: { damage = number, isCrit = boolean, isMiss = boolean }
@@ -47,7 +49,7 @@ function DamageCalculator.ComputeHit(skillDamage, attackerStats, targetStats, da
 		mitigationFactor = 2 - (RESISTANCE_HALF_LIFE / (RESISTANCE_HALF_LIFE - targetResistance))
 	end
 	
-	local finalDamage = math.max(1, math.floor(baseDamage * mitigationFactor))
+	local finalDamage = math.max(CombatConfig.minDamage, math.floor(baseDamage * mitigationFactor))
 
 	return { damage = finalDamage, isCrit = isCrit, isMiss = false }
 end

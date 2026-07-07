@@ -69,8 +69,8 @@ function PlayerHUDUI.new(playerGui)
 
 	local root = Instance.new("Frame")
 	root.Name = "PlayerHUD"
-	root.Size = UDim2.new(0, 240, 0, 54)
-	root.Position = UDim2.new(0, 16, 1, -165)
+	root.Size = UDim2.new(0, 240, 0, 68)
+	root.Position = UDim2.new(0, 16, 1, -180)
 	root.BackgroundTransparency = 1
 	root.Visible = false
 	root.Parent = screenGui
@@ -78,19 +78,20 @@ function PlayerHUDUI.new(playerGui)
 
 	local barsFrame = Instance.new("Frame")
 	barsFrame.Name = "Bars"
-	barsFrame.Size = UDim2.new(1, 0, 0, 50)
+	barsFrame.Size = UDim2.new(1, 0, 0, 64)
 	barsFrame.BackgroundTransparency = 1
 	barsFrame.Parent = root
 
 	self._hpBar = makeBar(barsFrame, "Hp", 0, 22, Color3.fromRGB(210, 50, 50))
 	self._manaBar = makeBar(barsFrame, "Mana", 24, 16, Color3.fromRGB(60, 120, 220))
-	self._shieldBar = makeBar(barsFrame, "Shield", 42, 10, Color3.fromRGB(80, 180, 255))
+	self._xpBar = makeBar(barsFrame, "Xp", 42, 14, Color3.fromRGB(180, 140, 255))
+	self._shieldBar = makeBar(barsFrame, "Shield", 58, 10, Color3.fromRGB(80, 180, 255))
 	self._shieldBar.bg.Visible = false
 
 	local statusFrame = Instance.new("Frame")
 	statusFrame.Name = "StatusEffects"
 	statusFrame.Size = UDim2.new(1, 0, 0, 32)
-	statusFrame.Position = UDim2.new(0, 0, 0, 54)
+	statusFrame.Position = UDim2.new(0, 0, 0, 68)
 	statusFrame.BackgroundTransparency = 1
 	statusFrame.ClipsDescendants = false
 	statusFrame.Parent = root
@@ -239,7 +240,7 @@ function PlayerHUDUI:UpdateStatusEffects(effects)
 
 	local hasEffects = #self._activeEffects > 0
 	local hasShield = self._shieldBar.bg.Visible
-	local barHeight = hasShield and 54 or 42
+	local barHeight = hasShield and 70 or 58
 	self._root.Size = UDim2.new(0, 240, 0, barHeight + (hasEffects and 34 or 0))
 end
 
@@ -272,7 +273,7 @@ function PlayerHUDUI:StartStatusCountdown()
 			end
 			if not anyActive and #self._activeEffects == 0 then
 				local hasShield = self._shieldBar.bg.Visible
-				local barHeight = hasShield and 54 or 42
+				local barHeight = hasShield and 70 or 58
 				self._root.Size = UDim2.new(0, 240, 0, barHeight)
 			end
 		end
@@ -292,6 +293,7 @@ function PlayerHUDUI:Update(payload)
 
 	self:UpdateBar(self._hpBar, payload.hp or 0, payload.maxHp or 1, "HP")
 	self:UpdateBar(self._manaBar, payload.mana or 0, payload.maxMana or 1, "MP")
+	self:UpdateBar(self._xpBar, payload.xp or 0, payload.requiredXp or 1, "XP")
 
 	local shield = payload.shield or 0
 	if shield > 0 then

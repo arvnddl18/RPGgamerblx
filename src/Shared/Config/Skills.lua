@@ -415,4 +415,36 @@ local Skills = {
 	},
 }
 
+local SkillConfig = require(script.Parent.SkillConfig)
+
+local TARGETING_OVERRIDES = {
+	Warrior_Whirlwind = { targetType = "circle", aoeRadius = 8, showAoeIndicator = true },
+	Mage_IceSpike = { targetType = "ground", aoeRadius = 6, showAoeIndicator = true },
+	Mage_LightningStorm = { targetType = "circle", aoeRadius = 30, showAoeIndicator = true },
+	Mage_Meteor = { targetType = "ground", aoeRadius = 12, showAoeIndicator = true },
+	Archer_RainOfArrows = { targetType = "ground", aoeRadius = 10, showAoeIndicator = true },
+	Priest_Heal = { targetType = "party_circle", aoeRadius = 20 },
+	Priest_Blessing = { targetType = "party_circle", aoeRadius = 20 },
+	Priest_HolyNova = { targetType = "circle", aoeRadius = 12, showAoeIndicator = true },
+	Priest_DivineProtection = { targetType = "party_circle", aoeRadius = 20 },
+	Kavalier_LanceSpin = { targetType = "circle", aoeRadius = 10, showAoeIndicator = true },
+}
+
+for skillId, overrides in TARGETING_OVERRIDES do
+	local skill = Skills[skillId]
+	if skill then
+		for key, value in overrides do
+			skill[key] = value
+		end
+	end
+end
+
+function Skills.Get(skillId)
+	local skill = Skills[skillId]
+	if not skill then
+		return nil
+	end
+	return SkillConfig.Resolve(skill)
+end
+
 return Skills

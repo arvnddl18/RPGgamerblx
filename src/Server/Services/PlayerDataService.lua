@@ -6,6 +6,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Items = require(Shared.Config.Items)
 local Classes = require(Shared.Config.Classes)
 local LevelGrowth = require(Shared.Config.LevelGrowth)
+local ExperienceConfig = require(Shared.Config.ExperienceConfig)
+local CombatConfig = require(Shared.Config.CombatConfig)
+local DamageCalculator = require(Shared.Combat.DamageCalculator)
 local RarityConfig = require(Shared.Config.RarityConfig)
 
 local PlayerDataService = {}
@@ -628,11 +631,12 @@ function PlayerDataService:AddXP(player, amount)
 	data.xp += amount
 	leaderstats.XP.Value = data.xp
 
-	while data.xp >= data.requiredXp do
+	while data.xp >= data.requiredXp and not ExperienceConfig.IsMaxLevel(data.level) do
 		data.xp -= data.requiredXp
 		data.level += 1
 		leaderstats.Level.Value = data.level
 		leaderstats.XP.Value = data.xp
+		data.requiredXp = ExperienceConfig.GetRequiredXp(data.level)
 		self:RecalculateStats(player)
 		data.hp = data.combatStats.maxHp
 		data.mana = data.combatStats.maxMana
@@ -640,6 +644,11 @@ function PlayerDataService:AddXP(player, amount)
 		if getRemotes():FindFirstChild("LevelUp") then
 			getRemotes().LevelUp:FireClient(player, data.level)
 		end
+	end
+
+	if ExperienceConfig.IsMaxLevel(data.level) then
+		data.xp = math.min(data.xp, data.requiredXp)
+		leaderstats.XP.Value = data.xp
 	end
 
 	syncHumanoid(player, data)
@@ -704,13 +713,29 @@ function PlayerDataService:Damage(player, amount, attacker, skipMitigation, dama
 
 	local mitigated
 	if skipMitigation then
-		mitigated = math.max(1, amount)
+		mitigated = math.max(CombatConfig.minDamage, amount)
+	elseif typeof(attacker) == "Instance" and attacker:IsA("Model") and CombatConfig.enemyMitigationUsesCalculator then
+		local attackerStats = {
+			physicalAttack = attacker:GetAttribute("Attack") or amount,
+			magicAttack = attacker:GetAttribute("Attack") or amount,
+			accuracy = 1,
+			critChance = 0,
+			critDamage = 1,
+		}
+		local targetStats = {
+			defense = data.combatStats.defense,
+			magicalResistance = data.combatStats.magicalResistance or 0,
+			evasion = 0,
+			critReduction = data.combatStats.critReduction or 0,
+		}
+		local hit = DamageCalculator.ComputeHit(0, attackerStats, targetStats, damageType or "physical")
+		mitigated = hit.isMiss and 0 or hit.damage
 	else
 		local res = data.combatStats.defense
 		if damageType == "magic" then
 			res = data.combatStats.magicalResistance or 0
 		end
-		mitigated = math.max(1, amount - math.floor(res * 0.5))
+		mitigated = math.max(CombatConfig.minDamage, amount - math.floor(res * 0.5))
 	end
 	data.hp = math.max(0, data.hp - mitigated)
 	syncHumanoid(player, data)

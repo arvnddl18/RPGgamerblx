@@ -5,11 +5,13 @@ local Quests = require(Shared.Config.Quests)
 
 local QuestService = {}
 QuestService._playerData = nil
+QuestService._experienceService = nil
 QuestService._remotes = nil
 
 function QuestService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
 	self._playerData = Framework:GetService("PlayerDataService")
+	self._experienceService = Framework:GetService("ExperienceService")
 	self._karmaService = Framework:GetService("KarmaService")
 	self._remotes = Framework:GetRemotesFolder()
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
@@ -300,7 +302,11 @@ function QuestService:CompleteQuest(player, config)
 
 	data.quest.completed = true
 	local rewards = config.rewards or {}
-	self._playerData:AddXP(player, rewards.experience or 0)
+	if self._experienceService then
+		self._experienceService:GrantExperience(player, rewards.experience or 0, "quest")
+	else
+		self._playerData:AddXP(player, rewards.experience or 0)
+	end
 	self._playerData:AddCoins(player, rewards.gold or 0)
 
 	if rewards.items then

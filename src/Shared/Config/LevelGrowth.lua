@@ -1,6 +1,6 @@
+local ExperienceConfig = require(script.Parent.ExperienceConfig)
+
 local LevelGrowth = {
-	baseRequiredXp = 100,
-	xpExponent = 1.15,
 	perLevel = {
 		maxHp = 12,
 		maxMana = 5,
@@ -11,7 +11,7 @@ local LevelGrowth = {
 }
 
 function LevelGrowth.GetRequiredXp(level)
-	return math.floor(LevelGrowth.baseRequiredXp * (level ^ LevelGrowth.xpExponent))
+	return ExperienceConfig.GetRequiredXp(level)
 end
 
 function LevelGrowth.GetLevelBonuses(level)

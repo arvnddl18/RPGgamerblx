@@ -4,6 +4,8 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Skills = require(Shared.Config.Skills)
+local SkillConfig = require(Shared.Config.SkillConfig)
+local TargetingUtil = require(Shared.Combat.TargetingUtil)
 
 local SkillService = {}
 SkillService._playerData = nil
@@ -40,6 +42,10 @@ function SkillService:Init()
 	Framework:GetRemote("SkillCooldownUpdated")
 end
 
+function SkillService:GetSkill(skillId)
+	return Skills.Get(skillId)
+end
+
 function SkillService:GetSkillIdForSlot(player, slotIndex)
 	local data = self._playerData:GetData(player)
 	if not data or not data.skillLoadout then
@@ -71,6 +77,40 @@ function SkillService:GetAttackerStats(player)
 		return {}
 	end
 	return data.combatStats
+end
+
+function SkillService:ValidateTargetData(player, skill, targetData)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return nil
+	end
+
+	local sanitized = TargetingUtil.SanitizeTargetData(targetData)
+	local range = skill.range or 10
+
+	if skill.targetType == SkillConfig.TargetTypes.Ground then
+		if not sanitized.groundPosition then
+			return nil
+		end
+		if not TargetingUtil.IsValidTargetPosition(root.Position, sanitized.groundPosition, range) then
+			return nil
+		end
+		sanitized.groundPosition = TargetingUtil.ClampGroundPosition(root.Position, sanitized.groundPosition, range)
+	elseif sanitized.direction then
+		sanitized.direction = sanitized.direction.Unit
+	else
+		sanitized.direction = root.CFrame.LookVector
+	end
+
+	if sanitized.targetUserId then
+		local targetPlayer = Players:GetPlayerByUserId(sanitized.targetUserId)
+		if not targetPlayer or targetPlayer == player then
+			sanitized.targetUserId = nil
+		end
+	end
+
+	return sanitized
 end
 
 function SkillService:FindFriendlyTargets(caster, range)
@@ -113,14 +153,14 @@ function SkillService:FindFriendlyTargets(caster, range)
 	return targets
 end
 
-function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOnly)
+function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOnly, lookVector)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root or not self._combatService then
 		return {}
 	end
 
 	local origin = root.Position
-	local look = root.CFrame.LookVector
+	local look = lookVector or root.CFrame.LookVector
 	local targets = {}
 
 	for _, otherPlayer in Players:GetPlayers() do
@@ -132,7 +172,7 @@ function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOn
 				local offset = otherRoot.Position - origin
 				local distance = offset.Magnitude
 				if distance <= range then
-					if not coneOnly or offset.Unit:Dot(look) > 0.2 then
+					if not coneOnly or offset.Unit:Dot(look) > TargetingUtil.GetConeDotThreshold() then
 						table.insert(targets, otherPlayer)
 					end
 				end
@@ -143,14 +183,14 @@ function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOn
 	return targets
 end
 
-function SkillService:FindMeleeTargets(character, range, coneOnly)
+function SkillService:FindMeleeTargets(character, range, coneOnly, lookVector)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then
 		return {}
 	end
 
 	local origin = root.Position
-	local look = root.CFrame.LookVector
+	local look = lookVector or root.CFrame.LookVector
 	local targets = {}
 
 	for _, enemy in CollectionService:GetTagged("Enemy") do
@@ -160,7 +200,7 @@ function SkillService:FindMeleeTargets(character, range, coneOnly)
 				local offset = enemyRoot.Position - origin
 				local distance = offset.Magnitude
 				if distance <= range then
-					if not coneOnly or offset.Unit:Dot(look) > 0.2 then
+					if not coneOnly or offset.Unit:Dot(look) > TargetingUtil.GetConeDotThreshold() then
 						table.insert(targets, enemy)
 					end
 				end
@@ -286,7 +326,15 @@ end
 
 function SkillService:ExecuteFriendlySkill(player, skill)
 	local range = skill.range or 0
-	local targets = self:FindFriendlyTargets(player, range)
+	local targets
+
+	if skill.targetType == SkillConfig.TargetTypes.PartyCircle then
+		targets = self:FindFriendlyTargets(player, range)
+	elseif skill.targetType == SkillConfig.TargetTypes.Self then
+		targets = { player }
+	else
+		targets = self:FindFriendlyTargets(player, range)
+	end
 
 	if skill.skillType == "heal" then
 		if skill.healAmount and skill.healAmount > 0 then
@@ -302,7 +350,72 @@ function SkillService:ExecuteFriendlySkill(player, skill)
 	return true
 end
 
-function SkillService:ExecuteSkill(player, skill, slotIndex)
+function SkillService:ResolveTargets(player, skill, targetData)
+	local character = player.Character
+	if not character then
+		return {}, {}
+	end
+
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return {}, {}
+	end
+
+	local range = skill.range or 10
+	local lookVector = targetData and targetData.direction or root.CFrame.LookVector
+	local targetType = skill.targetType
+	local enemyTargets = {}
+	local playerTargets = {}
+
+	if targetType == SkillConfig.TargetTypes.Ground then
+		local groundPos = targetData and targetData.groundPosition or root.Position
+		local radius = skill.aoeRadius or range
+		enemyTargets = TargetingUtil.GetTargetsInRadius(groundPos, radius)
+		playerTargets = TargetingUtil.GetPlayersInRadius(groundPos, radius, function(otherPlayer)
+			return otherPlayer ~= player and self._combatService:CanDamagePlayer(player, otherPlayer)
+		end)
+	elseif targetType == SkillConfig.TargetTypes.Circle then
+		local radius = skill.aoeRadius or range
+		enemyTargets = TargetingUtil.GetTargetsInRadius(root.Position, radius)
+		playerTargets = TargetingUtil.GetPlayersInRadius(root.Position, radius, function(otherPlayer)
+			return otherPlayer ~= player and self._combatService:CanDamagePlayer(player, otherPlayer)
+		end)
+	elseif targetType == SkillConfig.TargetTypes.Cone or targetType == SkillConfig.TargetTypes.Directional then
+		local angle = skill.coneAngle or 60
+		enemyTargets = TargetingUtil.GetTargetsInCone(root.Position, lookVector, range, angle)
+		playerTargets = TargetingUtil.GetPlayersInCone(root.Position, lookVector, range, angle, function(otherPlayer)
+			return otherPlayer ~= player and self._combatService:CanDamagePlayer(player, otherPlayer)
+		end)
+	elseif targetType == SkillConfig.TargetTypes.Single then
+		if targetData and targetData.targetUserId then
+			local targetPlayer = Players:GetPlayerByUserId(targetData.targetUserId)
+			if targetPlayer and self._combatService:CanDamagePlayer(player, targetPlayer) then
+				playerTargets = { targetPlayer }
+			end
+		else
+			local nearest = self:FindNearestDamageTarget(player, character, range)
+			if nearest then
+				if typeof(nearest) == "Instance" and nearest:IsA("Player") then
+					playerTargets = { nearest }
+				else
+					enemyTargets = { nearest }
+				end
+			end
+		end
+	else
+		enemyTargets = self:FindMeleeTargets(character, range, true, lookVector)
+		playerTargets = self:FindPlayerDamageTargets(player, character, range, true, lookVector)
+	end
+
+	if skill.slotType == "autoAttack" then
+		enemyTargets = self:FindMeleeTargets(character, range, true, lookVector)
+		playerTargets = self:FindPlayerDamageTargets(player, character, range, true, lookVector)
+	end
+
+	return enemyTargets, playerTargets
+end
+
+function SkillService:ExecuteSkill(player, skill, slotIndex, targetData)
 	local character = player.Character
 	if not character then
 		return false
@@ -312,34 +425,7 @@ function SkillService:ExecuteSkill(player, skill, slotIndex)
 		return self:ExecuteFriendlySkill(player, skill)
 	end
 
-	local range = skill.range or 10
-	local enemyTargets = {}
-	local playerTargets = {}
-
-	if skill.aoe then
-		enemyTargets = self:FindMeleeTargets(character, range, false)
-		playerTargets = self:FindPlayerDamageTargets(player, character, range, false)
-	elseif skill.skillType == "melee" then
-		enemyTargets = self:FindMeleeTargets(character, range, true)
-		playerTargets = self:FindPlayerDamageTargets(player, character, range, true)
-	elseif skill.skillType == "magic" or skill.skillType == "ranged" then
-		local nearest = self:FindNearestDamageTarget(player, character, range)
-		if nearest then
-			if typeof(nearest) == "Instance" and nearest:IsA("Player") then
-				playerTargets = { nearest }
-			else
-				enemyTargets = { nearest }
-			end
-		end
-	else
-		enemyTargets = self:FindMeleeTargets(character, range, true)
-		playerTargets = self:FindPlayerDamageTargets(player, character, range, true)
-	end
-
-	if skill.slotType == "autoAttack" and slotIndex == 1 then
-		enemyTargets = self:FindMeleeTargets(character, range, true)
-		playerTargets = self:FindPlayerDamageTargets(player, character, range, true)
-	end
+	local enemyTargets, playerTargets = self:ResolveTargets(player, skill, targetData)
 
 	local totalTargets = #enemyTargets + #playerTargets
 	if totalTargets == 0 and (skill.damage or 0) > 0 then
@@ -350,7 +436,7 @@ function SkillService:ExecuteSkill(player, skill, slotIndex)
 	return true
 end
 
-function SkillService:HandleCastSkill(player, slotIndex)
+function SkillService:HandleCastSkill(player, slotIndex, targetData)
 	if not self._playerData:HasSelectedClass(player) then
 		return
 	end
@@ -379,12 +465,11 @@ function SkillService:HandleCastSkill(player, slotIndex)
 		return
 	end
 
-	local skill = Skills[skillId]
+	local skill = self:GetSkill(skillId)
 	if not skill then
 		return
 	end
 
-	-- Check level requirement — block casting skills the player hasn't unlocked
 	local data = self._playerData:GetData(player)
 	local requiredLevel = skill.requiredLevel or 1
 	if not data or data.level < requiredLevel then
@@ -404,12 +489,17 @@ function SkillService:HandleCastSkill(player, slotIndex)
 		self._playerData:SpendMana(player, skill.manaCost)
 	end
 
-	-- Set cooldown immediately to prevent spam during the cast window.
+	local validatedTargetData = self:ValidateTargetData(player, skill, targetData)
+	if skill.targetType == SkillConfig.TargetTypes.Ground and not validatedTargetData then
+		if skill.manaCost and skill.manaCost > 0 then
+			self._playerData:RestoreMana(player, skill.manaCost)
+		end
+		self._remotes.Notification:FireClient(player, "Invalid target position!")
+		return
+	end
+
 	self:SetCooldown(player, skillId, skill.cooldown or 1)
 
-	-- Delay damage application by castTime so it syncs with the client-side
-	-- cast animation.  The client plays the animation at t=0; the server
-	-- applies the effect at t=castTime, matching the hit-marker frame.
 	local castTime = skill.castTime or 0
 
 	if character then
@@ -417,7 +507,6 @@ function SkillService:HandleCastSkill(player, slotIndex)
 	end
 
 	local function executeAndFinalize()
-		-- Re-validate: player may have died or disconnected during the cast
 		if not player.Parent then
 			return
 		end
@@ -430,7 +519,7 @@ function SkillService:HandleCastSkill(player, slotIndex)
 			return
 		end
 
-		local success = self:ExecuteSkill(player, skill, slotIndex)
+		local success = self:ExecuteSkill(player, skill, slotIndex, validatedTargetData)
 		if not success and skill.manaCost and skill.manaCost > 0 then
 			self._playerData:RestoreMana(player, skill.manaCost)
 		end
@@ -448,8 +537,8 @@ function SkillService:HandleCastSkill(player, slotIndex)
 end
 
 function SkillService:Start()
-	self._remotes.CastSkill.OnServerEvent:Connect(function(player, slotIndex)
-		self:HandleCastSkill(player, slotIndex)
+	self._remotes.CastSkill.OnServerEvent:Connect(function(player, slotIndex, targetData)
+		self:HandleCastSkill(player, slotIndex, targetData)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

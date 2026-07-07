@@ -3,7 +3,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Enemies = require(Shared.Config.Enemies)
+local MonsterConfig = require(Shared.Config.MonsterConfig)
+local MobRarityConfig = require(Shared.Config.MobRarityConfig)
 local Items = require(Shared.Config.Items)
 local LootTables = require(Shared.Config.LootTables)
 
@@ -14,6 +15,7 @@ local EnemyService = {}
 EnemyService._playerData = nil
 EnemyService._questService = nil
 EnemyService._inventoryService = nil
+EnemyService._experienceService = nil
 EnemyService._framework = nil
 EnemyService._playMonsterAnimRemote = nil
 EnemyService._enemies = {}
@@ -59,6 +61,7 @@ function EnemyService:Init()
 	self._questService = Framework:GetService("QuestService")
 	self._inventoryService = Framework:GetService("InventoryService")
 	self._karmaService = Framework:GetService("KarmaService")
+	self._experienceService = Framework:GetService("ExperienceService")
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
 	self._playMonsterAnimRemote = Framework:GetRemote("PlayMonsterAnimation")
 end
@@ -107,8 +110,15 @@ function EnemyService:UpdateHealthBar(enemy)
 end
 
 function EnemyService:CreateEnemy(enemyId, position, spawnCenter, spawnRadius)
-	local config = Enemies[enemyId]
+	local config = MonsterConfig.Get(enemyId)
 	if not config then return nil end
+
+	local rarityConfig = MobRarityConfig[config.rarity] or MobRarityConfig.Common
+	local maxHealth = math.floor(config.maxHealth * rarityConfig.hpScale)
+	local damage = math.floor(config.damage * rarityConfig.damageScale)
+	local defense = math.floor(config.defense * rarityConfig.defenseScale)
+	local xpReward = math.floor(config.experienceReward * rarityConfig.xpScale)
+
 	local model = Instance.new("Model")
 	model.Name = config.name
 
@@ -348,27 +358,33 @@ function EnemyService:CreateEnemy(enemyId, position, spawnCenter, spawnRadius)
 
 	-- Humanoid
 	local humanoid = Instance.new("Humanoid")
-	humanoid.MaxHealth = config.MaxHP or 50
-	humanoid.Health = config.MaxHP or 50
-	humanoid.WalkSpeed = config.MoveSpeed or 4
+	humanoid.MaxHealth = maxHealth
+	humanoid.Health = maxHealth
+	humanoid.WalkSpeed = config.moveSpeed or 4
 	humanoid.HipHeight = 1.5
 	humanoid.Parent = model
 
 	model.PrimaryPart = torso
 	model:SetAttribute("EnemyType", config.id)
-	model:SetAttribute("Health", config.MaxHP or 50)
-	model:SetAttribute("MaxHealth", config.MaxHP or 50)
-	model:SetAttribute("PhysicalResistance", config.PhysicalResistance or 0)
-	model:SetAttribute("MagicalResistance", config.MagicalResistance or 0)
-	model:SetAttribute("Evasion", config.Evasion or 0)
-	model:SetAttribute("CritReduction", config.CritReduction or 0)
-	model:SetAttribute("Attack", config.PhysicalDamage or 5)
+	model:SetAttribute("Level", config.level or 1)
+	model:SetAttribute("Rarity", config.rarity or "Common")
+	model:SetAttribute("DisplayName", config.name)
+	model:SetAttribute("Health", maxHealth)
+	model:SetAttribute("MaxHealth", maxHealth)
+	model:SetAttribute("PhysicalResistance", defense)
+	model:SetAttribute("MagicalResistance", config.magicalResistance or defense)
+	model:SetAttribute("Evasion", config.evasion or 0)
+	model:SetAttribute("CritReduction", config.critReduction or 0)
+	model:SetAttribute("Attack", damage)
+	model:SetAttribute("XpReward", xpReward)
+	model:SetAttribute("GoldReward", config.goldReward or 0)
+	model:SetAttribute("RespawnTime", config.respawnTime or 5)
 
 	model:SetAttribute("SpawnCenter", spawnCenter or position)
 	model:SetAttribute("SpawnRadius", spawnRadius or 10)
 
 	CollectionService:AddTag(model, "Enemy")
-	self:CreateHealthBar(model, config.MaxHP or 50)
+	self:CreateHealthBar(model, maxHealth)
 
 	EnemyStateMachine.InitEnemy(model, position, config)
 
@@ -492,13 +508,20 @@ end
 
 function EnemyService:OnEnemyKilled(enemy, killer)
 	local enemyId = enemy:GetAttribute("EnemyType") or "Goblin"
-	local config = Enemies[enemyId]
+	local config = MonsterConfig.Get(enemyId)
 	local root = enemy.PrimaryPart
 	local deathPosition = root and root.Position or Vector3.new()
 
-	if killer then
-		self._playerData:AddXP(killer, config.xpReward)
-		self._playerData:AddCoins(killer, config.coinReward)
+	if killer and config then
+		local xpReward = enemy:GetAttribute("XpReward") or config.experienceReward or 0
+		local goldReward = enemy:GetAttribute("GoldReward") or config.goldReward or 0
+
+		if self._experienceService then
+			self._experienceService:GrantExperience(killer, xpReward, "monster")
+		else
+			self._playerData:AddXP(killer, xpReward)
+		end
+		self._playerData:AddCoins(killer, goldReward)
 		if self._questService then
 			self._questService:OnEnemyKilled(killer, config.id)
 		end
@@ -507,7 +530,7 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 		end
 	end
 
-	if math.random() < config.dropChance and root then
+	if config and math.random() < config.dropChance and root then
 		local lootItem = nil
 		if config.lootTableId then
 			lootItem = LootTables.Roll(config.lootTableId)
@@ -527,6 +550,7 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 
 	local spawnCenter = enemy:GetAttribute("SpawnCenter") or Vector3.new()
 	local spawnRadius = enemy:GetAttribute("SpawnRadius") or 10
+	local respawnTime = enemy:GetAttribute("RespawnTime") or (config and config.respawnTime) or 5
 
 	for i, e in self._enemies do
 		if e == enemy then
@@ -538,7 +562,7 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 	enemy:Destroy()
 
 	-- Respawn near the original group spawn point after a delay
-	task.delay(5, function()
+	task.delay(respawnTime, function()
 		local offsetX = (math.random() - 0.5) * 2 * spawnRadius
 		local offsetZ = (math.random() - 0.5) * 2 * spawnRadius
 		local posX = spawnCenter.X + offsetX

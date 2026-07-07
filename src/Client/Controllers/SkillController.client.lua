@@ -6,6 +6,7 @@ local SkillBarUI = require(script.Parent.Parent.UI.SkillBar.SkillBarUI)
 local AnimationController = require(ReplicatedStorage.Shared.Util.AnimationController)
 local LocalAnimationBuilder = require(ReplicatedStorage.Shared.Util.LocalAnimationBuilder)
 local Skills = require(ReplicatedStorage.Shared.Config.Skills)
+local TargetingController = require(script.Parent.TargetingController)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -100,6 +101,8 @@ local POTION_SLOTS = {
 	[7] = { id = "ManaPotion", drink = LocalAnimationBuilder.DrinkManaPotion },
 }
 
+TargetingController:Init()
+
 local function castSlot(slotIndex)
 	if not hasSelectedClass then
 		return
@@ -116,7 +119,7 @@ local function castSlot(slotIndex)
 	local skillId = currentLoadout[slotIndex]
 	if not skillId then return end
 
-	local skillConfig = Skills[skillId]
+	local skillConfig = Skills.Get(skillId)
 	if not skillConfig then return end
 
 	local now = tick()
@@ -129,9 +132,12 @@ local function castSlot(slotIndex)
 		return
 	end
 
+	local targetData = TargetingController:GetTargetDataForCast(skillConfig)
+	TargetingController:BeginPreview(skillConfig, skillConfig.castTime or 0)
+
 	localCooldowns[skillId] = now + (skillConfig.cooldown or 0)
 	playSkillAnimation(slotIndex)
-	remotes.CastSkill:FireServer(slotIndex)
+	remotes.CastSkill:FireServer(slotIndex, targetData)
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
