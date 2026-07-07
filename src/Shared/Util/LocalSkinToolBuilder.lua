@@ -1,4 +1,6 @@
 local WeaponGrips = require(script.Parent.Parent.Config.WeaponGrips)
+local WeaponTextures = require(script.Parent.Parent.Config.WeaponTextures)
+local WeaponMeshConfig = require(script.Parent.Parent.Config.WeaponMeshConfig)
 local Items = require(script.Parent.Parent.Config.Items)
 
 local SkinToolBuilder = {}
@@ -335,11 +337,99 @@ end
 
 local function hasVisuals(handle)
 	for _, child in handle:GetChildren() do
-		if child:IsA("BasePart") then
+		if child:IsA("BasePart") and child.Name ~= "Handle" then
 			return true
 		end
 	end
 	return false
+end
+
+local function addMeshEffects(meshPart, style, color)
+	if style == "sword" or style == "spear" then
+		addTrail(meshPart, color)
+		addEmitter(meshPart, "SlashSpark", color, 40, 0.2)
+	elseif style == "staff" then
+		addEmitter(meshPart, "ArcaneBurst", color, 50, 0.4)
+		addEmitter(meshPart, "CastMist", Color3.fromRGB(140, 160, 255), 25, 0.6)
+	elseif style == "bow" then
+		addEmitter(meshPart, "ArrowGlow", color, 20, 0.15)
+		addEmitter(meshPart, "ReleaseFlash", Color3.fromRGB(255, 220, 120), 35, 0.2)
+	elseif style == "mace" then
+		addEmitter(meshPart, "HolyBurst", Color3.fromRGB(255, 230, 120), 30, 0.35)
+		addEmitter(meshPart, "HealGlow", color, 20, 0.5)
+	end
+end
+
+local function buildMeshVisuals(handle, style, color)
+	local template = WeaponMeshConfig.GetTemplate(style)
+	local cfg = WeaponMeshConfig.Get(style)
+	if not cfg and not template then
+		return false
+	end
+
+	local srcHandle = template and template:FindFirstChild("Handle")
+	local visualFolder = srcHandle and srcHandle:FindFirstChild("WeaponVisual")
+	if visualFolder then
+		for _, part in visualFolder:GetChildren() do
+			if part:IsA("BasePart") then
+				local p = part:Clone()
+				p.CanCollide = false
+				p.Massless = true
+				p.Anchored = false
+				local localCF = part:GetAttribute("LocalCF")
+				p.Parent = handle
+				if typeof(localCF) == "CFrame" then
+					p.CFrame = handle.CFrame * localCF
+				end
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = handle
+				weld.Part1 = p
+				weld.Parent = p
+			end
+		end
+		local fxPart = handle:FindFirstChildWhichIsA("MeshPart", true) or handle:FindFirstChildWhichIsA("BasePart", true)
+		if fxPart then
+			addMeshEffects(fxPart, style, color)
+		end
+		return true
+	end
+
+	local meshPart
+	local srcMesh = srcHandle and srcHandle:FindFirstChild("WeaponMesh")
+	if srcMesh and srcMesh:IsA("MeshPart") then
+		meshPart = srcMesh:Clone()
+	elseif cfg then
+		meshPart = Instance.new("MeshPart")
+		meshPart.MeshId = cfg.meshId
+	else
+		return false
+	end
+
+	meshPart.Name = "WeaponMesh"
+	meshPart.CanCollide = false
+	meshPart.Massless = true
+	meshPart.Anchored = false
+	meshPart.CastShadow = true
+	meshPart.Parent = handle
+
+	local gripOffset = template and template:GetAttribute("GripOffset")
+	if typeof(gripOffset) ~= "Vector3" and cfg then
+		gripOffset = cfg.gripOffset
+	end
+	if typeof(gripOffset) == "Vector3" then
+		meshPart.CFrame = CFrame.new(-gripOffset)
+	end
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = handle
+	weld.Part1 = meshPart
+	weld.Parent = meshPart
+
+	if not meshPart:FindFirstChildOfClass("SurfaceAppearance") or meshPart.TextureID == "" then
+		WeaponTextures.Apply(meshPart, style)
+	end
+	addMeshEffects(meshPart, style, color)
+	return true
 end
 
 function SkinToolBuilder.ApplySkin(tool, weaponId, itemConfig)
@@ -359,11 +449,12 @@ function SkinToolBuilder.ApplySkin(tool, weaponId, itemConfig)
 		handle.Parent = tool
 	end
 
-	local SKIN_VERSION = 5
+	local SKIN_VERSION = 7
 
 	local skin = item.weaponSkin or {}
 	local style = WeaponGrips.GetStyle(weaponId, item)
 	local gripCfg = WeaponGrips.Styles[style]
+	local meshStyles = { sword = true, staff = true, bow = true }
 
 	local function applyGripMeta()
 		tool.Grip = gripCfg.idle
@@ -378,9 +469,8 @@ function SkinToolBuilder.ApplySkin(tool, weaponId, itemConfig)
 		return tool
 	end
 
-	-- Clear stale skin attempt (Skinned set but parts missing)
 	for _, child in handle:GetChildren() do
-		if child:IsA("BasePart") then
+		if child:IsA("BasePart") and child ~= handle then
 			child:Destroy()
 		end
 	end
@@ -394,9 +484,12 @@ function SkinToolBuilder.ApplySkin(tool, weaponId, itemConfig)
 	handle.Color = color
 	handle.Material = Enum.Material.SmoothPlastic
 
-	local builder = BUILDERS[style]
-	if builder then
-		builder(handle, color)
+	local usedMesh = meshStyles[style] and buildMeshVisuals(handle, style, color)
+	if not usedMesh then
+		local builder = BUILDERS[style]
+		if builder then
+			builder(handle, color)
+		end
 	end
 
 	setupEffectsFolder(tool)

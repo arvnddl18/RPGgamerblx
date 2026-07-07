@@ -17,14 +17,14 @@ function FastTravelMiniMapUI.new(playerGui)
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "FastTravelMiniMapUI"
 	screenGui.ResetOnSpawn = false
-	screenGui.DisplayOrder = 6
+	screenGui.DisplayOrder = 20
 	screenGui.Parent = playerGui
 	self._screenGui = screenGui
 
 	local container = Instance.new("TextButton")
 	container.Name = "MiniMapButton"
 	container.Size = UDim2.new(0, 88, 0, 88)
-	container.Position = UDim2.new(1, -100, 0, 16)
+	container.Position = UDim2.new(1, -100, 0, 58)
 	container.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	container.Text = ""
 	container.AutoButtonColor = false
@@ -46,6 +46,7 @@ function FastTravelMiniMapUI.new(playerGui)
 	mapBg.Position = UDim2.new(0, 6, 0, 6)
 	mapBg.BackgroundColor3 = Color3.fromRGB(30, 45, 35)
 	mapBg.BorderSizePixel = 0
+	mapBg.Active = false
 	mapBg.Parent = container
 	local mapCorner = Instance.new("UICorner")
 	mapCorner.CornerRadius = UDim.new(1, 0)
@@ -57,6 +58,7 @@ function FastTravelMiniMapUI.new(playerGui)
 	self._playerDot.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
 	self._playerDot.BorderSizePixel = 0
 	self._playerDot.ZIndex = 3
+	self._playerDot.Active = false
 	self._playerDot.Parent = mapBg
 	local dotCorner = Instance.new("UICorner")
 	dotCorner.CornerRadius = UDim.new(1, 0)
@@ -65,24 +67,10 @@ function FastTravelMiniMapUI.new(playerGui)
 	self._markerLayer = Instance.new("Frame")
 	self._markerLayer.Size = UDim2.fromScale(1, 1)
 	self._markerLayer.BackgroundTransparency = 1
+	self._markerLayer.Active = false
 	self._markerLayer.Parent = mapBg
 	self._markers = {}
-
-	for id, location in FastTravelUtil.GetEnabledLocations(FastTravelConfig) do
-		local x, z = FastTravelUtil.WorldToMapPercent(location.position, FastTravelConfig.MapBounds)
-		local dot = Instance.new("Frame")
-		dot.Name = id
-		dot.Size = UDim2.new(0, 5, 0, 5)
-		dot.AnchorPoint = Vector2.new(0.5, 0.5)
-		dot.Position = UDim2.fromScale(x, z)
-		dot.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
-		dot.BorderSizePixel = 0
-		dot.Parent = self._markerLayer
-		local mCorner = Instance.new("UICorner")
-		mCorner.CornerRadius = UDim.new(1, 0)
-		mCorner.Parent = dot
-		self._markers[id] = dot
-	end
+	self._markersBuilt = false
 
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 0, 14)
@@ -92,29 +80,60 @@ function FastTravelMiniMapUI.new(playerGui)
 	label.TextColor3 = Color3.fromRGB(200, 200, 210)
 	label.Font = Enum.Font.GothamBold
 	label.TextSize = 10
+	label.Active = false
 	label.Parent = container
+
+	local function openMap()
+		if self._onOpenMap then
+			self._onOpenMap()
+		end
+	end
+
+	container.MouseButton1Click:Connect(openMap)
+	container.Activated:Connect(openMap)
 
 	container.MouseEnter:Connect(function()
 		TweenService:Create(container, TweenInfo.new(0.15), {
 			Size = UDim2.new(0, 94, 0, 94),
-			Position = UDim2.new(1, -103, 0, 13),
+			Position = UDim2.new(1, -103, 0, 55),
 		}):Play()
 	end)
 
 	container.MouseLeave:Connect(function()
 		TweenService:Create(container, TweenInfo.new(0.15), {
 			Size = UDim2.new(0, 88, 0, 88),
-			Position = UDim2.new(1, -100, 0, 16),
+			Position = UDim2.new(1, -100, 0, 58),
 		}):Play()
 	end)
 
-	container.MouseButton1Click:Connect(function()
-		if self._onOpenMap then
-			self._onOpenMap()
-		end
-	end)
-
 	return self
+end
+
+function FastTravelMiniMapUI:_buildMarkers()
+	for id, location in FastTravelUtil.GetEnabledLocations(FastTravelConfig) do
+		local x, z = FastTravelUtil.WorldToMapPercent(location.position, FastTravelConfig.MapBounds)
+		local dot = Instance.new("Frame")
+		dot.Name = id
+		dot.Size = UDim2.new(0, 5, 0, 5)
+		dot.AnchorPoint = Vector2.new(0.5, 0.5)
+		dot.Position = UDim2.fromScale(x, z)
+		dot.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
+		dot.BorderSizePixel = 0
+		dot.Active = false
+		dot.Parent = self._markerLayer
+		local mCorner = Instance.new("UICorner")
+		mCorner.CornerRadius = UDim.new(1, 0)
+		mCorner.Parent = dot
+		self._markers[id] = dot
+	end
+end
+
+function FastTravelMiniMapUI:_ensureMarkers()
+	if self._markersBuilt then
+		return
+	end
+	self._markersBuilt = true
+	self:_buildMarkers()
 end
 
 function FastTravelMiniMapUI:OnOpenMap(callback)
@@ -123,9 +142,13 @@ end
 
 function FastTravelMiniMapUI:SetVisible(visible)
 	self._container.Visible = visible
+	if visible then
+		self:_ensureMarkers()
+	end
 end
 
 function FastTravelMiniMapUI:SetUnlocked(unlocked)
+	self:_ensureMarkers()
 	self._unlocked = unlocked or {}
 	for id, dot in self._markers do
 		local isUnlocked = self._unlocked[id] == true

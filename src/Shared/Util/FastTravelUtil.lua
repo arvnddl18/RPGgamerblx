@@ -7,7 +7,12 @@ function FastTravelUtil.GetLocation(config, id)
 	return config.Locations[id]
 end
 
+local enabledCache = nil
+
 function FastTravelUtil.GetEnabledLocations(config)
+	if enabledCache then
+		return enabledCache
+	end
 	local list = {}
 	if not config or not config.Locations then
 		return list
@@ -17,6 +22,7 @@ function FastTravelUtil.GetEnabledLocations(config)
 			list[id] = location
 		end
 	end
+	enabledCache = list
 	return list
 end
 

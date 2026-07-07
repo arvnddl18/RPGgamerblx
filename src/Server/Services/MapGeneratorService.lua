@@ -1518,13 +1518,30 @@ function MapGeneratorService:GetPrimaryMarketplace()
 	return self.Marketplaces[1]
 end
 
--- Offset from marketplace center: left (west) interior, facing the plaza.
-function MapGeneratorService:GetMarketplaceShopCFrame()
+local MARKETPLACE_NPC_SLOTS = {
+	Shop = { offsetX = -50, offsetZ = 10, yaw = math.pi / 2 },
+	Crafting = { offsetX = 50, offsetZ = 10, yaw = -math.pi / 2 },
+	QuestGiver = { offsetX = -30, offsetZ = -20, yaw = math.pi * 0.75 },
+	HerbMaster = { offsetX = -10, offsetZ = -20, yaw = math.pi * 0.5 },
+	VillageElder = { offsetX = 10, offsetZ = -20, yaw = math.pi * 0.25 },
+	Scout = { offsetX = 30, offsetZ = -20, yaw = 0 },
+}
+
+function MapGeneratorService:GetMarketplaceNpcCFrame(slotName)
 	local market = self:GetPrimaryMarketplace()
-	local x = market.x - 50
-	local z = market.z + 10
+	local slot = MARKETPLACE_NPC_SLOTS[slotName]
+	if not market or not slot then
+		return nil
+	end
+
+	local x = market.x + slot.offsetX
+	local z = market.z + slot.offsetZ
 	local y = self:GetGroundHeight(x, z)
-	return CFrame.new(x, y + 2, z) * CFrame.Angles(0, math.pi / 2, 0)
+	return CFrame.new(x, y + 2, z) * CFrame.Angles(0, slot.yaw, 0)
+end
+
+function MapGeneratorService:GetMarketplaceShopCFrame()
+	return self:GetMarketplaceNpcCFrame("Shop")
 end
 
 function MapGeneratorService:Generate()

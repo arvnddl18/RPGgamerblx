@@ -24,6 +24,10 @@ function FastTravelUI.new(playerGui)
 	self._unlocked = {}
 	self._playerLevel = 1
 	self._listButtons = {}
+	self._renderToken = 0
+	self._searchDebounceToken = 0
+	self._rowPool = {}
+	self._listBuilt = false
 
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "FastTravelUI"
@@ -233,7 +237,13 @@ function FastTravelUI.new(playerGui)
 
 	self._searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 		self._searchText = string.lower(self._searchBox.Text)
-		self:_renderList()
+		self._searchDebounceToken += 1
+		local token = self._searchDebounceToken
+		task.delay(0.12, function()
+			if token == self._searchDebounceToken then
+				self:_scheduleRenderList()
+			end
+		end)
 	end)
 
 	self._travelBtn.MouseButton1Click:Connect(function()
@@ -266,7 +276,7 @@ end
 
 function FastTravelUI:SetUnlocked(unlocked)
 	self._unlocked = unlocked or {}
-	self:_renderList()
+	self:_updateRowStates()
 	self:_updatePreview()
 end
 
@@ -279,6 +289,7 @@ function FastTravelUI:SetCurrentLocation(locationId)
 	self._currentLocationId = locationId
 	local location = FastTravelUtil.GetLocation(FastTravelConfig, locationId)
 	self._currentLabel.Text = "Current: " .. (location and location.displayName or "Unknown")
+	self:_updateRowStates()
 end
 
 function FastTravelUI:SetCategory(category)
@@ -286,14 +297,14 @@ function FastTravelUI:SetCategory(category)
 	for name, btn in self._filterButtons do
 		btn.BackgroundColor3 = name == category and ACCENT or Color3.fromRGB(45, 45, 60)
 	end
-	self:_renderList()
+	self:_scheduleRenderList()
 end
 
-function FastTravelUI:SelectLocation(locationId)
+function FastTravelUI:SelectLocation(locationId, skipSync)
 	self._selectedId = locationId
-	self:_renderList()
+	self:_updateRowStates()
 	self:_updatePreview()
-	if self._onSelect then
+	if not skipSync and self._onSelect then
 		self._onSelect(locationId)
 	end
 end
@@ -313,86 +324,174 @@ function FastTravelUI:IsLocationSelectable(locationId)
 	return true
 end
 
-function FastTravelUI:_renderList()
-	for _, child in self._list:GetChildren() do
-		if child:IsA("TextButton") then
-			child:Destroy()
-		end
+function FastTravelUI:_createRow(id, location)
+	local row = table.remove(self._rowPool)
+	if not row then
+		row = Instance.new("TextButton")
+		row.Size = UDim2.new(1, -4, 0, 44)
+		row.Text = ""
+		row.AutoButtonColor = false
+
+		local rowCorner = Instance.new("UICorner")
+		rowCorner.CornerRadius = UDim.new(0, 6)
+		rowCorner.Parent = row
+
+		local name = Instance.new("TextLabel")
+		name.Name = "Name"
+		name.Size = UDim2.new(1, -50, 1, 0)
+		name.Position = UDim2.new(0, 10, 0, 0)
+		name.BackgroundTransparency = 1
+		name.Font = Enum.Font.GothamBold
+		name.TextSize = 13
+		name.TextXAlignment = Enum.TextXAlignment.Left
+		name.Active = false
+		name.Parent = row
+
+		local lock = Instance.new("TextLabel")
+		lock.Name = "Lock"
+		lock.Size = UDim2.new(0, 24, 0, 24)
+		lock.Position = UDim2.new(1, -30, 0.5, -12)
+		lock.BackgroundTransparency = 1
+		lock.Text = "🔒"
+		lock.TextSize = 14
+		lock.Visible = false
+		lock.Active = false
+		lock.Parent = row
 	end
-	self._listButtons = {}
 
-	for id, location in FastTravelUtil.GetEnabledLocations(FastTravelConfig) do
-		local matchesCategory = self._activeCategory == "All" or location.category == self._activeCategory
-		local matchesSearch = self._searchText == ""
-			or string.find(string.lower(location.displayName), self._searchText, 1, true)
-			or string.find(string.lower(location.region or ""), self._searchText, 1, true)
+	row:SetAttribute("LocationId", id)
+	row.Parent = self._list
 
-		if matchesCategory and matchesSearch then
+	local name = row:FindFirstChild("Name")
+	local lock = row:FindFirstChild("Lock")
+	local isUnlocked = self._unlocked[id] == true
+	local isCurrent = id == self._currentLocationId
+	local isSelected = id == self._selectedId
+
+	name.Text = location.displayName .. (isCurrent and " (Here)" or "")
+	name.TextColor3 = isUnlocked and Color3.new(1, 1, 1) or Color3.fromRGB(130, 130, 140)
+	lock.Visible = not isUnlocked
+	row.BackgroundColor3 = isSelected and ACCENT or Color3.fromRGB(40, 40, 55)
+
+	if not row:GetAttribute("Bound") then
+		row:SetAttribute("Bound", true)
+		row.MouseEnter:Connect(function()
+			local locationId = row:GetAttribute("LocationId")
+			if locationId ~= self._selectedId then
+				TweenService:Create(row, TweenInfo.new(0.12), {
+					BackgroundColor3 = Color3.fromRGB(55, 55, 72),
+				}):Play()
+			end
+		end)
+		row.MouseLeave:Connect(function()
+			local locationId = row:GetAttribute("LocationId")
+			if locationId ~= self._selectedId then
+				TweenService:Create(row, TweenInfo.new(0.12), {
+					BackgroundColor3 = Color3.fromRGB(40, 40, 55),
+				}):Play()
+			end
+		end)
+		row.MouseButton1Click:Connect(function()
+			local locationId = row:GetAttribute("LocationId")
+			if type(locationId) == "string" then
+				self:SelectLocation(locationId)
+			end
+		end)
+	end
+
+	self._listButtons[id] = row
+	return row
+end
+
+function FastTravelUI:_updateRowStates()
+	for id, row in self._listButtons do
+		local location = FastTravelUtil.GetLocation(FastTravelConfig, id)
+		if location then
+			local name = row:FindFirstChild("Name")
+			local lock = row:FindFirstChild("Lock")
 			local isUnlocked = self._unlocked[id] == true
 			local isCurrent = id == self._currentLocationId
 			local isSelected = id == self._selectedId
-
-			local row = Instance.new("TextButton")
-			row.Size = UDim2.new(1, -4, 0, 44)
-			row.BackgroundColor3 = isSelected and ACCENT or Color3.fromRGB(40, 40, 55)
-			row.Text = ""
-			row.AutoButtonColor = false
-			row.Parent = self._list
-
-			local rowCorner = Instance.new("UICorner")
-			rowCorner.CornerRadius = UDim.new(0, 6)
-			rowCorner.Parent = row
-
-			local name = Instance.new("TextLabel")
-			name.Size = UDim2.new(1, -50, 1, 0)
-			name.Position = UDim2.new(0, 10, 0, 0)
-			name.BackgroundTransparency = 1
-			name.Text = location.displayName .. (isCurrent and " (Here)" or "")
-			name.TextColor3 = isUnlocked and Color3.new(1, 1, 1) or Color3.fromRGB(130, 130, 140)
-			name.Font = Enum.Font.GothamBold
-			name.TextSize = 13
-			name.TextXAlignment = Enum.TextXAlignment.Left
-			name.Parent = row
-
-			if not isUnlocked then
-				local lock = Instance.new("TextLabel")
-				lock.Size = UDim2.new(0, 24, 0, 24)
-				lock.Position = UDim2.new(1, -30, 0.5, -12)
-				lock.BackgroundTransparency = 1
-				lock.Text = "🔒"
-				lock.TextSize = 14
-				lock.Parent = row
+			if name then
+				name.Text = location.displayName .. (isCurrent and " (Here)" or "")
+				name.TextColor3 = isUnlocked and Color3.new(1, 1, 1) or Color3.fromRGB(130, 130, 140)
 			end
+			if lock then
+				lock.Visible = not isUnlocked
+			end
+			row.BackgroundColor3 = isSelected and ACCENT or Color3.fromRGB(40, 40, 55)
+		end
+	end
+end
 
-			row.MouseEnter:Connect(function()
-				if not isSelected then
-					TweenService:Create(row, TweenInfo.new(0.12), {
-						BackgroundColor3 = Color3.fromRGB(55, 55, 72),
-					}):Play()
-				end
-			end)
-			row.MouseLeave:Connect(function()
-				if not isSelected then
-					TweenService:Create(row, TweenInfo.new(0.12), {
-						BackgroundColor3 = Color3.fromRGB(40, 40, 55),
-					}):Play()
-				end
-			end)
+function FastTravelUI:_rowMatchesFilter(id, location)
+	local matchesCategory = self._activeCategory == "All" or location.category == self._activeCategory
+	local matchesSearch = self._searchText == ""
+		or string.find(string.lower(location.displayName), self._searchText, 1, true)
+		or string.find(string.lower(location.region or ""), self._searchText, 1, true)
+	return matchesCategory and matchesSearch
+end
 
-			row.MouseButton1Click:Connect(function()
-				self:SelectLocation(id)
-			end)
+function FastTravelUI:_applyListFilter()
+	for id, row in self._listButtons do
+		local location = FastTravelUtil.GetLocation(FastTravelConfig, id)
+		if location then
+			row.Visible = self:_rowMatchesFilter(id, location)
+		end
+	end
+end
 
-			self._listButtons[id] = row
+function FastTravelUI:_updateListCanvasSize()
+	local layout = self._list:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		self._list.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
+	end
+end
+function FastTravelUI:_scheduleRenderList()
+	if self._listBuilt then
+		self:_applyListFilter()
+		self:_updateListCanvasSize()
+		return
+	end
+
+	self._renderToken += 1
+	local token = self._renderToken
+	task.defer(function()
+		if token ~= self._renderToken then
+			return
+		end
+		self:_buildListAsync(token)
+	end)
+end
+
+function FastTravelUI:_buildListAsync(token)
+	local entries = {}
+	for id, location in FastTravelUtil.GetEnabledLocations(FastTravelConfig) do
+		table.insert(entries, { id = id, location = location })
+	end
+
+	local batchSize = 3
+	for index, entry in entries do
+		if token ~= self._renderToken then
+			return
+		end
+		self:_createRow(entry.id, entry.location)
+		if index % batchSize == 0 then
+			task.wait()
 		end
 	end
 
-	task.defer(function()
-		local layout = self._list:FindFirstChildOfClass("UIListLayout")
-		if layout then
-			self._list.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
-		end
-	end)
+	if token ~= self._renderToken then
+		return
+	end
+
+	self._listBuilt = true
+	self:_applyListFilter()
+	self:_updateListCanvasSize()
+end
+
+function FastTravelUI:_renderList()
+	self:_scheduleRenderList()
 end
 
 function FastTravelUI:_updatePreview()
@@ -424,12 +523,17 @@ end
 function FastTravelUI:SetVisible(visible)
 	self._panel.Visible = visible
 	if visible then
-		self._panel.Size = UDim2.new(0, 680, 0, 450)
-		TweenService:Create(self._panel, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Size = UDim2.new(0, 720, 0, 480),
-		}):Play()
-		self:_renderList()
+		self._panel.Size = UDim2.new(0, 700, 0, 470)
+		task.defer(function()
+			if not self._panel.Visible then
+				return
+			end
+			TweenService:Create(self._panel, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Size = UDim2.new(0, 720, 0, 480),
+			}):Play()
+		end)
 		self:_updatePreview()
+		self:_scheduleRenderList()
 	end
 end
 

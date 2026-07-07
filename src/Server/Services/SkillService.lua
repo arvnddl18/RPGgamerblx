@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Skills = require(Shared.Config.Skills)
 local SkillConfig = require(Shared.Config.SkillConfig)
 local TargetingUtil = require(Shared.Combat.TargetingUtil)
+local SkillVfxConfig = require(Shared.Config.SkillVfxConfig)
 
 local SkillService = {}
 SkillService._playerData = nil
@@ -499,6 +500,11 @@ function SkillService:HandleCastSkill(player, slotIndex, targetData)
 	end
 
 	self:SetCooldown(player, skillId, skill.cooldown or 1)
+
+	local vfxKey = SkillVfxConfig.GetForSkill(skillId)
+	if vfxKey then
+		self._remotes.PlaySkillVfx:FireAllClients(player, vfxKey)
+	end
 
 	local castTime = skill.castTime or 0
 

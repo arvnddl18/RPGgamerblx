@@ -287,16 +287,10 @@ function CraftingService:CreateNPC(cframe)
 end
 
 function CraftingService:Start()
-	local market = self._mapGenerator and self._mapGenerator:GetPrimaryMarketplace()
-	local pos
-	if market then
-		-- Crafting Master: right (east) interior of the same marketplace.
-		pos = Vector3.new(market.x + 50, 0, market.z + 10)
-	else
-		pos = Vector3.new(-35, 0, 237)
+	local cframe = self._mapGenerator and self._mapGenerator:GetMarketplaceNpcCFrame("Crafting")
+	if cframe then
+		self:CreateNPC(cframe)
 	end
-	local y = self._mapGenerator and self._mapGenerator:GetGroundHeight(pos.X, pos.Z) or 0
-	self:CreateNPC(CFrame.new(pos.X, y + 2, pos.Z) * CFrame.Angles(0, -math.pi / 2, 0))
 
 	self._remotes.CraftItem.OnServerInvoke = function(player, recipeId)
 		return self:CraftItem(player, recipeId)

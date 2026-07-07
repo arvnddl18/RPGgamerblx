@@ -27,6 +27,7 @@ function FastTravelWorldMapUI.new(playerGui)
 	self._dragging = false
 	self._dragStart = nil
 	self._markers = {}
+	self._markersBuilt = false
 
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "FastTravelWorldMapUI"
@@ -262,8 +263,16 @@ function FastTravelWorldMapUI.new(playerGui)
 		end
 	end)
 
-	self:_buildMarkers()
+	self._markersBuilt = false
 	return self
+end
+
+function FastTravelWorldMapUI:_ensureMarkers()
+	if self._markersBuilt then
+		return
+	end
+	self._markersBuilt = true
+	self:_buildMarkers()
 end
 
 function FastTravelWorldMapUI:OnSelect(callback)
@@ -408,6 +417,7 @@ end
 function FastTravelWorldMapUI:SetVisible(visible)
 	self._panel.Visible = visible
 	if visible then
+		self:_ensureMarkers()
 		self._panOffset = Vector2.zero
 		self._mapCanvas.Position = UDim2.fromOffset(0, 0)
 		self._zoom = 1
