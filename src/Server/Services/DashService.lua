@@ -61,6 +61,8 @@ function DashService:ApplyDash(player, direction)
 		self._restService:CancelRest(player, true)
 	end
 
+	character:SetAttribute("IsDashing", true)
+
 	self._cooldowns[player] = tick() + DashConfig.cooldown
 	self._remotes.DashCooldownUpdated:FireClient(player, DashConfig.cooldown)
 
@@ -102,6 +104,10 @@ function DashService:ApplyDash(player, direction)
 	if root.Parent then
 		local flatTarget = Vector3.new(targetPos.X, root.Position.Y, targetPos.Z)
 		root.CFrame = CFrame.new(flatTarget, flatTarget + direction)
+	end
+
+	if character.Parent then
+		character:SetAttribute("IsDashing", false)
 	end
 end
 

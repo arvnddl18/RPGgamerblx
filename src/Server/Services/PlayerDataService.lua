@@ -124,6 +124,10 @@ local function createEmptyData()
 		karmaPoints = 0,
 		pkCount = 0,
 		karmaFlagExpiry = nil,
+		fastTravel = {
+			visited = {},
+			favorites = {},
+		},
 	}
 end
 
@@ -391,6 +395,7 @@ function PlayerDataService:GetSaveSnapshot(player)
 		karmaPoints = data.karmaPoints or 0,
 		pkCount = data.pkCount or 0,
 		karmaFlagExpiry = data.karmaFlagExpiry,
+		fastTravel = data.fastTravel or { visited = {}, favorites = {} },
 		position = position,
 	}
 end
@@ -429,6 +434,13 @@ function PlayerDataService:LoadFromSnapshot(player, snapshot)
 	data.karmaPoints = snapshot.karmaPoints or 0
 	data.pkCount = snapshot.pkCount or 0
 	data.karmaFlagExpiry = snapshot.karmaFlagExpiry
+	data.fastTravel = snapshot.fastTravel or { visited = {}, favorites = {} }
+	if type(data.fastTravel.visited) ~= "table" then
+		data.fastTravel.visited = {}
+	end
+	if type(data.fastTravel.favorites) ~= "table" then
+		data.fastTravel.favorites = {}
+	end
 
 	if snapshot.position then
 		data.savedPosition = Vector3.new(snapshot.position.x, snapshot.position.y, snapshot.position.z)

@@ -412,6 +412,10 @@ function SkillService:HandleCastSkill(player, slotIndex)
 	-- applies the effect at t=castTime, matching the hit-marker frame.
 	local castTime = skill.castTime or 0
 
+	if character then
+		character:SetAttribute("IsCasting", castTime > 0)
+	end
+
 	local function executeAndFinalize()
 		-- Re-validate: player may have died or disconnected during the cast
 		if not player.Parent then
@@ -429,6 +433,10 @@ function SkillService:HandleCastSkill(player, slotIndex)
 		local success = self:ExecuteSkill(player, skill, slotIndex)
 		if not success and skill.manaCost and skill.manaCost > 0 then
 			self._playerData:RestoreMana(player, skill.manaCost)
+		end
+
+		if character and character.Parent then
+			character:SetAttribute("IsCasting", false)
 		end
 	end
 

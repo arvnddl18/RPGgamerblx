@@ -1,4 +1,4 @@
-﻿local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Server = ServerScriptService:WaitForChild("Server")
@@ -123,6 +123,12 @@ local coreRemotes = {
 	"SetPvpMode",
 	"SetResting",
 	"PlayMonsterAnimation",
+	"RequestFastTravel",
+	"FastTravelVisit",
+	"FastTravelBegin",
+	"FastTravelComplete",
+	"FastTravelStateUpdated",
+	"FastTravelResult",
 }
 for _, remoteName in coreRemotes do
 	Framework:GetRemote(remoteName)
