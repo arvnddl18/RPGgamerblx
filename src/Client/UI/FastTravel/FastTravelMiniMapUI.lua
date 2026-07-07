@@ -9,7 +9,7 @@ local FastTravelMiniMapUI = {}
 FastTravelMiniMapUI.__index = FastTravelMiniMapUI
 
 local MINIMAP_SIZE = 156
-local MINIMAP_MARGIN = 12
+local MINIMAP_MARGIN = 0
 
 function FastTravelMiniMapUI.new(playerGui)
 	local self = setmetatable({}, FastTravelMiniMapUI)
@@ -23,13 +23,15 @@ function FastTravelMiniMapUI.new(playerGui)
 	screenGui.Name = "FastTravelMiniMapUI"
 	screenGui.ResetOnSpawn = false
 	screenGui.DisplayOrder = 20
+	screenGui.IgnoreGuiInset = true
 	screenGui.Parent = playerGui
 	self._screenGui = screenGui
 
 	local container = Instance.new("TextButton")
 	container.Name = "MiniMapButton"
 	container.Size = UDim2.fromOffset(MINIMAP_SIZE, MINIMAP_SIZE)
-	container.Position = self._basePosition
+	container.AnchorPoint = Vector2.new(1, 0)
+	container.Position = UDim2.new(1, -10, 0, 10)
 	container.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	container.Text = ""
 	container.AutoButtonColor = false

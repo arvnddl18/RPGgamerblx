@@ -69,8 +69,9 @@ function PlayerHUDUI.new(playerGui)
 
 	local root = Instance.new("Frame")
 	root.Name = "PlayerHUD"
-	root.Size = UDim2.new(0, 240, 0, 68)
-	root.Position = UDim2.new(0, 16, 1, -180)
+	root.Size = UDim2.new(0, 240, 0, 90)
+	root.AnchorPoint = Vector2.new(0, 1)
+	root.Position = UDim2.new(0, 20, 1, -60)
 	root.BackgroundTransparency = 1
 	root.Visible = false
 	root.Parent = screenGui
@@ -79,8 +80,38 @@ function PlayerHUDUI.new(playerGui)
 	local barsFrame = Instance.new("Frame")
 	barsFrame.Name = "Bars"
 	barsFrame.Size = UDim2.new(1, 0, 0, 64)
+	barsFrame.Position = UDim2.new(0, 0, 0, 22)
 	barsFrame.BackgroundTransparency = 1
 	barsFrame.Parent = root
+
+	-- Level Ribbon (positioned above the HP bar, upper-left)
+	local levelRibbon = Instance.new("Frame")
+	levelRibbon.Name = "LevelRibbon"
+	levelRibbon.Size = UDim2.new(0, 50, 0, 20)
+	levelRibbon.Position = UDim2.new(0, 0, 0, 0)
+	levelRibbon.BackgroundColor3 = Color3.fromRGB(255, 200, 60)
+	levelRibbon.BorderSizePixel = 0
+	levelRibbon.Parent = root
+
+	local ribbonCorner = Instance.new("UICorner")
+	ribbonCorner.CornerRadius = UDim.new(0, 6)
+	ribbonCorner.Parent = levelRibbon
+
+	local ribbonGrad = Instance.new("UIGradient")
+	ribbonGrad.Color = ColorSequence.new(Color3.fromRGB(255, 200, 60), Color3.fromRGB(220, 160, 30))
+	ribbonGrad.Rotation = 90
+	ribbonGrad.Parent = levelRibbon
+
+	local levelLabel = Instance.new("TextLabel")
+	levelLabel.Name = "LevelLabel"
+	levelLabel.Size = UDim2.new(1, 0, 1, 0)
+	levelLabel.BackgroundTransparency = 1
+	levelLabel.Text = "Lv.1"
+	levelLabel.TextColor3 = Color3.fromRGB(30, 20, 5)
+	levelLabel.Font = Enum.Font.GothamBlack
+	levelLabel.TextSize = 12
+	levelLabel.Parent = levelRibbon
+	self._levelLabel = levelLabel
 
 	self._hpBar = makeBar(barsFrame, "Hp", 0, 22, Color3.fromRGB(210, 50, 50))
 	self._manaBar = makeBar(barsFrame, "Mana", 24, 16, Color3.fromRGB(60, 120, 220))
@@ -91,7 +122,8 @@ function PlayerHUDUI.new(playerGui)
 	local statusFrame = Instance.new("Frame")
 	statusFrame.Name = "StatusEffects"
 	statusFrame.Size = UDim2.new(1, 0, 0, 32)
-	statusFrame.Position = UDim2.new(0, 0, 0, 68)
+	statusFrame.AnchorPoint = Vector2.new(0, 1)
+	statusFrame.Position = UDim2.new(0, 0, 0, -4)
 	statusFrame.BackgroundTransparency = 1
 	statusFrame.ClipsDescendants = false
 	statusFrame.Parent = root
@@ -294,6 +326,10 @@ function PlayerHUDUI:Update(payload)
 	self:UpdateBar(self._hpBar, payload.hp or 0, payload.maxHp or 1, "HP")
 	self:UpdateBar(self._manaBar, payload.mana or 0, payload.maxMana or 1, "MP")
 	self:UpdateBar(self._xpBar, payload.xp or 0, payload.requiredXp or 1, "XP")
+
+	if payload.level then
+		self._levelLabel.Text = "Lv." .. tostring(payload.level)
+	end
 
 	local shield = payload.shield or 0
 	if shield > 0 then

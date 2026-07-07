@@ -462,6 +462,12 @@ function EnemyService:DamageEnemy(enemy, baseDamage, attackerStats, attacker, da
 
 		self:UpdateHealthBar(enemy)
 		
+		local ok, Framework = pcall(function() return require(game:GetService("ReplicatedStorage").Shared.Framework) end)
+		if ok then
+			local combatEvent = Framework:GetRemote("CombatEvents")
+			combatEvent:FireAllClients("Damage", enemy, result.damage, result.isCrit, attacker)
+		end
+		
 		-- Optionally fire a remote to show damage numbers here
 		
 		if health <= 0 then

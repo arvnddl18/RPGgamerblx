@@ -630,6 +630,14 @@ function PlayerDataService:AddXP(player, amount)
 
 	data.xp += amount
 	leaderstats.XP.Value = data.xp
+	
+	if amount > 0 then
+		local ok, Framework = pcall(function() return require(game:GetService("ReplicatedStorage").Shared.Framework) end)
+		if ok then
+			local combatEvent = Framework:GetRemote("CombatEvents")
+			combatEvent:FireClient(player, "Exp", amount)
+		end
+	end
 
 	while data.xp >= data.requiredXp and not ExperienceConfig.IsMaxLevel(data.level) do
 		data.xp -= data.requiredXp
@@ -669,6 +677,14 @@ function PlayerDataService:AddCoins(player, amount)
 	data.coins += amount
 	leaderstats.Coins.Value = data.coins
 	self:FireStatsUpdated(player)
+	
+	if amount > 0 then
+		local ok, Framework = pcall(function() return require(game:GetService("ReplicatedStorage").Shared.Framework) end)
+		if ok then
+			local combatEvent = Framework:GetRemote("CombatEvents")
+			combatEvent:FireClient(player, "Gold", amount)
+		end
+	end
 end
 
 function PlayerDataService:TakeCoins(player, amount)
@@ -740,6 +756,14 @@ function PlayerDataService:Damage(player, amount, attacker, skipMitigation, dama
 	data.hp = math.max(0, data.hp - mitigated)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
+	
+	if player.Character and mitigated > 0 then
+		local ok, Framework = pcall(function() return require(game:GetService("ReplicatedStorage").Shared.Framework) end)
+		if ok then
+			local combatEvent = Framework:GetRemote("CombatEvents")
+			combatEvent:FireAllClients("Damage", player.Character, mitigated, false, attacker)
+		end
+	end
 
 	if data.hp <= 0 then
 		-- Kill-confirmation: apply karma penalty only when a Hostile player attacker
@@ -783,6 +807,15 @@ function PlayerDataService:Heal(player, amount)
 	data.hp = math.min(data.combatStats.maxHp, data.hp + amount)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
+	
+	if player.Character and amount > 0 then
+		local ok, Framework = pcall(function() return require(game:GetService("ReplicatedStorage").Shared.Framework) end)
+		if ok then
+			local combatEvent = Framework:GetRemote("CombatEvents")
+			combatEvent:FireAllClients("Heal", player.Character, amount)
+		end
+	end
+	
 	return true
 end
 

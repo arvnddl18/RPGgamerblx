@@ -53,7 +53,8 @@ function StatsPanelUI.new(playerGui)
 	local iconBtn = Instance.new("TextButton")
 	iconBtn.Name = "StatsIcon"
 	iconBtn.Size = UDim2.new(0, 36, 0, 36)
-	iconBtn.Position = UDim2.new(1, -52, 0, 16)
+	iconBtn.AnchorPoint = Vector2.new(1, 1)
+	iconBtn.Position = UDim2.new(1, -16, 1, -16)
 	iconBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	iconBtn.BackgroundTransparency = 0.15
 	iconBtn.Text = "S"
@@ -71,7 +72,8 @@ function StatsPanelUI.new(playerGui)
 	local panel = Instance.new("Frame")
 	panel.Name = "StatsPanel"
 	panel.Size = UDim2.new(0, 240, 0, 440)
-	panel.Position = UDim2.new(1, -256, 0, 60)
+	panel.AnchorPoint = Vector2.new(1, 1)
+	panel.Position = UDim2.new(1, -16, 1, -60)
 	panel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	panel.BackgroundTransparency = 0.15
 	panel.BorderSizePixel = 0

@@ -29,7 +29,7 @@ local MATERIAL_COLORS = {
 local DEFAULT_TERRAIN_COLOR = Color3.fromRGB(36, 52, 34)
 local DEFAULT_PART_COLOR = Color3.fromRGB(100, 100, 100)
 local RAY_HEIGHT = 800
-local ROWS_PER_YIELD = 8
+local ROWS_PER_YIELD = 2
 
 local cachedLayer = nil
 local cachedBoundsKey = nil
