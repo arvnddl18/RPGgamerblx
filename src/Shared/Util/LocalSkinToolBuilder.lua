@@ -345,7 +345,7 @@ local function hasVisuals(handle)
 end
 
 local function addMeshEffects(meshPart, style, color)
-	if style == "sword" or style == "spear" then
+	if style == "sword" or style == "spear" or style == "axe" then
 		addTrail(meshPart, color)
 		addEmitter(meshPart, "SlashSpark", color, 40, 0.2)
 	elseif style == "staff" then
@@ -449,12 +449,12 @@ function SkinToolBuilder.ApplySkin(tool, weaponId, itemConfig)
 		handle.Parent = tool
 	end
 
-	local SKIN_VERSION = 7
+	local SKIN_VERSION = 8
 
 	local skin = item.weaponSkin or {}
 	local style = WeaponGrips.GetStyle(weaponId, item)
 	local gripCfg = WeaponGrips.Styles[style]
-	local meshStyles = { sword = true, staff = true, bow = true }
+	local meshStyles = { sword = true, staff = true, bow = true, axe = true }
 
 	local function applyGripMeta()
 		tool.Grip = gripCfg.idle

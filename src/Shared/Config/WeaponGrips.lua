@@ -37,6 +37,11 @@ WeaponGrips.Styles = {
 		attack = fwd(-0.2, -72, -90, 10),
 		handleSize = Vector3.new(0.5, 0.5, 1.2),
 	},
+	axe = {
+		idle = CFrame.new(0, -0.25, -1.2) * CFrame.Angles(math.rad(90), 0, 0),
+		attack = CFrame.new(0, -0.25, -1.2) * CFrame.Angles(math.rad(105), 0, 0),
+		handleSize = Vector3.new(0.25, 0.25, 0.5),
+	},
 }
 
 function WeaponGrips.GetStyle(weaponId, itemConfig)
@@ -48,6 +53,7 @@ function WeaponGrips.GetStyle(weaponId, itemConfig)
 	if weaponId:find("Bow") then return "bow" end
 	if weaponId:find("Spear") then return "spear" end
 	if weaponId:find("Mace") then return "mace" end
+	if weaponId:find("Axe") then return "axe" end
 	return "sword"
 end
 

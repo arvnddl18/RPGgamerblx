@@ -14,7 +14,7 @@ local Classes = {
 			movementSpeed = 16,
 		},
 		startingEquipment = {
-			weapon = "WarriorSword",
+			weapon = "WarriorAxe",
 			helmet = "WarriorHelm",
 			armor = "WarriorPlate",
 			pants = "WarriorLeggings",

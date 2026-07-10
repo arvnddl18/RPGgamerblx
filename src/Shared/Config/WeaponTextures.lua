@@ -4,6 +4,7 @@ WeaponTextures.Styles = {
 	sword = "Longsword",
 	staff = "MageStaff",
 	bow = "RecurveBow",
+	axe = "WarriorAxe",
 }
 
 WeaponTextures.MapNames = {

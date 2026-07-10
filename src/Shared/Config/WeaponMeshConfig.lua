@@ -14,6 +14,10 @@ WeaponMeshConfig.Styles = {
 		gripOffset = Vector3.new(0, 0, 0),
 		scale = 0.012,
 	},
+	axe = {
+		gripOffset = Vector3.new(0, 0, 0),
+		scale = 0.07,
+	},
 }
 
 function WeaponMeshConfig.Get(style)
