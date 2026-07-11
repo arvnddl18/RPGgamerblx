@@ -1,9 +1,12 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local WeaponGrips = require(Shared.Config.WeaponGrips)
-local SkinToolBuilder = require(Shared.Util.LocalSkinToolBuilder)
+local SkinToolBuilder = require(Shared.Util.SkinToolBuilder)
 local AnimationController = require(Shared.Util.AnimationController)
 local LocalAnimationBuilder = require(Shared.Util.LocalAnimationBuilder)
 
@@ -181,3 +184,7 @@ if player.Character then
 		onCharacter(player.Character)
 	end)
 end
+
+end
+
+return Controller

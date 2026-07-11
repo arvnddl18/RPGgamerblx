@@ -1,10 +1,13 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Framework = require(Shared.Framework)
 
-local ClassSelectionUI = require(script.Parent.Parent.UI.ClassSelection.ClassSelectionUI)
+local ClassSelectionUI = require(script.Parent.Parent.Parent.UI.ClassSelection.ClassSelectionUI)
 
 local ClassSelectionController = {}
 ClassSelectionController._ui = nil
@@ -65,3 +68,7 @@ ClassSelectionController:Init()
 ClassSelectionController:Start()
 
 return ClassSelectionController
+
+end
+
+return Controller

@@ -1,9 +1,12 @@
+local Controller = {}
+
+function Controller:Start()
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Classes = require(Shared.Config.Classes)
-local StatsPanelUI = require(script.Parent.Parent.UI.Stats.StatsPanelUI)
+local StatsPanelUI = require(script.Parent.Parent.Parent.UI.Stats.StatsPanelUI)
 
 local player = game:GetService("Players").LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -26,3 +29,7 @@ remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	statsPanelUI:SetHudVisible(hasSelectedClass)
 	statsPanelUI:Update(payload, Classes)
 end)
+
+end
+
+return Controller

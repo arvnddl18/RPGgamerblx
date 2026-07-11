@@ -1,3 +1,6 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -17,3 +20,7 @@ remotes.PlaySkillVfx.OnClientEvent:Connect(function(player, vfxKey)
 		SkillVfxUtil.Play(character, vfxKey)
 	end
 end)
+
+end
+
+return Controller

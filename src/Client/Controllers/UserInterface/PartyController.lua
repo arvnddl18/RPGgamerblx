@@ -1,8 +1,11 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local PartyUI = require(script.Parent.Parent.UI.Party.PartyUI)
+local PartyUI = require(script.Parent.Parent.Parent.UI.Party.PartyUI)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -117,3 +120,7 @@ remotes.PartyInviteResult.OnClientEvent:Connect(function(result)
 		partyUI:ShowStatusMessage(result.message, not result.success)
 	end
 end)
+
+end
+
+return Controller

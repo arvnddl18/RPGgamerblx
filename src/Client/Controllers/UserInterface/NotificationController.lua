@@ -1,6 +1,9 @@
+local Controller = {}
+
+function Controller:Start()
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local NotificationUI = require(script.Parent.Parent.UI.Notification.NotificationUI)
+local NotificationUI = require(script.Parent.Parent.Parent.UI.Notification.NotificationUI)
 
 local player = game:GetService("Players").LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -12,3 +15,7 @@ remotes.Notification.OnClientEvent:Connect(function(message)
 		notificationUI:Show(message)
 	end
 end)
+
+end
+
+return Controller

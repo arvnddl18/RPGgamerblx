@@ -1,3 +1,6 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -427,3 +430,7 @@ remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 		setVisible(false)
 	end
 end)
+
+end
+
+return Controller

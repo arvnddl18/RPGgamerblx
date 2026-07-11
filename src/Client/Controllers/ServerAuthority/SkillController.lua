@@ -1,12 +1,15 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local SkillBarUI = require(script.Parent.Parent.UI.SkillBar.SkillBarUI)
+local SkillBarUI = require(script.Parent.Parent.Parent.UI.SkillBar.SkillBarUI)
 local AnimationController = require(ReplicatedStorage.Shared.Util.AnimationController)
 local LocalAnimationBuilder = require(ReplicatedStorage.Shared.Util.LocalAnimationBuilder)
 local Skills = require(ReplicatedStorage.Shared.Config.Skills)
-local TargetingController = require(script.Parent.TargetingController)
+local TargetingController = require(script.Parent.Parent.UserInterface.TargetingController)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -196,3 +199,7 @@ end)
 remotes.SkillCooldownUpdated.OnClientEvent:Connect(function(skillId, duration)
 	skillBar:StartCooldown(skillId, duration)
 end)
+
+end
+
+return Controller

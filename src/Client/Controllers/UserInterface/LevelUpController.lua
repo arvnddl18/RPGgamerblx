@@ -1,3 +1,6 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -53,3 +56,7 @@ if remotes:FindFirstChild("LevelUp") then
 		flashLevelUp(level)
 	end)
 end
+
+end
+
+return Controller

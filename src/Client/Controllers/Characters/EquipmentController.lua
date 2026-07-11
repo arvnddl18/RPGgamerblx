@@ -1,10 +1,13 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Items = require(Shared.Config.Items)
-local EquipmentUI = require(script.Parent.Parent.UI.Equipment.EquipmentUI)
+local EquipmentUI = require(script.Parent.Parent.Parent.UI.Equipment.EquipmentUI)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -41,3 +44,7 @@ remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 		equipmentUI:Update(payload.equipped, Items)
 	end
 end)
+
+end
+
+return Controller

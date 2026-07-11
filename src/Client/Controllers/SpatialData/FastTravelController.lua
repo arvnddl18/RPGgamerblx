@@ -1,3 +1,6 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -6,7 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local FastTravelConfig = require(Shared.Config.FastTravel)
 local FastTravelUtil = require(Shared.Util.FastTravelUtil)
 
-local UI_ROOT = script.Parent.Parent.UI.FastTravel
+local UI_ROOT = script.Parent.Parent.Parent.UI.FastTravel
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -381,3 +384,7 @@ RunService.Heartbeat:Connect(function()
 		end
 	end
 end)
+
+end
+
+return Controller

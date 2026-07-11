@@ -1,8 +1,11 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local QuestLogUI = require(script.Parent.Parent.UI.Quest.QuestLogUI)
+local QuestLogUI = require(script.Parent.Parent.Parent.UI.Quest.QuestLogUI)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -34,3 +37,7 @@ remotes.QuestUpdated.OnClientEvent:Connect(function(payload)
 	questData = payload
 	questLog:Update(questData)
 end)
+
+end
+
+return Controller

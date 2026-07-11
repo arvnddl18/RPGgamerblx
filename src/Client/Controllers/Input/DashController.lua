@@ -1,8 +1,11 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local DashCooldownUI = require(script.Parent.Parent.UI.Dash.DashCooldownUI)
+local DashCooldownUI = require(script.Parent.Parent.Parent.UI.Dash.DashCooldownUI)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -44,3 +47,7 @@ end)
 remotes.DashCooldownUpdated.OnClientEvent:Connect(function(duration)
 	dashUI:StartCooldown(duration)
 end)
+
+end
+
+return Controller

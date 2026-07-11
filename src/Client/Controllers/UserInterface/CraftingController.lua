@@ -1,7 +1,10 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local CraftingUI = require(script.Parent.Parent.UI.Crafting.CraftingUI)
+local CraftingUI = require(script.Parent.Parent.Parent.UI.Crafting.CraftingUI)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -54,3 +57,7 @@ remotes.CraftResult.OnClientEvent:Connect(function(payload)
 	end
 	remotes.RequestInventory:FireServer()
 end)
+
+end
+
+return Controller

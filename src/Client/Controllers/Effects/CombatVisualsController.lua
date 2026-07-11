@@ -1,8 +1,11 @@
+local Controller = {}
+
+function Controller:Start()
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Framework = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Framework"))
-local FloatingText = require(script.Parent.Parent.Util.FloatingText)
-local TargetHUDUI = require(script.Parent.Parent.UI.Targeting.TargetHUDUI)
+local FloatingText = require(script.Parent.Parent.Parent.Util.FloatingText)
+local TargetHUDUI = require(script.Parent.Parent.Parent.UI.Targeting.TargetHUDUI)
 
 local targetHud = TargetHUDUI.new(Players.LocalPlayer:WaitForChild("PlayerGui"))
 local combatEvent = Framework:GetRemote("CombatEvents")
@@ -40,3 +43,7 @@ combatEvent.OnClientEvent:Connect(function(eventType, ...)
 		FloatingText.ShowExpGain(amount)
 	end
 end)
+
+end
+
+return Controller

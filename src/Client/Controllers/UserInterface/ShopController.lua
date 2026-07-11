@@ -1,7 +1,10 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ShopUI = require(script.Parent.Parent.UI.Shop.ShopUI)
+local ShopUI = require(script.Parent.Parent.Parent.UI.Shop.ShopUI)
 
 local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -23,3 +26,7 @@ remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	playerLevel = payload.level or 1
 	shopUI:SetPlayerLevel(playerLevel)
 end)
+
+end
+
+return Controller

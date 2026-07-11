@@ -3,7 +3,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local SkinToolBuilder = require(Shared.Util.LocalSkinToolBuilder)
+local SkinToolBuilder = require(Shared.Util.SkinToolBuilder)
 local DamageCalculator = require(Shared.Combat.DamageCalculator)
 
 local CombatService = {}

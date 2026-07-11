@@ -9,7 +9,7 @@ local Framework = require(Shared:WaitForChild("Framework"))
 
 local function setupWorld()
 	-- Run massive map generator
-	local MapGeneratorService = require(Services:WaitForChild("MapGeneratorService"))
+	local MapGeneratorService = require(Services.Workspace:WaitForChild("MapGeneratorService"))
 	MapGeneratorService:Generate()
 
 	local world = workspace:FindFirstChild("RPGWorld")
@@ -123,6 +123,7 @@ local coreRemotes = {
 	"SetPvpMode",
 	"SetResting",
 	"PlayMonsterAnimation",
+	"CombatEvents",
 	"RequestFastTravel",
 	"FastTravelVisit",
 	"FastTravelBegin",
@@ -146,7 +147,7 @@ end
 setupWorld()
 
 -- 1. Register all services
-for _, module in Services:GetChildren() do
+for _, module in Services:GetDescendants() do
 	if module:IsA("ModuleScript") then
 		local service = require(module)
 		Framework:RegisterService(module.Name, service)

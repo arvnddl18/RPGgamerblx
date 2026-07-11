@@ -1,3 +1,6 @@
+local Controller = {}
+
+function Controller:Start()
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
@@ -128,3 +131,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
 	remotes.SetResting:FireServer(not isResting)
 end)
+
+end
+
+return Controller

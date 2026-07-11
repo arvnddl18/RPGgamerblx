@@ -7,6 +7,32 @@ pcall(function()
 end)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-require(Shared.Framework)
+local Framework = require(Shared:WaitForChild("Framework"))
 
--- Controllers in Controllers/ are LocalScripts that self-start via *.client.lua suffix.
+local Controllers = script.Parent:WaitForChild("Controllers")
+
+-- 1. Register all controllers
+for _, module in Controllers:GetDescendants() do
+	if module:IsA("ModuleScript") then
+		local controller = require(module)
+		Framework:RegisterController(module.Name, controller)
+	end
+end
+
+-- 2. Init all controllers
+for _, controller in Framework:GetControllers() do
+	if type(controller.Init) == "function" then
+		controller:Init()
+	end
+end
+
+-- 3. Start all controllers
+for name, controller in Framework:GetControllers() do
+	if type(controller.Start) == "function" then
+		task.spawn(function()
+			controller:Start()
+		end)
+	end
+end
+
+print("[SimpleRPG] Client Framework started successfully.")

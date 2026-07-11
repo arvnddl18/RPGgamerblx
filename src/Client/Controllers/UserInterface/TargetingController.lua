@@ -5,7 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TargetingUtil = require(Shared.Combat.TargetingUtil)
 local SkillConfig = require(Shared.Config.SkillConfig)
-local TargetingIndicator = require(script.Parent.Parent.UI.Targeting.TargetingIndicator)
+local TargetingIndicator = require(script.Parent.Parent.Parent.UI.Targeting.TargetingIndicator)
 
 local TargetingController = {}
 TargetingController._player = Players.LocalPlayer

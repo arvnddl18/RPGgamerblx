@@ -1,3 +1,6 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,7 +11,7 @@ pcall(function()
 	StarterGui:SetCore("TopbarEnabled", false)
 end)
 
-local LoadingScreenUI = require(script.Parent.Parent.UI.Loading.LoadingScreenUI)
+local LoadingScreenUI = require(script.Parent.Parent.Parent.UI.Loading.LoadingScreenUI)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -38,7 +41,7 @@ task.spawn(function()
 	
 	local Shared = ReplicatedStorage:WaitForChild("Shared")
 	local FastTravelConfig = require(Shared.Config.FastTravel)
-	local WorldMapTerrainRenderer = require(script.Parent.Parent.UI.FastTravel.WorldMapTerrainRenderer)
+	local WorldMapTerrainRenderer = require(script.Parent.Parent.Parent.UI.FastTravel.WorldMapTerrainRenderer)
 	
 	-- We pass 160 resolution to match FastTravelWorldMapUI
 	WorldMapTerrainRenderer.GetTerrainLayer(FastTravelConfig.MapBounds, 160, function(layer)
@@ -54,3 +57,7 @@ task.spawn(function()
 		loadingScreen:FadeOutAndDestroy()
 	end)
 end)
+
+end
+
+return Controller

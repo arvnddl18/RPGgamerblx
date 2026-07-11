@@ -1,3 +1,6 @@
+local Controller = {}
+
+function Controller:Start()
 -- MonsterAnimationHandler
 -- Client-side LocalScript that handles all monster animations.
 -- Listens for PlayMonsterAnimation remote for attack animations,
@@ -175,3 +178,7 @@ playMonsterAnimRemote.OnClientEvent:Connect(function(enemy, animKey)
 end)
 
 print("[MonsterAnimationHandler] Started.")
+
+end
+
+return Controller

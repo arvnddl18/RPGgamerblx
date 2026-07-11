@@ -1,3 +1,6 @@
+local Controller = {}
+
+function Controller:Start()
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -124,3 +127,7 @@ for _, p in Players:GetPlayers() do
 	setupPlayer(p)
 end
 Players.PlayerAdded:Connect(setupPlayer)
+
+end
+
+return Controller
