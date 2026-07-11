@@ -219,6 +219,28 @@ local Items = {
 		statBonuses = { PhysicalDamage = 2, PhysicalResistance = 1 },
 		color = Color3.fromRGB(100, 100, 110),
 	},
+	WarriorShoulders = {
+		id = "WarriorShoulders",
+		name = "Warrior Pauldrons",
+		description = "Steel shoulder guards.",
+		type = "shoulders",
+		category = "armor",
+		slot = "shoulders",
+		classRestriction = "Warrior",
+		statBonuses = { PhysicalResistance = 2, MaxHP = 8 },
+		color = Color3.fromRGB(135, 135, 145),
+	},
+	WarriorUpperArms = {
+		id = "WarriorUpperArms",
+		name = "Warrior Arm Guards",
+		description = "Plate covering the upper arms.",
+		type = "upperArms",
+		category = "armor",
+		slot = "upperArms",
+		classRestriction = "Warrior",
+		statBonuses = { PhysicalResistance = 3, MaxHP = 5 },
+		color = Color3.fromRGB(110, 110, 120),
+	},
 
 	MageStaff = {
 		id = "MageStaff",
@@ -287,6 +309,28 @@ local Items = {
 		classRestriction = "Mage",
 		statBonuses = { MagicalDamage = 3 },
 		color = Color3.fromRGB(60, 70, 150),
+	},
+	MageShoulders = {
+		id = "MageShoulders",
+		name = "Mage Mantle",
+		description = "Arcane shoulder mantle.",
+		type = "shoulders",
+		category = "armor",
+		slot = "shoulders",
+		classRestriction = "Mage",
+		statBonuses = { MagicalDamage = 1, MaxMana = 8 },
+		color = Color3.fromRGB(65, 75, 170),
+	},
+	MageUpperArms = {
+		id = "MageUpperArms",
+		name = "Mage Arm Wraps",
+		description = "Enchanted wraps for the upper arms.",
+		type = "upperArms",
+		category = "armor",
+		slot = "upperArms",
+		classRestriction = "Mage",
+		statBonuses = { MagicalDamage = 2, MaxMana = 5 },
+		color = Color3.fromRGB(65, 75, 165),
 	},
 
 	ArcherBow = {
@@ -357,6 +401,28 @@ local Items = {
 		statBonuses = { PhysicalDamage = 2 },
 		color = Color3.fromRGB(70, 100, 50),
 	},
+	ArcherShoulders = {
+		id = "ArcherShoulders",
+		name = "Archer Shoulder Guards",
+		description = "Light leather shoulder guards.",
+		type = "shoulders",
+		category = "armor",
+		slot = "shoulders",
+		classRestriction = "Archer",
+		statBonuses = { PhysicalDamage = 1, MoveSpeed = 1 },
+		color = Color3.fromRGB(75, 115, 55),
+	},
+	ArcherUpperArms = {
+		id = "ArcherUpperArms",
+		name = "Archer Arm Bracers",
+		description = "Bracers protecting the upper arms.",
+		type = "upperArms",
+		category = "armor",
+		slot = "upperArms",
+		classRestriction = "Archer",
+		statBonuses = { PhysicalResistance = 1, MoveSpeed = 1 },
+		color = Color3.fromRGB(65, 100, 48),
+	},
 
 	PriestMace = {
 		id = "PriestMace",
@@ -425,6 +491,28 @@ local Items = {
 		classRestriction = "Priest",
 		statBonuses = { MagicalDamage = 2, MaxMana = 5 },
 		color = Color3.fromRGB(210, 210, 190),
+	},
+	PriestShoulders = {
+		id = "PriestShoulders",
+		name = "Priest Mantle",
+		description = "Holy shoulder mantle.",
+		type = "shoulders",
+		category = "armor",
+		slot = "shoulders",
+		classRestriction = "Priest",
+		statBonuses = { MagicalDamage = 1, MaxHP = 5 },
+		color = Color3.fromRGB(230, 230, 210),
+	},
+	PriestUpperArms = {
+		id = "PriestUpperArms",
+		name = "Priest Arm Wraps",
+		description = "Blessed wraps for the upper arms.",
+		type = "upperArms",
+		category = "armor",
+		slot = "upperArms",
+		classRestriction = "Priest",
+		statBonuses = { MagicalDamage = 2, MaxHP = 3 },
+		color = Color3.fromRGB(215, 215, 195),
 	},
 
 	KavalierSpear = {
@@ -495,6 +583,36 @@ local Items = {
 		statBonuses = { PhysicalDamage = 2 },
 		color = Color3.fromRGB(120, 65, 170),
 	},
+	KavalierShoulders = {
+		id = "KavalierShoulders",
+		name = "Kavalier Pauldrons",
+		description = "Ornate lancer pauldrons.",
+		type = "shoulders",
+		category = "armor",
+		slot = "shoulders",
+		classRestriction = "Kavalier",
+		statBonuses = { PhysicalResistance = 2, MaxHP = 6 },
+		color = Color3.fromRGB(150, 85, 200),
+	},
+	KavalierUpperArms = {
+		id = "KavalierUpperArms",
+		name = "Kavalier Arm Guards",
+		description = "Arm guards for a lancer's charge.",
+		type = "upperArms",
+		category = "armor",
+		slot = "upperArms",
+		classRestriction = "Kavalier",
+		statBonuses = { PhysicalResistance = 2, PhysicalDamage = 1 },
+		color = Color3.fromRGB(130, 75, 185),
+	},
 }
+
+local EquipmentSlots = require(script.Parent.EquipmentSlots)
+
+for _, item in pairs(Items) do
+	if item.slot and EquipmentSlots.DEFAULT_VISUAL_MODE[item.slot] then
+		item.visualMode = item.visualMode or EquipmentSlots.DEFAULT_VISUAL_MODE[item.slot]
+	end
+end
 
 return Items

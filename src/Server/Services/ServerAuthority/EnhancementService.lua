@@ -116,6 +116,14 @@ function EnhancementService:ApplyEnhancement(player, scrollItemId, targetUid)
 	end
 	self._playerData:FireStatsUpdated(player)
 
+	if outcome == "break" and equippedSlot then
+		local Framework = require(ReplicatedStorage.Shared.Framework)
+		local equipmentService = Framework:GetService("EquipmentService")
+		if equipmentService then
+			equipmentService:ApplyEquipmentChange(player)
+		end
+	end
+
 	self._remotes.EnhancementResult:FireClient(player, resultPayload)
 	if outcome == "success" then
 		self._remotes.Notification:FireClient(player, "Enhancement success! +" .. resultPayload.enhanceLevel)

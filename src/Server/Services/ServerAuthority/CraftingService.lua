@@ -30,6 +30,7 @@ function CraftingService:Init()
 	end
 	Framework:GetRemote("CraftResult")
 	Framework:GetRemote("OpenCrafting")
+	Framework:GetRemote("RequestCrafting")
 end
 
 function CraftingService:_itemMatchesRecipe(targetEntry, recipe)
@@ -190,6 +191,15 @@ function CraftingService:UpgradeEquipment(player, recipeId, targetUid)
 	self._playerData:RecalculateStats(player)
 	self._remotes.InventoryUpdated:FireClient(player, data.inventory)
 	self._playerData:FireStatsUpdated(player)
+
+	if outcome == "destroy" and equippedSlot then
+		local Framework = require(ReplicatedStorage.Shared.Framework)
+		local equipmentService = Framework:GetService("EquipmentService")
+		if equipmentService then
+			equipmentService:ApplyEquipmentChange(player)
+		end
+	end
+
 	self._remotes.CraftResult:FireClient(player, payload)
 	local outcomeMsg = {
 		success = "Upgrade success!",
@@ -299,6 +309,11 @@ function CraftingService:Start()
 	self._remotes.UpgradeEquipment.OnServerInvoke = function(player, recipeId, targetUid)
 		return self:UpgradeEquipment(player, recipeId, targetUid)
 	end
+
+	self._remotes.RequestCrafting.OnServerEvent:Connect(function(player, context)
+		local recipes = self:BuildRecipePayload()
+		self._remotes.OpenCrafting:FireClient(player, recipes, context)
+	end)
 end
 
 return CraftingService

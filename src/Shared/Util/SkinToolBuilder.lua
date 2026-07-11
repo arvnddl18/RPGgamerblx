@@ -3,6 +3,9 @@ local WeaponTextures = require(script.Parent.Parent.Config.WeaponTextures)
 local WeaponMeshConfig = require(script.Parent.Parent.Config.WeaponMeshConfig)
 local Items = require(script.Parent.Parent.Config.Items)
 
+local InsertService = game:GetService("InsertService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local SkinToolBuilder = {}
 
 local SCALE = 1.75
@@ -398,7 +401,7 @@ local function buildMeshVisuals(handle, style, color)
 	local srcMesh = srcHandle and srcHandle:FindFirstChild("WeaponMesh")
 	if srcMesh and srcMesh:IsA("MeshPart") then
 		meshPart = srcMesh:Clone()
-	elseif cfg then
+	elseif cfg and cfg.meshId and cfg.meshId ~= "" then
 		meshPart = Instance.new("MeshPart")
 		meshPart.MeshId = cfg.meshId
 	else
@@ -449,12 +452,12 @@ function SkinToolBuilder.ApplySkin(tool, weaponId, itemConfig)
 		handle.Parent = tool
 	end
 
-	local SKIN_VERSION = 7
+	local SKIN_VERSION = 8
 
 	local skin = item.weaponSkin or {}
 	local style = WeaponGrips.GetStyle(weaponId, item)
 	local gripCfg = WeaponGrips.Styles[style]
-	local meshStyles = { sword = true, staff = true, bow = true }
+	local meshStyles = { sword = true, staff = true, bow = true, mace = true, spear = true }
 
 	local function applyGripMeta()
 		tool.Grip = gripCfg.idle
@@ -499,10 +502,68 @@ function SkinToolBuilder.ApplySkin(tool, weaponId, itemConfig)
 	return tool
 end
 
+function SkinToolBuilder.LoadWeaponTemplate(weaponId, item)
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local folder = assets and assets:FindFirstChild("Weapons")
+	if not folder then
+		return nil
+	end
+
+	local byId = folder:FindFirstChild(weaponId)
+	if byId and byId:IsA("Tool") then
+		return byId:Clone()
+	end
+
+	local style = WeaponGrips.GetStyle(weaponId, item)
+	local byStyle = folder:FindFirstChild(style)
+	if byStyle and byStyle:IsA("Tool") then
+		return byStyle:Clone()
+	end
+
+	return nil
+end
+
+local function loadToolFromCatalog(toolAssetId)
+	local ok, container = pcall(function()
+		return InsertService:LoadAsset(toolAssetId)
+	end)
+	if not ok or not container then
+		return nil
+	end
+
+	local tool = container:FindFirstChildWhichIsA("Tool", true)
+	if tool then
+		tool = tool:Clone()
+	end
+	container:Destroy()
+	return tool
+end
+
+local function prepareTool(tool, weaponId, item)
+	tool.Name = item.name or weaponId
+	tool.RequiresHandle = true
+	tool.CanBeDropped = false
+	tool:SetAttribute("WeaponId", weaponId)
+	SkinToolBuilder.ApplySkin(tool, weaponId, item)
+	return tool
+end
+
 function SkinToolBuilder.BuildWeaponTool(weaponId)
 	local item = Items[weaponId]
 	if not item or item.type ~= "weapon" then
 		return nil
+	end
+
+	if item.toolAssetId then
+		local catalogTool = loadToolFromCatalog(item.toolAssetId)
+		if catalogTool then
+			return prepareTool(catalogTool, weaponId, item)
+		end
+	end
+
+	local template = SkinToolBuilder.LoadWeaponTemplate(weaponId, item)
+	if template then
+		return prepareTool(template, weaponId, item)
 	end
 
 	local tool = Instance.new("Tool")

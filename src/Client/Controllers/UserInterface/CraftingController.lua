@@ -30,11 +30,12 @@ craftingUI:OnUpgrade(function(recipeId, targetUid)
 	end
 end)
 
-remotes.OpenCrafting.OnClientEvent:Connect(function(recipes)
+remotes.OpenCrafting.OnClientEvent:Connect(function(recipes, context)
 	craftingUI:SetRecipes(recipes)
 	craftingUI:SetClassId(classId)
 	craftingUI:SetInventory(inventory)
 	craftingUI:SetEquipped(equipped)
+	craftingUI:ApplyOpenContext(context)
 	craftingUI:SetVisible(true)
 end)
 

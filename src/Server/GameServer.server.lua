@@ -113,11 +113,11 @@ end
 -- Create core remotes BEFORE map generation so clients can connect immediately
 local coreRemotes = {
 	"Attack", "CastSkill", "SkillCooldownUpdated", "RequestDash", "DashCooldownUpdated", "PlaySkillVfx",
-	"StatsUpdated", "InventoryUpdated", "RequestInventory", "UseItem",
+	"StatsUpdated", "InventoryUpdated", "RequestInventory", "UseItem", "DropItem",
 	"SelectClass", "ClassSelected", "EquipItem", "UnequipItem",
 	"OpenQuest", "AcceptQuest", "QuestUpdated", "OpenQuestLog",
 	"OpenShop", "PurchaseItem", "SellItem", "Notification", "LevelUp",
-	"OpenCrafting", "CraftResult", "EnhancementResult",
+	"OpenCrafting", "RequestCrafting", "CraftResult", "EnhancementResult",
 	"PartyInvite", "PartyInviteReceived", "PartyRespondInvite", "PartyLeave",
 	"PartyKick", "PartyUpdated", "PartyInviteResult",
 	"SetPvpMode",

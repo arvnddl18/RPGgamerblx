@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local SkinToolBuilder = require(Shared.Util.SkinToolBuilder)
+local EquipmentVisualUtil = require(Shared.Util.EquipmentVisualUtil)
 local DamageCalculator = require(Shared.Combat.DamageCalculator)
 
 local CombatService = {}
@@ -36,6 +37,9 @@ function CombatService:GiveWeapon(player, weaponId)
 	end
 
 	weaponId = weaponId or data.equippedWeapon
+	if not weaponId and data.equipped.weapon then
+		weaponId = EquipmentVisualUtil.resolveItemId(data.equipped.weapon)
+	end
 	if type(weaponId) == "table" then
 		weaponId = weaponId.id
 	end
@@ -48,7 +52,7 @@ function CombatService:GiveWeapon(player, weaponId)
 		return
 	end
 
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 5)
 	if not humanoid then
 		return
 	end
@@ -194,25 +198,6 @@ function CombatService:Start()
 	self._remotes.Attack.OnServerEvent:Connect(function(player)
 		self:HandleAttack(player)
 	end)
-
-	Players.PlayerAdded:Connect(function(player)
-		player.CharacterAdded:Connect(function()
-			task.wait(0.5)
-			self:GiveWeapon(player)
-		end)
-	end)
-
-	for _, player in Players:GetPlayers() do
-		if player.Character then
-			task.delay(0.5, function()
-				self:GiveWeapon(player)
-			end)
-		end
-		player.CharacterAdded:Connect(function()
-			task.wait(0.5)
-			self:GiveWeapon(player)
-		end)
-	end
 end
 
 return CombatService

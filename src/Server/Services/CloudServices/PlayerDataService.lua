@@ -10,6 +10,7 @@ local ExperienceConfig = require(Shared.Config.ExperienceConfig)
 local CombatConfig = require(Shared.Config.CombatConfig)
 local DamageCalculator = require(Shared.Combat.DamageCalculator)
 local RarityConfig = require(Shared.Config.RarityConfig)
+local EquipmentSlots = require(Shared.Config.EquipmentSlots)
 
 local PlayerDataService = {}
 PlayerDataService._data = {}
@@ -17,7 +18,7 @@ PlayerDataService._remotes = nil
 PlayerDataService._saveService = nil
 PlayerDataService._questService = nil
 
-local EQUIPMENT_SLOTS = { "weapon", "helmet", "armor", "pants", "boots", "gloves" }
+local EQUIPMENT_SLOTS = EquipmentSlots.ORDER
 
 local function getEnhancementConfig()
 	local ok, config = pcall(require, Shared.Config.EnhancementConfig)
@@ -89,14 +90,27 @@ local function markSaveDirty(player)
 end
 
 local function createEmptyEquipped()
-	return {
-		weapon = nil,
-		helmet = nil,
-		armor = nil,
-		pants = nil,
-		boots = nil,
-		gloves = nil,
-	}
+	return EquipmentSlots.createEmpty()
+end
+
+local function migrateMissingEquippedSlots(data)
+	if not data.hasSelectedClass or not data.classId then
+		return false
+	end
+	local classConfig = Classes[data.classId]
+	if not classConfig or not classConfig.startingEquipment then
+		return false
+	end
+	local migrated = false
+	for _, slot in EQUIPMENT_SLOTS do
+		if data.equipped[slot] == nil and classConfig.startingEquipment[slot] then
+			local item = RarityConfig.GenerateItem(classConfig.startingEquipment[slot], "Common")
+			normalizeInventoryEntry(item)
+			data.equipped[slot] = item
+			migrated = true
+		end
+	end
+	return migrated
 end
 
 local function createEmptyData()
@@ -308,7 +322,12 @@ function PlayerDataService:RecalculateStats(player)
 
 	data.hp = math.clamp(data.hp, 0, data.combatStats.maxHp)
 	data.mana = math.clamp(data.mana, 0, data.combatStats.maxMana)
-	data.equippedWeapon = data.equipped.weapon
+	local weaponEntry = data.equipped.weapon
+	if type(weaponEntry) == "table" then
+		data.equippedWeapon = weaponEntry.id
+	elseif type(weaponEntry) == "string" then
+		data.equippedWeapon = weaponEntry
+	end
 end
 
 function PlayerDataService:ApplyClass(player, classId)
@@ -349,7 +368,6 @@ function PlayerDataService:ApplyClass(player, classId)
 	self:RecalculateStats(player)
 	data.hp = data.combatStats.maxHp
 	data.mana = data.combatStats.maxMana
-	data.equippedWeapon = data.equipped.weapon
 
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
@@ -417,7 +435,6 @@ function PlayerDataService:LoadFromSnapshot(player, snapshot)
 	data.hp = snapshot.hp or 1
 	data.mana = snapshot.mana or 0
 	data.equipped = snapshot.equipped or createEmptyEquipped()
-	data.equippedWeapon = snapshot.equippedWeapon or data.equipped.weapon
 	data.inventory = snapshot.inventory or {}
 	for _, entry in data.inventory do
 		normalizeInventoryEntry(entry)
@@ -430,6 +447,15 @@ function PlayerDataService:LoadFromSnapshot(player, snapshot)
 			normalizeInventoryEntry(migrated)
 			data.equipped[slot] = migrated
 		end
+	end
+	if migrateMissingEquippedSlots(data) then
+		markSaveDirty(player)
+	end
+	data.equippedWeapon = snapshot.equippedWeapon
+	if type(data.equipped.weapon) == "table" then
+		data.equippedWeapon = data.equipped.weapon.id
+	elseif type(data.equipped.weapon) == "string" then
+		data.equippedWeapon = data.equipped.weapon
 	end
 	data.skillLoadout = snapshot.skillLoadout or {}
 	data.quest = snapshot.quest or data.quest
@@ -866,7 +892,9 @@ function PlayerDataService:SetEquippedWeapon(player, weaponId)
 		return false
 	end
 
-	data.equipped.weapon = weaponId
+	local weaponEntry = RarityConfig.GenerateItem(weaponId, "Common")
+	normalizeInventoryEntry(weaponEntry)
+	data.equipped.weapon = weaponEntry
 	data.equippedWeapon = weaponId
 	self:RecalculateStats(player)
 	syncHumanoid(player, data)
@@ -874,7 +902,7 @@ function PlayerDataService:SetEquippedWeapon(player, weaponId)
 	return true
 end
 
-function PlayerDataService:EquipItem(player, itemId)
+function PlayerDataService:EquipItem(player, itemId, uid)
 	local data = self._data[player]
 	if not data or not data.hasSelectedClass then
 		return false, "Select a class first"
@@ -885,14 +913,24 @@ function PlayerDataService:EquipItem(player, itemId)
 		return false, "Item cannot be equipped"
 	end
 
-	-- Find the specific item entry in inventory
+	if itemConfig.classRestriction and data.classId ~= itemConfig.classRestriction then
+		return false, "This item is for " .. itemConfig.classRestriction .. " only"
+	end
+
 	local itemEntry = nil
 	local itemIndex = nil
-	for i, entry in ipairs(data.inventory) do
-		if entry.id == itemId then
-			itemEntry = entry
-			itemIndex = i
-			break
+	if uid then
+		itemEntry, itemIndex = self:GetInventoryEntryByUid(player, uid)
+		if not itemEntry or itemEntry.id ~= itemId then
+			return false, "Item not in inventory"
+		end
+	else
+		for i, entry in ipairs(data.inventory) do
+			if entry.id == itemId then
+				itemEntry = entry
+				itemIndex = i
+				break
+			end
 		end
 	end
 

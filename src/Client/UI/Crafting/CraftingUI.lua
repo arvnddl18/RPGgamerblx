@@ -4,6 +4,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Items = require(Shared.Config.Items)
 local CraftingConfig = require(Shared.Config.CraftingConfig)
 local RarityConfig = require(Shared.Config.RarityConfig)
+local EquipmentSlots = require(Shared.Config.EquipmentSlots)
 
 local CraftingUI = {}
 CraftingUI.__index = CraftingUI
@@ -196,6 +197,32 @@ function CraftingUI:SetVisible(visible)
 	end
 end
 
+function CraftingUI:ApplyOpenContext(context)
+	if not context then
+		return
+	end
+	if context.tab then
+		self._activeTab = context.tab
+		for id, btn in self._tabButtons do
+			btn.BackgroundColor3 = id == context.tab and Color3.fromRGB(80, 100, 180) or Color3.fromRGB(45, 45, 60)
+		end
+	end
+	if context.targetUid then
+		self._selectedTargetUid = context.targetUid
+	end
+	if context.slot then
+		for _, recipe in self._recipes do
+			if recipe.type == "equipmentUpgrade" and recipe.slot == context.slot then
+				if not context.classId or not recipe.classRestriction or recipe.classRestriction == context.classId then
+					self._selectedRecipe = recipe
+					break
+				end
+			end
+		end
+	end
+	self:_updatePreview()
+end
+
 function CraftingUI:_updatePreview()
 	if not self._selectedRecipe then
 		self._preview.Text = "Select a recipe and item."
@@ -224,7 +251,7 @@ function CraftingUI:_updatePreview()
 		end
 	end
 	if not targetEntry then
-		for _, slot in { "weapon", "helmet", "armor", "pants", "boots", "gloves" } do
+		for _, slot in EquipmentSlots.ORDER do
 			local e = self._equipped[slot]
 			if type(e) == "table" and e.uid == self._selectedTargetUid then
 				targetEntry = e
@@ -326,7 +353,7 @@ function CraftingUI:_render()
 						addTargetRow(entry)
 					end
 				end
-				for _, slot in { "weapon", "helmet", "armor", "pants", "boots", "gloves" } do
+				for _, slot in EquipmentSlots.ORDER do
 					local entry = self._equipped[slot]
 					if type(entry) == "table" and entry.uid then
 						local item = Items[entry.id]
