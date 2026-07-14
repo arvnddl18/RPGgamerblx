@@ -128,6 +128,47 @@ local function createBaseBillboard(character, text)
 	return billboard, textLabel
 end
 
+-- Helper to create a BillboardGui at a static Vector3 position
+local function createPositionBillboard(position, text)
+	local part = Instance.new("Part")
+	part.Size = Vector3.new(0.1, 0.1, 0.1)
+	part.Position = position
+	part.Anchored = true
+	part.CanCollide = false
+	part.Transparency = 1
+	part.Parent = workspace.Terrain
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Adornee = part
+	billboard.Size = UDim2.new(4, 0, 2, 0)
+	billboard.StudsOffset = Vector3.new(0, 0, 0)
+	billboard.ExtentsOffset = Vector3.new(0, 0, 0)
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	
+	local textLabel = Instance.new("TextLabel")
+	textLabel.BackgroundTransparency = 1
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+	textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	textLabel.Text = text
+	textLabel.Font = FONT
+	textLabel.TextScaled = true
+	
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.new(0, 0, 0)
+	stroke.Thickness = 2
+	stroke.Parent = textLabel
+	
+	textLabel.Parent = billboard
+	billboard.Parent = part
+	
+	-- Cleanup the invisible part along with the billboard
+	Debris:AddItem(part, 3)
+	
+	return billboard, textLabel
+end
+
 --[[ 
 	1. DAMAGE NUMBERS
 	Shows damage on a character. 
@@ -278,6 +319,49 @@ function FloatingText.ShowExpGain(amount)
 	
 	textLabel.TextColor3 = Color3.fromRGB(150, 100, 255) -- Purple
 	animateScreenText(textLabel, 120) -- Offset to the right
+end
+
+--[[ 
+	6. LOOT DROP
+	Shows floating text for loot in the 3D world at a specific position.
+]]
+function FloatingText.ShowLootDrop(position, itemName, count, rarityColor)
+	local text = "+ " .. tostring(count) .. " " .. itemName
+	local billboard, textLabel = createPositionBillboard(position, text)
+	if not billboard then return end
+	
+	textLabel.TextColor3 = rarityColor or Color3.new(1, 1, 1)
+	
+	-- Add a slight horizontal spread so multiple items don't overlap perfectly
+	local rng = Random.new()
+	local offset = Vector3.new(rng:NextNumber(-1.5, 1.5), rng:NextNumber(-0.5, 1), rng:NextNumber(-1.5, 1.5))
+	billboard.Adornee.Position = billboard.Adornee.Position + offset
+	
+	-- Animate popping up and fading
+	local startScale = UDim2.new(0, 0, 0, 0)
+	local normalScale = UDim2.new(1, 0, 1, 0)
+	
+	textLabel.Size = startScale
+	textLabel.TextTransparency = 0
+	textLabel.UIStroke.Transparency = 0
+	
+	local popTween = TweenService:Create(textLabel, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = normalScale})
+	popTween:Play()
+	
+	popTween.Completed:Connect(function()
+		local floatInfo = TweenInfo.new(2, Enum.EasingStyle.Linear)
+		local endPos = billboard.Adornee.Position + Vector3.new(0, 4, 0)
+		
+		local floatTween = TweenService:Create(billboard.Adornee, floatInfo, {Position = endPos})
+		local fadeTween = TweenService:Create(textLabel, floatInfo, {TextTransparency = 1})
+		local strokeFadeTween = TweenService:Create(textLabel.UIStroke, floatInfo, {Transparency = 1})
+		
+		task.delay(0.5, function()
+			floatTween:Play()
+			fadeTween:Play()
+			strokeFadeTween:Play()
+		end)
+	end)
 end
 
 return FloatingText

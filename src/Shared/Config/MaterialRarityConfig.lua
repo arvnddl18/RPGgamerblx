@@ -1,10 +1,11 @@
 local MaterialRarityConfig = {
 	weights = {
-		{ rarity = "Common", weight = 60 },
-		{ rarity = "Uncommon", weight = 25 },
-		{ rarity = "Rare", weight = 10 },
-		{ rarity = "Epic", weight = 4 },
-		{ rarity = "Legendary", weight = 1 },
+		{ rarity = "Common", weight = 240 },
+		{ rarity = "Uncommon", weight = 100 },
+		{ rarity = "Rare", weight = 40 },
+		{ rarity = "Epic", weight = 16 },
+		{ rarity = "Legendary", weight = 4 },
+		{ rarity = "Mythic", weight = 1 },
 	},
 }
 
@@ -26,3 +27,4 @@ function MaterialRarityConfig.Roll()
 end
 
 return MaterialRarityConfig
+

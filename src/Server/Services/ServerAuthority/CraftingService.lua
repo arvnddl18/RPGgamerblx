@@ -35,7 +35,10 @@ end
 
 function CraftingService:_itemMatchesRecipe(targetEntry, recipe)
 	local itemConfig = Items[targetEntry.id]
-	if not itemConfig or itemConfig.slot ~= recipe.slot then
+	if not itemConfig then
+		return false
+	end
+	if recipe.slot and itemConfig.slot ~= recipe.slot then
 		return false
 	end
 	if recipe.classRestriction and itemConfig.classRestriction ~= recipe.classRestriction then

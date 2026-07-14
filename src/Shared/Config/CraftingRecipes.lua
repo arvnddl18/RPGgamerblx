@@ -20,52 +20,53 @@ local CraftingRecipes = {
 			{ itemId = "ArcaneDust", amount = 1 },
 		},
 	},
-	WarriorWeapon_Upgrade = {
-		id = "WarriorWeapon_Upgrade",
+	AppleJuice = {
+		id = "AppleJuice", type = "consumable", resultItem = "AppleJuice", resultAmount = 1, requiredLevel = 1,
+		materials = { { itemId = "SweetLeaf", amount = 2 } },
+	},
+	RedPotion = {
+		id = "RedPotion", type = "consumable", resultItem = "RedPotion", resultAmount = 1, requiredLevel = 3,
+		materials = { { itemId = "SlimeGel", amount = 3 }, { itemId = "Herb", amount = 1 } },
+	},
+	BluePotion = {
+		id = "BluePotion", type = "consumable", resultItem = "BluePotion", resultAmount = 1, requiredLevel = 3,
+		materials = { { itemId = "ManaRoot", amount = 2 }, { itemId = "WaterDrop", amount = 1 } },
+	},
+	GoldenApple = {
+		id = "GoldenApple", type = "consumable", resultItem = "GoldenApple", resultAmount = 1, requiredLevel = 25,
+		materials = { { itemId = "LifeSeed", amount = 3 }, { itemId = "GoldenIdol", amount = 1 } },
+	},
+	TearsOfTheGoddess = {
+		id = "TearsOfTheGoddess", type = "consumable", resultItem = "TearsOfTheGoddess", resultAmount = 1, requiredLevel = 50,
+		materials = { { itemId = "DragonTear", amount = 2 }, { itemId = "CosmicSpark", amount = 1 }, { itemId = "WorldTreeSap", amount = 1 } },
+	},
+	WarriorEquipment_Upgrade = {
+		id = "WarriorEquipment_Upgrade",
 		type = "equipmentUpgrade",
-		slot = "weapon",
 		classRestriction = "Warrior",
 		materials = { { itemId = "IronOre" } },
 	},
-	WarriorArmor_Upgrade = {
-		id = "WarriorArmor_Upgrade",
+	MageEquipment_Upgrade = {
+		id = "MageEquipment_Upgrade",
 		type = "equipmentUpgrade",
-		slot = "armor",
-		classRestriction = "Warrior",
-		materials = { { itemId = "IronOre" } },
-	},
-	MageWeapon_Upgrade = {
-		id = "MageWeapon_Upgrade",
-		type = "equipmentUpgrade",
-		slot = "weapon",
 		classRestriction = "Mage",
 		materials = { { itemId = "ArcaneDust" } },
 	},
-	MageArmor_Upgrade = {
-		id = "MageArmor_Upgrade",
+	ArcherEquipment_Upgrade = {
+		id = "ArcherEquipment_Upgrade",
 		type = "equipmentUpgrade",
-		slot = "armor",
-		classRestriction = "Mage",
-		materials = { { itemId = "ArcaneDust" } },
-	},
-	ArcherWeapon_Upgrade = {
-		id = "ArcherWeapon_Upgrade",
-		type = "equipmentUpgrade",
-		slot = "weapon",
 		classRestriction = "Archer",
 		materials = { { itemId = "BeastHide" } },
 	},
-	PriestWeapon_Upgrade = {
-		id = "PriestWeapon_Upgrade",
+	PriestEquipment_Upgrade = {
+		id = "PriestEquipment_Upgrade",
 		type = "equipmentUpgrade",
-		slot = "weapon",
 		classRestriction = "Priest",
 		materials = { { itemId = "ArcaneDust" } },
 	},
-	KavalierWeapon_Upgrade = {
-		id = "KavalierWeapon_Upgrade",
+	KavalierEquipment_Upgrade = {
+		id = "KavalierEquipment_Upgrade",
 		type = "equipmentUpgrade",
-		slot = "weapon",
 		classRestriction = "Kavalier",
 		materials = { { itemId = "BeastHide" } },
 	},

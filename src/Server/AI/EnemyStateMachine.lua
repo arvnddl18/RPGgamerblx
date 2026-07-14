@@ -14,6 +14,11 @@ local function getDistance(a, b)
 	return (a - b).Magnitude
 end
 
+local function getFlatDistance(a, b)
+	local v = a - b
+	return math.sqrt(v.X^2 + v.Z^2)
+end
+
 function EnemyStateMachine.InitEnemy(enemy, spawnPosition, config)
 	enemy:SetAttribute("AIState", STATES.Idle)
 	enemy:SetAttribute("SpawnX", spawnPosition.X)
@@ -62,16 +67,39 @@ function EnemyStateMachine.Tick(enemy, humanoid, root, config, context)
 			targetPlayer = nil
 		else
 			local distance = getDistance(root.Position, targetRoot.Position)
+			local flatDistance = getFlatDistance(root.Position, targetRoot.Position)
+			local vertDistance = math.abs(root.Position.Y - targetRoot.Position.Y)
+
 			if distance > (config.aggroRange or 40) * 1.5 then
 				enemy:SetAttribute("AggroTarget", nil)
 				enemy:SetAttribute("AIState", STATES.ReturnHome)
 				targetPlayer = nil
-			elseif distance <= config.attackRange then
+			elseif flatDistance <= config.attackRange and vertDistance < 15 then
 				enemy:SetAttribute("AIState", STATES.Attack)
 				context.tryAttack(enemy, targetPlayer, config)
+				-- Stop moving while attacking to prevent pushing the player constantly
+				if config.isFlying then
+					local alignPos = root:FindFirstChild("FlyAlignPosition")
+					local alignOri = root:FindFirstChild("FlyAlignOrientation")
+					if alignPos and alignOri then
+						alignPos.Position = root.Position
+						alignOri.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z))
+					end
+				else
+					humanoid:MoveTo(root.Position)
+				end
 			else
 				enemy:SetAttribute("AIState", STATES.Chase)
-				humanoid:MoveTo(targetRoot.Position)
+				if config.isFlying then
+					local alignPos = root:FindFirstChild("FlyAlignPosition")
+					local alignOri = root:FindFirstChild("FlyAlignOrientation")
+					if alignPos and alignOri then
+						alignPos.Position = targetRoot.Position
+						alignOri.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z))
+					end
+				else
+					humanoid:MoveTo(targetRoot.Position)
+				end
 			end
 		end
 	end
@@ -80,7 +108,17 @@ function EnemyStateMachine.Tick(enemy, humanoid, root, config, context)
 		if state == STATES.ReturnHome then
 			local flatSpawn = Vector3.new(spawnPos.X, root.Position.Y, spawnPos.Z)
 			if getDistance(root.Position, flatSpawn) > 4 then
-				humanoid:MoveTo(flatSpawn)
+				if config.isFlying then
+					local alignPos = root:FindFirstChild("FlyAlignPosition")
+					local alignOri = root:FindFirstChild("FlyAlignOrientation")
+					if alignPos and alignOri then
+						local targetHome = Vector3.new(spawnPos.X, spawnPos.Y, spawnPos.Z)
+						alignPos.Position = targetHome
+						alignOri.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetHome.X, root.Position.Y, targetHome.Z))
+					end
+				else
+					humanoid:MoveTo(flatSpawn)
+				end
 			else
 				enemy:SetAttribute("AIState", STATES.Idle)
 			end
@@ -91,7 +129,18 @@ function EnemyStateMachine.Tick(enemy, humanoid, root, config, context)
 			enemy:SetAttribute("PatrolTargetX", patrolTarget.X)
 			enemy:SetAttribute("PatrolTargetZ", patrolTarget.Z)
 			enemy:SetAttribute("NextPatrolTime", now + math.random(5, 12))
-			humanoid:MoveTo(Vector3.new(patrolTarget.X, root.Position.Y, patrolTarget.Z))
+			
+			if config.isFlying then
+				local alignPos = root:FindFirstChild("FlyAlignPosition")
+				local alignOri = root:FindFirstChild("FlyAlignOrientation")
+				if alignPos and alignOri then
+					local targetPatrol = Vector3.new(patrolTarget.X, spawnPos.Y, patrolTarget.Z)
+					alignPos.Position = targetPatrol
+					alignOri.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPatrol.X, root.Position.Y, targetPatrol.Z))
+				end
+			else
+				humanoid:MoveTo(Vector3.new(patrolTarget.X, root.Position.Y, patrolTarget.Z))
+			end
 		else
 			enemy:SetAttribute("AIState", STATES.Idle)
 		end

@@ -130,12 +130,7 @@ local function createEmptyData()
 		equippedWeapon = nil,
 		skillLoadout = {},
 		inventory = {},
-		quest = {
-			id = nil,
-			accepted = false,
-			completed = false,
-			progress = 0,
-		},
+		quests = {},
 		pvpMode = "Peaceful",
 		lastCombatTime = nil,
 		karmaPoints = 0,
@@ -247,11 +242,15 @@ local function syncHumanoid(player, data)
 
 	humanoid.MaxHealth = math.max(1, data.combatStats.maxHp)
 	humanoid.Health = math.clamp(data.hp, 0, data.combatStats.maxHp)
-	if character:GetAttribute("IsResting") then
+	if character:GetAttribute("IsResting") or character:GetAttribute("IsStunned") then
 		humanoid.WalkSpeed = 0
 		humanoid.JumpPower = 0
 	else
-		humanoid.WalkSpeed = math.max(0, data.combatStats.movementSpeed)
+		local baseSpeed = math.max(0, data.combatStats.movementSpeed)
+		if character:GetAttribute("IsSlowed") then
+			baseSpeed = math.floor(baseSpeed * 0.8)
+		end
+		humanoid.WalkSpeed = baseSpeed
 		humanoid.JumpPower = 50
 	end
 end
@@ -779,6 +778,11 @@ function PlayerDataService:Damage(player, amount, attacker, skipMitigation, dama
 		end
 		mitigated = math.max(CombatConfig.minDamage, amount - math.floor(res * 0.5))
 	end
+	
+	if player.Character and player.Character:GetAttribute("IsStunned") then
+		mitigated = math.floor(mitigated * 1.2)
+	end
+
 	data.hp = math.max(0, data.hp - mitigated)
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
@@ -1092,6 +1096,34 @@ function PlayerDataService:GetInventory(player)
 	return data and data.inventory or {}
 end
 
+local function ShowItemCollectedIndicator(player, itemName, count, itemColor)
+	local char = player.Character
+	local head = char and char:FindFirstChild("Head")
+	if not head then return end
+
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.new(5, 0, 1, 0)
+	bb.StudsOffset = Vector3.new((math.random()-0.5)*3, 2, (math.random()-0.5)*3)
+	bb.AlwaysOnTop = true
+
+	local label = Instance.new("TextLabel", bb)
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = "+" .. tostring(count) .. " " .. tostring(itemName)
+	label.TextColor3 = itemColor or Color3.new(1, 1, 1)
+	label.TextScaled = true
+	label.Font = Enum.Font.FredokaOne
+	label.TextStrokeTransparency = 0.2
+
+	bb.Parent = head
+
+	local ts = game:GetService("TweenService")
+	ts:Create(bb, TweenInfo.new(2), {StudsOffset = bb.StudsOffset + Vector3.new(0, 4, 0)}):Play()
+	ts:Create(label, TweenInfo.new(2), {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+
+	game.Debris:AddItem(bb, 2)
+end
+
 function PlayerDataService:AddItem(player, itemData, count)
 	local data = self._data[player]
 	local itemId = type(itemData) == "table" and itemData.id or itemData
@@ -1109,12 +1141,13 @@ function PlayerDataService:AddItem(player, itemData, count)
 		for _, entry in data.inventory do
 			local rarityMatch = not stackRarity or (entry.rarity or "Common") == stackRarity
 			if entry.id == itemId and rarityMatch then
-				local maxStack = itemConfig.maxStack or 99
+				local maxStack = 999
 				entry.count = math.min(maxStack, entry.count + count)
 				fireInventoryUpdated(player, data.inventory)
 				markSaveDirty(player)
 				local questService = getQuestService()
 				if questService then questService:OnItemCollected(player, itemId, count) end
+				ShowItemCollectedIndicator(player, itemConfig.name or itemId, count, itemConfig.color)
 				return true
 			end
 		end
@@ -1129,6 +1162,10 @@ function PlayerDataService:AddItem(player, itemData, count)
 	end
 	normalizeInventoryEntry(newEntry)
 
+	if #data.inventory >= 60 then
+		return false, "Inventory full"
+	end
+
 	table.insert(data.inventory, newEntry)
 	fireInventoryUpdated(player, data.inventory)
 	markSaveDirty(player)
@@ -1136,6 +1173,7 @@ function PlayerDataService:AddItem(player, itemData, count)
 	if questService then
 		questService:OnItemCollected(player, itemId, count)
 	end
+	ShowItemCollectedIndicator(player, itemConfig.name or itemId, count, itemConfig.color)
 	return true
 end
 

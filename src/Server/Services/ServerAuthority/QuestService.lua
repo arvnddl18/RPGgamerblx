@@ -18,210 +18,228 @@ function QuestService:Init()
 	Framework:GetRemote("OpenQuestLog")
 end
 
-function QuestService:CreateNPC(cframe)
-	local config = Quests.GoblinMenace
-	local model = Instance.new("Model")
-	model.Name = config.npcName
-
-	local skinColor = Color3.fromRGB(220, 180, 140)
-	local robeColor = Color3.fromRGB(50, 60, 140)
-	local robeDark = Color3.fromRGB(35, 40, 100)
+---------------------------------------------------------------------------
+-- Shared R15 rig builder (same skeleton structure as monster rigs)
+---------------------------------------------------------------------------
+function QuestService:_BuildR15Rig(cframe, skinColor)
 	local mat = Enum.Material.SmoothPlastic
+	local model = Instance.new("Model")
 
-	-- Torso / Robe Body
-	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(2.2, 2.8, 1.4)
-	if typeof(cframe) == "CFrame" then
-		root.CFrame = cframe
-	else
-		root.Position = cframe
+	local function makePart(name, size, canCollide)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.Anchored = true
+		p.CanCollide = canCollide or false
+		p.Color = skinColor
+		p.Material = mat
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Parent = model
+		return p
 	end
-	root.Anchored = true
-	root.CanCollide = true
-	root.Color = robeColor
-	root.Material = Enum.Material.Fabric
-	root.Parent = model
 
-	-- Robe skirt (lower half)
-	local skirt = Instance.new("Part")
-	skirt.Name = "RobeSkirt"
-	skirt.Size = Vector3.new(2.6, 2.0, 1.6)
-	skirt.Color = robeDark
-	skirt.Material = Enum.Material.Fabric
-	skirt.Anchored = true
-	skirt.CanCollide = false
-	skirt.CFrame = root.CFrame * CFrame.new(0, -2.4, 0)
-	skirt.Parent = model
+	local function makeMotor(name, part0, part1, c0, c1)
+		local motor = Instance.new("Motor6D")
+		motor.Name = name
+		motor.Part0 = part0
+		motor.Part1 = part1
+		motor.C0 = c0
+		motor.C1 = c1 or CFrame.new()
+		motor.Parent = part1
+		return motor
+	end
 
-	-- Head
-	local head = Instance.new("Part")
-	head.Name = "Head"
-	head.Shape = Enum.PartType.Ball
-	head.Size = Vector3.new(2, 2, 2)
-	head.Color = skinColor
-	head.Material = mat
-	head.Anchored = true
-	head.CanCollide = false
-	head.CFrame = root.CFrame * CFrame.new(0, 2.2, 0)
-	head.Parent = model
+	---------------------------------------------------------------------------
+	-- Standard R15 part sizes
+	---------------------------------------------------------------------------
+	local hrp          = makePart("HumanoidRootPart", Vector3.new(2, 2, 1), true)
+	hrp.Transparency = 1
 
-	-- Left Eye
-	local leftEye = Instance.new("Part")
-	leftEye.Name = "LeftEye"
-	leftEye.Shape = Enum.PartType.Ball
-	leftEye.Size = Vector3.new(0.3, 0.35, 0.15)
-	leftEye.Color = Color3.fromRGB(60, 100, 200)
-	leftEye.Material = Enum.Material.Neon
-	leftEye.Anchored = true
-	leftEye.CanCollide = false
-	leftEye.CFrame = head.CFrame * CFrame.new(-0.35, 0.1, -0.85)
-	leftEye.Parent = model
+	local lowerTorso   = makePart("LowerTorso",      Vector3.new(2, 0.4, 1))
+	local upperTorso   = makePart("UpperTorso",       Vector3.new(2, 1.6, 1))
+	local head         = makePart("Head",             Vector3.new(2, 1, 1))
 
-	-- Right Eye
-	local rightEye = Instance.new("Part")
-	rightEye.Name = "RightEye"
-	rightEye.Shape = Enum.PartType.Ball
-	rightEye.Size = Vector3.new(0.3, 0.35, 0.15)
-	rightEye.Color = Color3.fromRGB(60, 100, 200)
-	rightEye.Material = Enum.Material.Neon
-	rightEye.Anchored = true
-	rightEye.CanCollide = false
-	rightEye.CFrame = head.CFrame * CFrame.new(0.35, 0.1, -0.85)
-	rightEye.Parent = model
+	local headMesh = Instance.new("SpecialMesh")
+	headMesh.MeshType = Enum.MeshType.Head
+	headMesh.Scale = Vector3.new(1.25, 1.25, 1.25)
+	headMesh.Parent = head
 
-	-- Smile
-	local smile = Instance.new("Part")
-	smile.Name = "Smile"
-	smile.Size = Vector3.new(0.6, 0.12, 0.1)
-	smile.Color = Color3.fromRGB(160, 100, 80)
-	smile.Material = mat
-	smile.Anchored = true
-	smile.CanCollide = false
-	smile.CFrame = head.CFrame * CFrame.new(0, -0.35, -0.9)
-	smile.Parent = model
+	local leftUpperArm  = makePart("LeftUpperArm",  Vector3.new(1, 1.2, 1))
+	local leftLowerArm  = makePart("LeftLowerArm",  Vector3.new(1, 1.2, 1))
+	local leftHand       = makePart("LeftHand",      Vector3.new(1, 0.3, 1))
 
-	-- Beard
-	local beard = Instance.new("Part")
-	beard.Name = "Beard"
-	beard.Size = Vector3.new(1.2, 1.8, 0.6)
-	beard.Color = Color3.fromRGB(200, 200, 210)
-	beard.Material = Enum.Material.Fabric
-	beard.Anchored = true
-	beard.CanCollide = false
-	beard.CFrame = head.CFrame * CFrame.new(0, -1.3, -0.3)
-	beard.Parent = model
+	local rightUpperArm = makePart("RightUpperArm", Vector3.new(1, 1.2, 1))
+	local rightLowerArm = makePart("RightLowerArm", Vector3.new(1, 1.2, 1))
+	local rightHand      = makePart("RightHand",     Vector3.new(1, 0.3, 1))
 
-	-- Wizard Hat (cone shape using 2 parts)
-	local hatBrim = Instance.new("Part")
-	hatBrim.Name = "HatBrim"
-	hatBrim.Shape = Enum.PartType.Cylinder
-	hatBrim.Size = Vector3.new(0.4, 3.2, 3.2)
-	hatBrim.Color = Color3.fromRGB(40, 30, 100)
-	hatBrim.Material = Enum.Material.Fabric
-	hatBrim.Anchored = true
-	hatBrim.CanCollide = false
-	hatBrim.CFrame = head.CFrame * CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(90))
-	hatBrim.Parent = model
+	local leftUpperLeg  = makePart("LeftUpperLeg",  Vector3.new(1, 1.3, 1))
+	local leftLowerLeg  = makePart("LeftLowerLeg",  Vector3.new(1, 1.3, 1))
+	local leftFoot       = makePart("LeftFoot",      Vector3.new(1, 0.3, 1))
 
-	local hatTop = Instance.new("Part")
-	hatTop.Name = "HatTop"
-	hatTop.Size = Vector3.new(1.6, 2.5, 1.6)
-	hatTop.Color = Color3.fromRGB(40, 30, 100)
-	hatTop.Material = Enum.Material.Fabric
-	hatTop.Anchored = true
-	hatTop.CanCollide = false
-	hatTop.CFrame = head.CFrame * CFrame.new(0, 2.2, 0)
-	hatTop.Parent = model
+	local rightUpperLeg = makePart("RightUpperLeg", Vector3.new(1, 1.3, 1))
+	local rightLowerLeg = makePart("RightLowerLeg", Vector3.new(1, 1.3, 1))
+	local rightFoot      = makePart("RightFoot",     Vector3.new(1, 0.3, 1))
 
-	-- Hat star decoration
-	local star = Instance.new("Part")
-	star.Name = "HatStar"
-	star.Shape = Enum.PartType.Ball
-	star.Size = Vector3.new(0.5, 0.5, 0.5)
-	star.Color = Color3.fromRGB(255, 220, 80)
-	star.Material = Enum.Material.Neon
-	star.Anchored = true
-	star.CanCollide = false
-	star.CFrame = hatTop.CFrame * CFrame.new(0, 1.3, 0)
-	star.Parent = model
+	---------------------------------------------------------------------------
+	-- Motor6D joints (standard R15 hierarchy)
+	---------------------------------------------------------------------------
+	makeMotor("Root",          hrp,          lowerTorso,
+		CFrame.new(),               CFrame.new())
+
+	makeMotor("Waist",         lowerTorso,   upperTorso,
+		CFrame.new(0, 0.2, 0),      CFrame.new(0, -0.8, 0))
+
+	makeMotor("Neck",          upperTorso,   head,
+		CFrame.new(0, 0.8, 0),      CFrame.new(0, -0.5, 0))
 
 	-- Left Arm
-	local leftArm = Instance.new("Part")
-	leftArm.Name = "LeftArm"
-	leftArm.Size = Vector3.new(0.9, 2.0, 0.9)
-	leftArm.Color = robeColor
-	leftArm.Material = Enum.Material.Fabric
-	leftArm.Anchored = true
-	leftArm.CanCollide = false
-	leftArm.CFrame = root.CFrame * CFrame.new(-1.55, -0.3, 0)
-	leftArm.Parent = model
+	makeMotor("LeftShoulder",  upperTorso,   leftUpperArm,
+		CFrame.new(-1, 0.5, 0),     CFrame.new(0.5, 0.6, 0))
 
-	-- Left Hand
-	local leftHand = Instance.new("Part")
-	leftHand.Name = "LeftHand"
-	leftHand.Shape = Enum.PartType.Ball
-	leftHand.Size = Vector3.new(0.7, 0.7, 0.7)
-	leftHand.Color = skinColor
-	leftHand.Material = mat
-	leftHand.Anchored = true
-	leftHand.CanCollide = false
-	leftHand.CFrame = leftArm.CFrame * CFrame.new(0, -1.2, 0)
-	leftHand.Parent = model
+	makeMotor("LeftElbow",     leftUpperArm, leftLowerArm,
+		CFrame.new(0, -0.6, 0),     CFrame.new(0, 0.6, 0))
+
+	makeMotor("LeftWrist",     leftLowerArm, leftHand,
+		CFrame.new(0, -0.6, 0),     CFrame.new(0, 0.15, 0))
 
 	-- Right Arm
-	local rightArm = Instance.new("Part")
-	rightArm.Name = "RightArm"
-	rightArm.Size = Vector3.new(0.9, 2.0, 0.9)
-	rightArm.Color = robeColor
-	rightArm.Material = Enum.Material.Fabric
-	rightArm.Anchored = true
-	rightArm.CanCollide = false
-	rightArm.CFrame = root.CFrame * CFrame.new(1.55, -0.3, 0)
-	rightArm.Parent = model
+	makeMotor("RightShoulder", upperTorso,   rightUpperArm,
+		CFrame.new(1, 0.5, 0),      CFrame.new(-0.5, 0.6, 0))
 
-	-- Right Hand
-	local rightHand = Instance.new("Part")
-	rightHand.Name = "RightHand"
-	rightHand.Shape = Enum.PartType.Ball
-	rightHand.Size = Vector3.new(0.7, 0.7, 0.7)
-	rightHand.Color = skinColor
-	rightHand.Material = mat
-	rightHand.Anchored = true
-	rightHand.CanCollide = false
-	rightHand.CFrame = rightArm.CFrame * CFrame.new(0, -1.2, 0)
-	rightHand.Parent = model
+	makeMotor("RightElbow",    rightUpperArm, rightLowerArm,
+		CFrame.new(0, -0.6, 0),     CFrame.new(0, 0.6, 0))
+
+	makeMotor("RightWrist",    rightLowerArm, rightHand,
+		CFrame.new(0, -0.6, 0),     CFrame.new(0, 0.15, 0))
+
+	-- Left Leg
+	makeMotor("LeftHip",       lowerTorso,   leftUpperLeg,
+		CFrame.new(-0.5, -0.2, 0),  CFrame.new(0, 0.65, 0))
+
+	makeMotor("LeftKnee",      leftUpperLeg, leftLowerLeg,
+		CFrame.new(0, -0.65, 0),    CFrame.new(0, 0.65, 0))
+
+	makeMotor("LeftAnkle",     leftLowerLeg, leftFoot,
+		CFrame.new(0, -0.65, 0),    CFrame.new(0, 0.15, 0))
+
+	-- Right Leg
+	makeMotor("RightHip",      lowerTorso,   rightUpperLeg,
+		CFrame.new(0.5, -0.2, 0),   CFrame.new(0, 0.65, 0))
+
+	makeMotor("RightKnee",     rightUpperLeg, rightLowerLeg,
+		CFrame.new(0, -0.65, 0),    CFrame.new(0, 0.65, 0))
+
+	makeMotor("RightAnkle",    rightLowerLeg, rightFoot,
+		CFrame.new(0, -0.65, 0),    CFrame.new(0, 0.15, 0))
+
+	---------------------------------------------------------------------------
+	-- Humanoid (anchored NPC – WalkSpeed 0)
+	---------------------------------------------------------------------------
+	local humanoid = Instance.new("Humanoid")
+	humanoid.RigType = Enum.HumanoidRigType.R15
+	humanoid.MaxHealth = 100
+	humanoid.Health = 100
+	humanoid.WalkSpeed = 0
+	humanoid.HipHeight = 2
+	humanoid.Parent = model
+
+	model.PrimaryPart = hrp
+
+	-- Position the rig
+	local cf = typeof(cframe) == "CFrame" and cframe or CFrame.new(cframe)
+	hrp.CFrame = cf
+
+	return model, hrp, head, rightHand
+end
+
+function QuestService:CreateNPC(cframe)
+	local config = Quests.GoblinMenace
+
+	local robeColor = Color3.fromRGB(50, 60, 140)
+	local skinColor = Color3.fromRGB(220, 180, 140)
+
+	local model, hrp, head, rHand = self:_BuildR15Rig(cframe, skinColor)
+	model.Name = config.npcName
+
+	-- Recolour torso parts to robe colour
+	local upperTorso = model:FindFirstChild("UpperTorso")
+	local lowerTorso = model:FindFirstChild("LowerTorso")
+	if upperTorso then upperTorso.Color = robeColor; upperTorso.Material = Enum.Material.Fabric end
+	if lowerTorso then lowerTorso.Color = robeColor; lowerTorso.Material = Enum.Material.Fabric end
+
+	-- Recolour arms to robe
+	for _, partName in {"LeftUpperArm", "LeftLowerArm", "RightUpperArm", "RightLowerArm"} do
+		local part = model:FindFirstChild(partName)
+		if part then part.Color = robeColor; part.Material = Enum.Material.Fabric end
+	end
+
+	-- Recolour legs to dark robe
+	local robeDark = Color3.fromRGB(35, 40, 100)
+	for _, partName in {"LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg", "RightFoot"} do
+		local part = model:FindFirstChild(partName)
+		if part then part.Color = robeDark; part.Material = Enum.Material.Fabric end
+	end
+
+	---------------------------------------------------------------------------
+	-- Wizard accessories (welded to head / right hand)
+	---------------------------------------------------------------------------
+	local function makeAccessory(name, size, color, material, parent, offset)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.Color = color
+		p.Material = material or Enum.Material.SmoothPlastic
+		p.Anchored = true
+		p.CanCollide = false
+		p.CFrame = parent.CFrame * offset
+		p.Parent = model
+		local w = Instance.new("WeldConstraint")
+		w.Part0 = parent
+		w.Part1 = p
+		w.Parent = p
+		return p
+	end
+
+	-- Beard
+	makeAccessory("Beard", Vector3.new(1.2, 1.0, 0.6),
+		Color3.fromRGB(200, 200, 210), Enum.Material.Fabric,
+		head, CFrame.new(0, -0.8, -0.2))
+
+	-- Wizard Hat
+	local hatBrim = makeAccessory("HatBrim", Vector3.new(0.4, 2.8, 2.8),
+		Color3.fromRGB(40, 30, 100), Enum.Material.Fabric,
+		head, CFrame.new(0, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90)))
+	hatBrim.Shape = Enum.PartType.Cylinder
+
+	local hatTop = makeAccessory("HatTop", Vector3.new(1.4, 2.0, 1.4),
+		Color3.fromRGB(40, 30, 100), Enum.Material.Fabric,
+		head, CFrame.new(0, 1.6, 0))
+
+	local star = makeAccessory("HatStar", Vector3.new(0.5, 0.5, 0.5),
+		Color3.fromRGB(255, 220, 80), Enum.Material.Neon,
+		hatTop, CFrame.new(0, 1.1, 0))
+	star.Shape = Enum.PartType.Ball
 
 	-- Staff in right hand
-	local staff = Instance.new("Part")
-	staff.Name = "Staff"
-	staff.Size = Vector3.new(0.35, 5, 0.35)
-	staff.Color = Color3.fromRGB(110, 80, 50)
-	staff.Material = Enum.Material.Wood
-	staff.Anchored = true
-	staff.CanCollide = false
-	staff.CFrame = rightHand.CFrame * CFrame.new(0, 1.5, 0)
-	staff.Parent = model
+	local staff = makeAccessory("Staff", Vector3.new(0.3, 4.5, 0.3),
+		Color3.fromRGB(110, 80, 50), Enum.Material.Wood,
+		rHand, CFrame.new(0, 2.0, 0))
 
-	-- Staff crystal
-	local crystal = Instance.new("Part")
-	crystal.Name = "StaffCrystal"
+	local crystal = makeAccessory("StaffCrystal", Vector3.new(0.7, 0.7, 0.7),
+		Color3.fromRGB(100, 180, 255), Enum.Material.Neon,
+		staff, CFrame.new(0, 2.5, 0))
 	crystal.Shape = Enum.PartType.Ball
-	crystal.Size = Vector3.new(0.8, 0.8, 0.8)
-	crystal.Color = Color3.fromRGB(100, 180, 255)
-	crystal.Material = Enum.Material.Neon
-	crystal.Anchored = true
-	crystal.CanCollide = false
-	crystal.CFrame = staff.CFrame * CFrame.new(0, 2.8, 0)
-	crystal.Parent = model
 
+	---------------------------------------------------------------------------
 	-- Glowing quest exclamation mark (!)
+	---------------------------------------------------------------------------
 	local questMarker = Instance.new("BillboardGui")
 	questMarker.Name = "QuestMarker"
 	questMarker.Size = UDim2.new(0, 40, 0, 50)
 	questMarker.StudsOffset = Vector3.new(0, 6, 0)
 	questMarker.AlwaysOnTop = true
-	questMarker.Parent = root
+	questMarker.Parent = hrp
 
 	local markerLabel = Instance.new("TextLabel")
 	markerLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -239,7 +257,7 @@ function QuestService:CreateNPC(cframe)
 	billboard.Size = UDim2.new(0, 140, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
 	billboard.AlwaysOnTop = true
-	billboard.Parent = root
+	billboard.Parent = hrp
 
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)
@@ -256,9 +274,8 @@ function QuestService:CreateNPC(cframe)
 	prompt.ObjectText = config.npcName
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 10
-	prompt.Parent = root
+	prompt.Parent = hrp
 
-	model.PrimaryPart = root
 	local npcsFolder = workspace:FindFirstChild("NPCs")
 	if not npcsFolder then
 		npcsFolder = Instance.new("Folder")
@@ -272,35 +289,26 @@ function QuestService:CreateNPC(cframe)
 		if not data then
 			return
 		end
-
-		self._remotes.OpenQuest:FireClient(player, {
-			id = config.id,
-			name = config.name,
-			description = config.description,
-			accepted = data.quest.accepted,
-			completed = data.quest.completed,
-			progress = data.quest.progress,
-			required = Quests.GetRequired(config),
-		})
+		self._remotes.OpenQuest:FireClient(player, config.npcName)
 	end)
 
 	return model
 end
 
-function QuestService:GetQuestConfig(data)
-	if not data or not data.quest.id then
-		return nil
-	end
-	return Quests[data.quest.id]
+function QuestService:GetQuestData(player, questId)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quests then return nil end
+	return data.quests[questId]
 end
 
 function QuestService:CompleteQuest(player, config)
 	local data = self._playerData:GetData(player)
-	if not data then
+	local qData = self:GetQuestData(player, config.id)
+	if not data or not qData then
 		return
 	end
 
-	data.quest.completed = true
+	qData.completed = true
 	local rewards = config.rewards or {}
 	if self._experienceService then
 		self._experienceService:GrantExperience(player, rewards.experience or 0, "quest")
@@ -316,7 +324,7 @@ function QuestService:CompleteQuest(player, config)
 	end
 
 	self._remotes.Notification:FireClient(player, "Quest complete: " .. config.name)
-	self:FireQuestUpdated(player)
+	self:FireQuestUpdated(player, config.id)
 	self._playerData:FireStatsUpdated(player)
 
 	if self._karmaService then
@@ -324,23 +332,19 @@ function QuestService:CompleteQuest(player, config)
 	end
 end
 
-function QuestService:AdvanceQuestProgress(player, amount)
-	local data = self._playerData:GetData(player)
-	if not data or not data.quest.accepted or data.quest.completed then
+function QuestService:AdvanceQuestProgress(player, questId, amount)
+	local qData = self:GetQuestData(player, questId)
+	if not qData or not qData.accepted or qData.completed then
 		return
 	end
 
-	local config = self:GetQuestConfig(data)
+	local config = Quests[questId]
 	if not config then
 		return
 	end
 
-	data.quest.progress += amount or 1
-	self:FireQuestUpdated(player)
-
-	if data.quest.progress >= Quests.GetRequired(config) then
-		self:CompleteQuest(player, config)
-	end
+	qData.progress += amount or 1
+	self:FireQuestUpdated(player, questId)
 end
 
 function QuestService:AcceptQuest(player, questId)
@@ -350,116 +354,109 @@ function QuestService:AcceptQuest(player, questId)
 		return false
 	end
 
-	if data.quest.id == questId and data.quest.completed then
+	if data.level and config.requiredLevel and data.level < config.requiredLevel then
 		return false
 	end
 
-	data.quest.id = questId
-	data.quest.accepted = true
-	data.quest.completed = false
-	data.quest.progress = 0
+	local qData = data.quests[questId]
+	if qData and qData.completed and not config.repeatable then
+		return false
+	end
+
+	data.quests[questId] = {
+		accepted = true,
+		completed = false,
+		progress = 0,
+	}
 	self._playerData:FireStatsUpdated(player)
-	self:FireQuestUpdated(player)
+	self:FireQuestUpdated(player, questId)
 	return true
+end
+
+function QuestService:TurnInQuest(player, questId)
+	local qData = self:GetQuestData(player, questId)
+	local config = Quests[questId]
+	if not qData or not config then return false end
+	
+	if qData.accepted and not qData.completed and qData.progress >= Quests.GetRequired(config) then
+		self:CompleteQuest(player, config)
+		return true
+	end
+	return false
 end
 
 function QuestService:OnEnemyKilled(player, enemyType)
 	local data = self._playerData:GetData(player)
-	if not data or not data.quest.accepted or data.quest.completed then
-		return
+	if not data or not data.quests then return end
+	for qId, qData in pairs(data.quests) do
+		local config = Quests[qId]
+		if config and config.objectiveType == "kill" and config.targetEnemy == enemyType then
+			self:AdvanceQuestProgress(player, qId, 1)
+		end
 	end
-
-	local config = self:GetQuestConfig(data)
-	if not config or config.objectiveType ~= "kill" or config.targetEnemy ~= enemyType then
-		return
-	end
-
-	self:AdvanceQuestProgress(player, 1)
 end
 
 function QuestService:OnItemCollected(player, itemId, count)
 	local data = self._playerData:GetData(player)
-	if not data or not data.quest.accepted or data.quest.completed then
-		return
+	if not data or not data.quests then return end
+	for qId, qData in pairs(data.quests) do
+		local config = Quests[qId]
+		if config and config.objectiveType == "collect" and config.targetItem == itemId then
+			self:AdvanceQuestProgress(player, qId, count or 1)
+		end
 	end
-
-	local config = self:GetQuestConfig(data)
-	if not config or config.objectiveType ~= "collect" or config.targetItem ~= itemId then
-		return
-	end
-
-	self:AdvanceQuestProgress(player, count or 1)
 end
 
 function QuestService:OnTalkToNPC(player, npcName)
 	local data = self._playerData:GetData(player)
-	if not data or not data.quest.accepted or data.quest.completed then
-		return
+	if not data or not data.quests then return end
+	for qId, qData in pairs(data.quests) do
+		local config = Quests[qId]
+		if config and config.objectiveType == "talk" and config.targetNpc == npcName then
+			self:AdvanceQuestProgress(player, qId, 1)
+		end
 	end
-
-	local config = self:GetQuestConfig(data)
-	if not config or config.objectiveType ~= "talk" or config.targetNpc ~= npcName then
-		return
-	end
-
-	self:AdvanceQuestProgress(player, 1)
 end
 
 function QuestService:OnReachZone(player, zoneId)
 	local data = self._playerData:GetData(player)
-	if not data or not data.quest.accepted or data.quest.completed then
-		return
+	if not data or not data.quests then return end
+	for qId, qData in pairs(data.quests) do
+		local config = Quests[qId]
+		if config and config.objectiveType == "reach" and config.targetZone == zoneId then
+			self:AdvanceQuestProgress(player, qId, 1)
+		end
 	end
-
-	local config = self:GetQuestConfig(data)
-	if not config or config.objectiveType ~= "reach" or config.targetZone ~= zoneId then
-		return
-	end
-
-	self:AdvanceQuestProgress(player, 1)
 end
 
-function QuestService:FireQuestUpdated(player)
-	local data = self._playerData:GetData(player)
-	if not data or not data.quest.id then
-		return
-	end
-
-	local config = Quests[data.quest.id]
-	if not config then
-		return
-	end
+function QuestService:FireQuestUpdated(player, questId)
+	local qData = self:GetQuestData(player, questId)
+	if not qData then return end
+	local config = Quests[questId]
+	if not config then return end
 
 	self._remotes.QuestUpdated:FireClient(player, {
-		id = data.quest.id,
+		id = questId,
 		name = config.name,
 		description = config.description,
 		objectiveType = config.objectiveType,
-		accepted = data.quest.accepted,
-		completed = data.quest.completed,
-		progress = data.quest.progress,
+		accepted = qData.accepted,
+		completed = qData.completed,
+		progress = qData.progress,
 		required = Quests.GetRequired(config),
 	})
 end
 
-function QuestService:CreateSimpleNPC(name, cframe, promptText)
-	local model = Instance.new("Model")
+function QuestService:CreateSimpleNPC(name, cframe, promptText, color)
+	local npcColor = color or Color3.fromRGB(100, 120, 180)
+	local model, hrp = self:_BuildR15Rig(cframe, npcColor)
 	model.Name = name
-
-	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(2, 3, 1.5)
-	root.CFrame = typeof(cframe) == "CFrame" and cframe or CFrame.new(cframe)
-	root.Anchored = true
-	root.CanCollide = true
-	root.Color = Color3.fromRGB(100, 120, 180)
-	root.Parent = model
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.new(0, 140, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4, 0)
 	billboard.AlwaysOnTop = true
-	billboard.Parent = root
+	billboard.Parent = hrp
 
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)
@@ -475,9 +472,8 @@ function QuestService:CreateSimpleNPC(name, cframe, promptText)
 	prompt.ObjectText = name
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 10
-	prompt.Parent = root
+	prompt.Parent = hrp
 
-	model.PrimaryPart = root
 	local npcsFolder = workspace:FindFirstChild("NPCs") or Instance.new("Folder")
 	npcsFolder.Name = "NPCs"
 	npcsFolder.Parent = workspace
@@ -519,31 +515,15 @@ function QuestService:Start()
 	herbPrompt.Triggered:Connect(function(player)
 		local data = self._playerData:GetData(player)
 		if not data then return end
-		self._remotes.OpenQuest:FireClient(player, {
-			id = Quests.CollectHerbs.id,
-			name = Quests.CollectHerbs.name,
-			description = Quests.CollectHerbs.description,
-			accepted = data.quest.accepted and data.quest.id == Quests.CollectHerbs.id,
-			completed = data.quest.completed and data.quest.id == Quests.CollectHerbs.id,
-			progress = data.quest.progress,
-			required = Quests.GetRequired(Quests.CollectHerbs),
-		})
+		self._remotes.OpenQuest:FireClient(player, "Herb Master")
 	end)
 
 	local _, elderPrompt = self:CreateSimpleNPC("Village Elder", self._mapGenerator:GetMarketplaceNpcCFrame("VillageElder"), "Talk")
 	elderPrompt.Triggered:Connect(function(player)
 		self:OnTalkToNPC(player, "Village Elder")
 		local data = self._playerData:GetData(player)
-		if data and not data.quest.accepted then
-			self._remotes.OpenQuest:FireClient(player, {
-				id = Quests.TalkToElder.id,
-				name = Quests.TalkToElder.name,
-				description = Quests.TalkToElder.description,
-				accepted = false,
-				completed = data.quest.completed and data.quest.id == Quests.TalkToElder.id,
-				progress = data.quest.progress,
-				required = Quests.GetRequired(Quests.TalkToElder),
-			})
+		if data then
+			self._remotes.OpenQuest:FireClient(player, "Village Elder")
 		end
 	end)
 
@@ -554,23 +534,24 @@ function QuestService:Start()
 	local _, scoutPrompt = self:CreateSimpleNPC("Scout", self._mapGenerator:GetMarketplaceNpcCFrame("Scout"), "Quest")
 	scoutPrompt.Triggered:Connect(function(player)
 		local data = self._playerData:GetData(player)
-		if not data then
-			return
-		end
-		self._remotes.OpenQuest:FireClient(player, {
-			id = Quests.ReachMonument.id,
-			name = Quests.ReachMonument.name,
-			description = Quests.ReachMonument.description,
-			accepted = data.quest.accepted and data.quest.id == Quests.ReachMonument.id,
-			completed = data.quest.completed and data.quest.id == Quests.ReachMonument.id,
-			progress = data.quest.progress,
-			required = Quests.GetRequired(Quests.ReachMonument),
-		})
+		if not data then return end
+		self._remotes.OpenQuest:FireClient(player, "Scout")
 	end)
 
 	self._remotes.AcceptQuest.OnServerEvent:Connect(function(player, questId)
 		if self:AcceptQuest(player, questId) then
 			self._remotes.Notification:FireClient(player, "Quest accepted!")
+		end
+	end)
+
+	if not self._remotes:FindFirstChild("TurnInQuest") then
+		local remote = Instance.new("RemoteEvent")
+		remote.Name = "TurnInQuest"
+		remote.Parent = self._remotes
+	end
+	self._remotes.TurnInQuest.OnServerEvent:Connect(function(player, questId)
+		if self:TurnInQuest(player, questId) then
+			-- Rewards handled inside CompleteQuest
 		end
 	end)
 end

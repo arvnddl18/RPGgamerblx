@@ -1,10 +1,11 @@
 local LootTables = {
 	-- ENHANCEMENT SCROLLS ARE SHOP-ONLY — DO NOT ADD TO ANY LOOT TABLE.
 	GoblinDrops = {
-		{ itemId = "Herb", weight = 40 },
-		{ itemId = "IronOre", weight = 25 },
+		{ itemId = "GoblinCloth", weight = 40 },
+		{ itemId = "Herb", weight = 25 },
 		{ itemId = "HealthPotion", weight = 20 },
-		{ itemId = "IronSword", weight = 5 },
+		{ itemId = "IronSword", weight = 10 },
+		{ itemId = "WolfFang", weight = 5 },
 	},
 	SkeletonDrops = {
 		{ itemId = "Herb", weight = 30 },
@@ -13,25 +14,49 @@ local LootTables = {
 		{ itemId = "ManaPotion", weight = 15 },
 	},
 	OrcDrops = {
-		{ itemId = "IronOre", weight = 35 },
-		{ itemId = "BeastHide", weight = 35 },
-		{ itemId = "HealthPotion", weight = 20 },
-		{ itemId = "IronSword", weight = 10 },
+		{ itemId = "IronOre", weight = 30 },
+		{ itemId = "BeastHide", weight = 30 },
+		{ itemId = "BearClaw", weight = 20 },
+		{ itemId = "HealthPotion", weight = 15 },
+		{ itemId = "WarriorSword", weight = 5 },
 	},
 	WolfDrops = {
-		{ itemId = "BeastHide", weight = 50 },
-		{ itemId = "Herb", weight = 30 },
-		{ itemId = "HealthPotion", weight = 20 },
+		{ itemId = "BeastHide", weight = 45 },
+		{ itemId = "WolfFang", weight = 25 },
+		{ itemId = "Herb", weight = 20 },
+		{ itemId = "SpeedyBootsPotion", weight = 10 },
 	},
 	SpiderDrops = {
-		{ itemId = "BeastHide", weight = 35 },
-		{ itemId = "ArcaneDust", weight = 35 },
-		{ itemId = "ManaPotion", weight = 30 },
+		{ itemId = "SpiderSilk", weight = 40 },
+		{ itemId = "ArcaneDust", weight = 30 },
+		{ itemId = "AntidoteHerb", weight = 20 },
+		{ itemId = "ManaPotion", weight = 10 },
 	},
 	SlimeDrops = {
-		{ itemId = "Herb", weight = 45 },
-		{ itemId = "ArcaneDust", weight = 35 },
-		{ itemId = "ManaPotion", weight = 20 },
+		{ itemId = "SlimeGel", weight = 50 },
+		{ itemId = "Herb", weight = 30 },
+		{ itemId = "ArcaneDust", weight = 15 },
+		{ itemId = "ManaPotion", weight = 5 },
+	},
+	-- ELITE / BOSS TABLES
+	DragonDrops = {
+		{ itemId = "DragonHorn", weight = 40 },
+		{ itemId = "DragonTear", weight = 20 },
+		{ itemId = "StarFragment", weight = 20 },
+		{ itemId = "Starcaller", weight = 10 },
+		{ itemId = "DragonLance", weight = 10 },
+	},
+	WyvernDrops = {
+		{ itemId = "DrakeScale", weight = 40 },
+		{ itemId = "CrystalShard", weight = 30 },
+		{ itemId = "GoldenApple", weight = 20 },
+		{ itemId = "AegisPlate", weight = 10 },
+	},
+	GriffinDrops = {
+		{ itemId = "PhoenixFeather", weight = 40 },
+		{ itemId = "MagicCore", weight = 30 },
+		{ itemId = "Hero's Feast", weight = 20 },
+		{ itemId = "Windpiercer", weight = 10 },
 	},
 }
 

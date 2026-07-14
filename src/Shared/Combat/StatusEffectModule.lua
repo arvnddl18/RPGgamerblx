@@ -11,6 +11,7 @@ StatusEffectModule.EffectTypes = {
 		stackBehavior = "Refresh",
 		disablesInput = true,
 		disablesSkills = true,
+		appliesAttribute = "IsStunned",
 	},
 	Knockdown = {
 		id = "Knockdown",
@@ -18,10 +19,12 @@ StatusEffectModule.EffectTypes = {
 		disablesInput = true,
 		disablesSkills = true,
 		forceRagdoll = true,
+		appliesAttribute = "IsKnockedDown",
 	},
 	Slow = {
 		id = "Slow",
 		stackBehavior = "Refresh",
+		appliesAttribute = "IsSlowed",
 		-- The exact % reduction is defined by the skill/buff applying it
 	},
 	Silence = {

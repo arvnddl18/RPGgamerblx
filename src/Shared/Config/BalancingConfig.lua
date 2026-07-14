@@ -43,7 +43,7 @@ function BalancingConfig.CalculateMonsterExp(level)
 end
 
 function BalancingConfig.GetDifficultyColor(monsterLevel, playerLevel, rarity)
-	if rarity == "Boss" then
+	if rarity == "Mythic" then
 		return BalancingConfig.difficultyColors.boss
 	end
 

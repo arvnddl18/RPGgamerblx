@@ -30,10 +30,7 @@ local COLORS = {
 	success = Color3.fromRGB(65, 120, 75),
 }
 
-local GRID_COLS = 6
-local GRID_ROWS = 6
-local SLOTS_PER_BAG = GRID_COLS * GRID_ROWS
-local BAG_COUNT = 4
+local MAX_INVENTORY_SLOTS = 100
 local SLOT_SIZE = 54
 local SLOT_PAD = 4
 
@@ -160,7 +157,7 @@ function InventoryEquipmentUI.new(playerGui)
 	self._screenGui.Name = "InventoryEquipmentUI"
 	self._screenGui.ResetOnSpawn = false
 	self._screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	self._screenGui.DisplayOrder = 20
+	self._screenGui.DisplayOrder = 100
 	self._screenGui.Parent = playerGui
 
 	self._overlay = Instance.new("TextButton")
@@ -178,9 +175,10 @@ function InventoryEquipmentUI.new(playerGui)
 	self._root.Name = "Root"
 	self._root.AnchorPoint = Vector2.new(0.5, 0.5)
 	self._root.Position = UDim2.fromScale(0.5, 0.5)
-	self._root.Size = UDim2.fromScale(0.92, 0.88)
+	self._root.Size = UDim2.fromScale(1, 1)
 	self._root.BackgroundColor3 = COLORS.panel
 	self._root.BorderSizePixel = 0
+	self._root.Active = true
 	self._root.Visible = false
 	self._root.Parent = self._screenGui
 	addCorner(self._root, 10)
@@ -194,12 +192,13 @@ function InventoryEquipmentUI.new(playerGui)
 	self._closeBtn.TextColor3 = COLORS.text
 	self._closeBtn.Font = Enum.Font.GothamBold
 	self._closeBtn.TextSize = 16
+	self._closeBtn.ZIndex = 10
 	self._closeBtn.Parent = self._root
 	addCorner(self._closeBtn, 6)
 
 	self._inventoryPanel = Instance.new("Frame")
 	self._inventoryPanel.Name = "InventoryPanel"
-	self._inventoryPanel.Size = UDim2.new(0.52, -12, 1, -24)
+	self._inventoryPanel.Size = UDim2.new(0.58, -12, 1, -24)
 	self._inventoryPanel.Position = UDim2.new(0, 12, 0, 12)
 	self._inventoryPanel.BackgroundColor3 = COLORS.panelInner
 	self._inventoryPanel.BorderSizePixel = 0
@@ -286,14 +285,14 @@ function InventoryEquipmentUI.new(playerGui)
 
 	local filterLayout = Instance.new("UIListLayout")
 	filterLayout.FillDirection = Enum.FillDirection.Horizontal
-	filterLayout.Padding = UDim.new(0, 6)
+	filterLayout.Padding = UDim.new(0, 2)
 	filterLayout.Parent = self._filterBar
 
 	self._filterButtons = {}
 	for _, filter in CATEGORY_FILTERS do
 		local btn = Instance.new("TextButton")
 		btn.Name = "Filter_" .. filter.id
-		btn.Size = UDim2.fromOffset(math.max(64, #filter.label * 7 + 16), 26)
+		btn.Size = UDim2.fromOffset(math.max(48, #filter.label * 6 + 10), 24)
 		btn.BackgroundColor3 = filter.id == "all" and COLORS.accent or COLORS.slot
 		btn.Text = filter.label
 		btn.TextColor3 = COLORS.text
@@ -325,59 +324,43 @@ function InventoryEquipmentUI.new(playerGui)
 	self._filterInfo.TextXAlignment = Enum.TextXAlignment.Left
 	self._filterInfo.Parent = self._inventoryPanel
 
-	self._bagBar = Instance.new("Frame")
-	self._bagBar.Size = UDim2.new(1, -24, 0, 32)
-	self._bagBar.Position = UDim2.new(0, 12, 1, -44)
-	self._bagBar.BackgroundTransparency = 1
-	self._bagBar.Parent = self._inventoryPanel
-	self._bagButtons = {}
-
-	for i = 1, BAG_COUNT do
-		local btn = Instance.new("TextButton")
-		btn.Name = "Bag" .. i
-		btn.Size = UDim2.new(0.25, -4, 1, 0)
-		btn.Position = UDim2.new((i - 1) * 0.25, (i - 1) * 4, 0, 0)
-		btn.BackgroundColor3 = i == 1 and COLORS.accent or COLORS.slot
-		btn.Text = "BAG " .. i
-		btn.TextColor3 = COLORS.text
-		btn.Font = Enum.Font.GothamBold
-		btn.TextSize = 11
-		btn.Parent = self._bagBar
-		addCorner(btn, 4)
-		self._bagButtons[i] = btn
-		btn.MouseButton1Click:Connect(function()
-			self:SetActiveBag(i)
-		end)
-	end
-
-	self._gridFrame = Instance.new("Frame")
+	self._gridFrame = Instance.new("ScrollingFrame")
 	self._gridFrame.Name = "Grid"
-	local gridW = GRID_COLS * (SLOT_SIZE + SLOT_PAD) - SLOT_PAD
-	local gridH = GRID_ROWS * (SLOT_SIZE + SLOT_PAD) - SLOT_PAD
-	self._gridFrame.Size = UDim2.fromOffset(gridW, gridH)
+	self._gridFrame.Size = UDim2.new(1, -24, 1, -100)
 	self._gridFrame.AnchorPoint = Vector2.new(0.5, 0)
 	self._gridFrame.Position = UDim2.new(0.5, 0, 0, 92)
 	self._gridFrame.BackgroundTransparency = 1
+	self._gridFrame.BorderSizePixel = 0
+	self._gridFrame.ScrollBarThickness = 6
+	self._gridFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 	self._gridFrame.Parent = self._inventoryPanel
 
+	local gridLayout = Instance.new("UIGridLayout")
+	gridLayout.CellSize = UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE)
+	gridLayout.CellPadding = UDim2.fromOffset(SLOT_PAD, SLOT_PAD)
+	gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	gridLayout.Parent = self._gridFrame
+
+	gridLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		self._gridFrame.CanvasSize = UDim2.new(0, 0, 0, gridLayout.AbsoluteContentSize.Y + 8)
+	end)
+
 	self._inventorySlots = {}
-	for row = 0, GRID_ROWS - 1 do
-		for col = 0, GRID_COLS - 1 do
-			local idx = row * GRID_COLS + col + 1
-			local slot = self:_createSlot(self._gridFrame, {
-				kind = "inventory",
-				index = idx,
-				size = UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE),
-				position = UDim2.fromOffset(col * (SLOT_SIZE + SLOT_PAD), row * (SLOT_SIZE + SLOT_PAD)),
-			})
-			self._inventorySlots[idx] = slot
-		end
+	for idx = 1, MAX_INVENTORY_SLOTS do
+		local slot = self:_createSlot(self._gridFrame, {
+			kind = "inventory",
+			index = idx,
+			size = UDim2.fromOffset(SLOT_SIZE, SLOT_SIZE),
+			position = UDim2.fromOffset(0, 0), -- Position is managed by UIGridLayout
+		})
+		slot.frame.LayoutOrder = idx
+		self._inventorySlots[idx] = slot
 	end
 
 	self._characterPanel = Instance.new("Frame")
 	self._characterPanel.Name = "CharacterPanel"
-	self._characterPanel.Size = UDim2.new(0.48, -12, 1, -24)
-	self._characterPanel.Position = UDim2.new(0.52, 0, 0, 12)
+	self._characterPanel.Size = UDim2.new(0.42, -12, 1, -24)
+	self._characterPanel.Position = UDim2.new(0.58, 0, 0, 12)
 	self._characterPanel.BackgroundColor3 = COLORS.panelInner
 	self._characterPanel.BorderSizePixel = 0
 	self._characterPanel.Parent = self._root
@@ -933,19 +916,17 @@ function InventoryEquipmentUI:_getFilteredInventory()
 	return filtered
 end
 
-function InventoryEquipmentUI:_getBagEntries()
+function InventoryEquipmentUI:_getGridEntries()
 	local flat = self:_getFilteredInventory()
-	local startIdx = (self._activeBag - 1) * SLOTS_PER_BAG + 1
-	local bagEntries = {}
-	for i = 1, SLOTS_PER_BAG do
-		bagEntries[i] = flat[startIdx + i - 1]
+	local gridEntries = {}
+	for i = 1, MAX_INVENTORY_SLOTS do
+		gridEntries[i] = flat[i]
 	end
-	return bagEntries, #flat
+	return gridEntries, #flat
 end
 
 function InventoryEquipmentUI:SetCategoryFilter(filterId)
 	self._categoryFilter = filterId
-	self._activeBag = 1
 	for id, btn in self._filterButtons do
 		btn.BackgroundColor3 = id == filterId and COLORS.accent or COLORS.slot
 	end
@@ -954,7 +935,6 @@ end
 
 function InventoryEquipmentUI:SetRarityFilter(rarityId)
 	self._rarityFilter = rarityId
-	self._activeBag = 1
 	local label = rarityId == "all" and "All" or rarityId
 	self._rarityButton.Text = "Rarity: " .. label .. " ▾"
 	self:Refresh()
@@ -1018,11 +998,11 @@ function InventoryEquipmentUI:_renderSlot(slotData, entry)
 end
 
 function InventoryEquipmentUI:Refresh()
-	local bagEntries, totalCount = self:_getBagEntries()
+	local gridEntries, totalCount = self:_getGridEntries()
 	self:_updateFilterInfo(totalCount)
 
 	for idx, slotData in self._inventorySlots do
-		self:_renderSlot(slotData, bagEntries[idx])
+		self:_renderSlot(slotData, gridEntries[idx])
 	end
 
 	for slotId, slotData in self._equipSlots do
@@ -1032,10 +1012,6 @@ function InventoryEquipmentUI:Refresh()
 		else
 			self:_renderSlot(slotData, nil)
 		end
-	end
-
-	for i, btn in self._bagButtons do
-		btn.BackgroundColor3 = i == self._activeBag and COLORS.accent or COLORS.slot
 	end
 end
 
@@ -1051,11 +1027,6 @@ function InventoryEquipmentUI:SetEquipped(equipped)
 	if self._visible then
 		self:Refresh()
 	end
-end
-
-function InventoryEquipmentUI:SetActiveBag(bagIndex)
-	self._activeBag = math.clamp(bagIndex, 1, BAG_COUNT)
-	self:Refresh()
 end
 
 function InventoryEquipmentUI:SetVisible(visible)

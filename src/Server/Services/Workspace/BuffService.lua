@@ -63,6 +63,14 @@ function BuffService:ApplyEffect(target, effectId, duration, instigator, customI
 		shieldRemaining = extraData and extraData.shieldAmount or nil,
 	}
 
+	if config.appliesAttribute then
+		if target:IsA("Player") and target.Character then
+			target.Character:SetAttribute(config.appliesAttribute, true)
+		elseif typeof(target) == "Instance" then
+			target:SetAttribute(config.appliesAttribute, true)
+		end
+	end
+
 	if config.disablesInput then
 		if target:IsA("Player") and target.Character then
 			target.Character:SetAttribute("IsStunned", true)
@@ -82,6 +90,16 @@ function BuffService:ApplyEffect(target, effectId, duration, instigator, customI
 	if target:IsA("Player") then
 		self._playerData:RecalculateStats(target)
 		self._playerData:FireStatsUpdated(target)
+	end
+
+	local character = target:IsA("Player") and target.Character or (typeof(target) == "Instance" and target)
+	if character and character:IsA("Model") then
+		local ok, Framework = pcall(function() return require(game:GetService("ReplicatedStorage").Shared.Framework) end)
+		if ok then
+			local combatEvent = Framework:GetRemote("CombatEvents")
+			local labelText = string.upper(effectId) .. "!"
+			combatEvent:FireAllClients("Skill", character, labelText)
+		end
 	end
 
 	return true
@@ -186,6 +204,14 @@ function BuffService:RemoveEffect(target, effectId)
 
 	local config = StatusEffectModule.EffectTypes[effectId]
 	self._activeBuffs[target][effectId] = nil
+
+	if config and config.appliesAttribute then
+		if target:IsA("Player") and target.Character then
+			target.Character:SetAttribute(config.appliesAttribute, false)
+		elseif typeof(target) == "Instance" then
+			target:SetAttribute(config.appliesAttribute, false)
+		end
+	end
 
 	if config and config.disablesInput then
 		if target:IsA("Player") and target.Character then

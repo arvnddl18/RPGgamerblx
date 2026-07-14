@@ -22,37 +22,104 @@ EnemyService._enemies = {}
 EnemyService._attackCooldowns = {}
 
 local SPAWN_GROUPS = {
-	-- North forest
-	{ type = "Orc", count = 3, center = Vector3.new(0, 3, -900), radius = 40 },
-	{ type = "Goblin", count = 4, center = Vector3.new(200, 3, -950), radius = 30 },
-	{ type = "Spider", count = 4, center = Vector3.new(-200, 3, -950), radius = 35 },
-	{ type = "Skeleton", count = 3, center = Vector3.new(100, 3, -1100), radius = 30 },
-	{ type = "DireWolf", count = 2, center = Vector3.new(-100, 3, -1100), radius = 40 },
+	---------------------------------------------------------------------------
+	-- ZONE 1: Village outskirts (just outside gates, dist ~750-900)
+	-- Low-level mobs for beginners leaving the village
+	---------------------------------------------------------------------------
+	-- North gate area
+	{ type = "Slime", count = 4, center = Vector3.new(0, 3, -800), radius = 30 },
+	{ type = "Slime", count = 3, center = Vector3.new(80, 3, -820), radius = 25 },
+	-- South gate area
+	{ type = "Slime", count = 4, center = Vector3.new(0, 3, 800), radius = 30 },
+	{ type = "Goblin", count = 3, center = Vector3.new(-80, 3, 820), radius = 25 },
+	-- East gate area
+	{ type = "Slime", count = 3, center = Vector3.new(800, 3, 0), radius = 25 },
+	{ type = "Goblin", count = 3, center = Vector3.new(820, 3, 80), radius = 25 },
+	-- West gate area
+	{ type = "Goblin", count = 4, center = Vector3.new(-800, 3, 0), radius = 30 },
+	{ type = "Slime", count = 3, center = Vector3.new(-820, 3, -80), radius = 25 },
 
-	-- South forest
-	{ type = "Slime", count = 5, center = Vector3.new(0, 3, 900), radius = 25 },
-	{ type = "Goblin", count = 3, center = Vector3.new(200, 3, 950), radius = 30 },
-	{ type = "DireWolf", count = 3, center = Vector3.new(-200, 3, 950), radius = 35 },
+	---------------------------------------------------------------------------
+	-- ZONE 2: Near forests (dist ~900-1100)
+	-- Mid-level mobs roaming the tree lines
+	---------------------------------------------------------------------------
+	-- Northeast forest
+	{ type = "Goblin", count = 3, center = Vector3.new(700, 3, -900), radius = 35 },
+	{ type = "Spider", count = 4, center = Vector3.new(900, 3, -700), radius = 30 },
+	-- Northwest forest
+	{ type = "Spider", count = 3, center = Vector3.new(-700, 3, -900), radius = 30 },
+	{ type = "Goblin", count = 3, center = Vector3.new(-900, 3, -700), radius = 35 },
+	-- Southeast forest
+	{ type = "Goblin", count = 3, center = Vector3.new(700, 3, 900), radius = 35 },
+	{ type = "Spider", count = 4, center = Vector3.new(900, 3, 700), radius = 30 },
+	-- Southwest forest
+	{ type = "Spider", count = 3, center = Vector3.new(-700, 3, 900), radius = 30 },
+	{ type = "Goblin", count = 3, center = Vector3.new(-900, 3, 700), radius = 35 },
 
+	---------------------------------------------------------------------------
+	-- ZONE 3: Deep wilderness (dist ~1000-1300)
+	-- Higher-level mobs in the thick forests
+	---------------------------------------------------------------------------
+	-- North deep forest
+	{ type = "DireWolf", count = 3, center = Vector3.new(0, 3, -1100), radius = 50 },
+	{ type = "Skeleton", count = 3, center = Vector3.new(300, 3, -1050), radius = 35 },
+	{ type = "Spider", count = 3, center = Vector3.new(-300, 3, -1050), radius = 35 },
+	-- South deep forest
+	{ type = "DireWolf", count = 3, center = Vector3.new(0, 3, 1100), radius = 50 },
+	{ type = "Skeleton", count = 3, center = Vector3.new(-300, 3, 1050), radius = 35 },
+	{ type = "Orc", count = 2, center = Vector3.new(300, 3, 1050), radius = 40 },
+	-- East deep forest
+	{ type = "Orc", count = 3, center = Vector3.new(1100, 3, 0), radius = 45 },
+	{ type = "Skeleton", count = 3, center = Vector3.new(1050, 3, 300), radius = 35 },
+	{ type = "DireWolf", count = 2, center = Vector3.new(1050, 3, -300), radius = 40 },
+	-- West deep forest
+	{ type = "Orc", count = 3, center = Vector3.new(-1100, 3, 0), radius = 45 },
+	{ type = "Skeleton", count = 3, center = Vector3.new(-1050, 3, -300), radius = 35 },
+	{ type = "DireWolf", count = 2, center = Vector3.new(-1050, 3, 300), radius = 40 },
+
+	---------------------------------------------------------------------------
+	-- ZONE 4: Mountain foothills & highlands (dist ~1300-1600)
+	-- Elite mobs where terrain gets rocky and high
+	---------------------------------------------------------------------------
+	-- North mountains
+	{ type = "SkeletonKnight", count = 2, center = Vector3.new(0, 3, -1400), radius = 50 },
+	{ type = "Orc", count = 3, center = Vector3.new(400, 3, -1350), radius = 40 },
+	{ type = "Skeleton", count = 3, center = Vector3.new(-400, 3, -1350), radius = 40 },
+	-- South mountains
+	{ type = "SkeletonKnight", count = 2, center = Vector3.new(0, 3, 1400), radius = 50 },
+	{ type = "Orc", count = 3, center = Vector3.new(-400, 3, 1350), radius = 40 },
+	{ type = "DireWolf", count = 3, center = Vector3.new(400, 3, 1350), radius = 40 },
 	-- East mountains
-	{ type = "Orc", count = 2, center = Vector3.new(900, 3, 0), radius = 40 },
-	{ type = "Spider", count = 3, center = Vector3.new(1000, 3, 200), radius = 30 },
-	{ type = "Skeleton", count = 4, center = Vector3.new(1000, 3, -200), radius = 35 },
-
+	{ type = "SkeletonKnight", count = 2, center = Vector3.new(1400, 3, 0), radius = 50 },
+	{ type = "Orc", count = 3, center = Vector3.new(1350, 3, 400), radius = 40 },
 	-- West mountains
-	{ type = "Orc", count = 2, center = Vector3.new(-900, 3, 0), radius = 40 },
-	{ type = "Goblin", count = 4, center = Vector3.new(-1000, 3, 200), radius = 30 },
-	{ type = "Skeleton", count = 3, center = Vector3.new(-1000, 3, -200), radius = 35 },
+	{ type = "SkeletonKnight", count = 2, center = Vector3.new(-1400, 3, 0), radius = 50 },
+	{ type = "Orc", count = 3, center = Vector3.new(-1350, 3, -400), radius = 40 },
 
-	-- Wilderness corners
-	{ type = "DireWolf", count = 3, center = Vector3.new(700, 3, -700), radius = 40 },
-	{ type = "Spider", count = 4, center = Vector3.new(-700, 3, -700), radius = 30 },
-	{ type = "Slime", count = 5, center = Vector3.new(700, 3, 700), radius = 25 },
-	{ type = "Goblin", count = 4, center = Vector3.new(-700, 3, 700), radius = 30 },
+	---------------------------------------------------------------------------
+	-- ZONE 5: Flying monsters (open sky above forests & mountains)
+	-- Wyverns patrol the eastern skies, Griffins the western skies
+	---------------------------------------------------------------------------
+	-- Wyverns — eastern sky (above the east mountains & forests)
+	{ type = "Wyvern", count = 2, center = Vector3.new(1200, 3, -200), radius = 80 },
+	{ type = "Wyvern", count = 2, center = Vector3.new(1000, 3, 500), radius = 70 },
+	-- Griffins — western sky (above the west forests, visible in daylight)
+	{ type = "Griffin", count = 2, center = Vector3.new(-1200, 3, 200), radius = 80 },
+	{ type = "Griffin", count = 2, center = Vector3.new(-1000, 3, -500), radius = 70 },
+	-- Wyvern & Griffin roaming the far corners
+	{ type = "Wyvern", count = 1, center = Vector3.new(600, 3, -1400), radius = 60 },
+	{ type = "Griffin", count = 1, center = Vector3.new(-600, 3, 1400), radius = 60 },
+
+	---------------------------------------------------------------------------
+	-- ZONE 6: Boss area — The Crater (centered at ~800, -600, radius 250)
+	-- The Dragon guards this ancient volcanic crater
+	---------------------------------------------------------------------------
+	{ type = "Dragon", count = 1, center = Vector3.new(800, 3, -600), radius = 40 },
+	-- Minions guarding the crater rim
+	{ type = "SkeletonKnight", count = 2, center = Vector3.new(650, 3, -500), radius = 30 },
+	{ type = "Orc", count = 2, center = Vector3.new(950, 3, -700), radius = 30 },
 }
 
--- Increased aggro range so enemies actively hunt nearby players
-local ACTIVE_AGGRO_RANGE = 40
 
 function EnemyService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
@@ -62,6 +129,7 @@ function EnemyService:Init()
 	self._inventoryService = Framework:GetService("InventoryService")
 	self._karmaService = Framework:GetService("KarmaService")
 	self._experienceService = Framework:GetService("ExperienceService")
+	self._treasureChestService = Framework:GetService("TreasureChestService")
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
 	self._playMonsterAnimRemote = Framework:GetRemote("PlayMonsterAnimation")
 end
@@ -119,252 +187,179 @@ function EnemyService:CreateEnemy(enemyId, position, spawnCenter, spawnRadius)
 	local defense = math.floor(config.defense * rarityConfig.defenseScale)
 	local xpReward = math.floor(config.experienceReward * rarityConfig.xpScale)
 
+	local skinColor = config.color or Color3.fromRGB(80, 160, 60)
+	local mat = Enum.Material.SmoothPlastic
+
 	local model = Instance.new("Model")
 	model.Name = config.name
 
-	local skinColor = config.color or Color3.fromRGB(80, 160, 60)
-	local h, s, v = skinColor:ToHSV()
-	local darkSkin = Color3.fromHSV(h, s, math.max(0, v - 0.2))
-	local mat = Enum.Material.SmoothPlastic
-
-	-- Torso (main body)
-	local torso = Instance.new("Part")
-	torso.Name = "HumanoidRootPart"
-	torso.Size = Vector3.new(2, 2.2, 1.2)
-	torso.Position = position
-	torso.Anchored = false
-	torso.CanCollide = true
-	torso.Color = skinColor
-	torso.Material = mat
-	torso.Parent = model
-
-	-- Head
-	local head = Instance.new("Part")
-	head.Name = "Head"
-	head.Shape = Enum.PartType.Ball
-	head.Size = Vector3.new(2.2, 2.2, 2.2)
-	head.Color = skinColor
-	head.Material = mat
-	head.Anchored = false
-	head.CanCollide = false
-	head.CFrame = torso.CFrame * CFrame.new(0, 2.1, 0)
-	head.Parent = model
-
-	local headWeld = Instance.new("WeldConstraint")
-	headWeld.Part0 = torso
-	headWeld.Part1 = head
-	headWeld.Parent = head
-
-	-- Left Eye
-	local leftEye = Instance.new("Part")
-	leftEye.Name = "LeftEye"
-	leftEye.Shape = Enum.PartType.Ball
-	leftEye.Size = Vector3.new(0.5, 0.55, 0.3)
-	leftEye.Color = Color3.fromRGB(255, 50, 30)
-	leftEye.Material = Enum.Material.Neon
-	leftEye.Anchored = false
-	leftEye.CanCollide = false
-	leftEye.CFrame = head.CFrame * CFrame.new(-0.4, 0.15, -0.85)
-	leftEye.Parent = model
-	local leWeld = Instance.new("WeldConstraint")
-	leWeld.Part0 = head
-	leWeld.Part1 = leftEye
-	leWeld.Parent = leftEye
-
-	-- Right Eye
-	local rightEye = Instance.new("Part")
-	rightEye.Name = "RightEye"
-	rightEye.Shape = Enum.PartType.Ball
-	rightEye.Size = Vector3.new(0.5, 0.55, 0.3)
-	rightEye.Color = Color3.fromRGB(255, 50, 30)
-	rightEye.Material = Enum.Material.Neon
-	rightEye.Anchored = false
-	rightEye.CanCollide = false
-	rightEye.CFrame = head.CFrame * CFrame.new(0.4, 0.15, -0.85)
-	rightEye.Parent = model
-	local reWeld = Instance.new("WeldConstraint")
-	reWeld.Part0 = head
-	reWeld.Part1 = rightEye
-	reWeld.Parent = rightEye
-
-	-- Pupils
-	for _, eyePart in {leftEye, rightEye} do
-		local pupil = Instance.new("Part")
-		pupil.Name = "Pupil"
-		pupil.Shape = Enum.PartType.Ball
-		pupil.Size = Vector3.new(0.2, 0.25, 0.15)
-		pupil.Color = Color3.fromRGB(20, 20, 20)
-		pupil.Material = mat
-		pupil.Anchored = false
-		pupil.CanCollide = false
-		pupil.CFrame = eyePart.CFrame * CFrame.new(0, 0, -0.1)
-		pupil.Parent = model
-		local pWeld = Instance.new("WeldConstraint")
-		pWeld.Part0 = eyePart
-		pWeld.Part1 = pupil
-		pWeld.Parent = pupil
+	---------------------------------------------------------------------------
+	-- Helper: create a part with standard properties
+	---------------------------------------------------------------------------
+	local function makePart(name, size, canCollide)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.Anchored = false
+		p.CanCollide = canCollide or false
+		p.Color = skinColor
+		p.Material = mat
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Parent = model
+		return p
 	end
 
-	-- Mouth (wide grin)
-	local mouth = Instance.new("Part")
-	mouth.Name = "Mouth"
-	mouth.Size = Vector3.new(0.9, 0.2, 0.15)
-	mouth.Color = Color3.fromRGB(30, 30, 30)
-	mouth.Material = mat
-	mouth.Anchored = false
-	mouth.CanCollide = false
-	mouth.CFrame = head.CFrame * CFrame.new(0, -0.4, -0.95)
-	mouth.Parent = model
-	local mWeld = Instance.new("WeldConstraint")
-	mWeld.Part0 = head
-	mWeld.Part1 = mouth
-	mWeld.Parent = mouth
+	---------------------------------------------------------------------------
+	-- Helper: create a Motor6D joint
+	---------------------------------------------------------------------------
+	local function makeMotor(name, part0, part1, c0, c1)
+		local motor = Instance.new("Motor6D")
+		motor.Name = name
+		motor.Part0 = part0
+		motor.Part1 = part1
+		motor.C0 = c0
+		motor.C1 = c1 or CFrame.new()
+		motor.Parent = part1
+		return motor
+	end
 
-	-- Left Ear (pointy)
-	local leftEar = Instance.new("WedgePart")
-	leftEar.Name = "LeftEar"
-	leftEar.Size = Vector3.new(0.3, 0.8, 1.2)
-	leftEar.Color = darkSkin
-	leftEar.Material = mat
-	leftEar.Anchored = false
-	leftEar.CanCollide = false
-	leftEar.CFrame = head.CFrame * CFrame.new(-1.2, 0.2, 0) * CFrame.Angles(0, 0, math.rad(-30))
-	leftEar.Parent = model
-	local learWeld = Instance.new("WeldConstraint")
-	learWeld.Part0 = head
-	learWeld.Part1 = leftEar
-	learWeld.Parent = leftEar
+	---------------------------------------------------------------------------
+	-- Standard R15 part sizes
+	---------------------------------------------------------------------------
+	local hrp       = makePart("HumanoidRootPart", Vector3.new(2, 2, 1), true)
+	hrp.Transparency = 1
 
-	-- Right Ear (pointy)
-	local rightEar = Instance.new("WedgePart")
-	rightEar.Name = "RightEar"
-	rightEar.Size = Vector3.new(0.3, 0.8, 1.2)
-	rightEar.Color = darkSkin
-	rightEar.Material = mat
-	rightEar.Anchored = false
-	rightEar.CanCollide = false
-	rightEar.CFrame = head.CFrame * CFrame.new(1.2, 0.2, 0) * CFrame.Angles(0, 0, math.rad(30))
-	rightEar.Parent = model
-	local rearWeld = Instance.new("WeldConstraint")
-	rearWeld.Part0 = head
-	rearWeld.Part1 = rightEar
-	rearWeld.Parent = rightEar
+	local lowerTorso  = makePart("LowerTorso",      Vector3.new(2, 0.4, 1))
+	local upperTorso  = makePart("UpperTorso",       Vector3.new(2, 1.6, 1))
+	local head        = makePart("Head",             Vector3.new(2, 1, 1))
+
+	-- Add a face mesh so it looks like a standard head
+	local headMesh = Instance.new("SpecialMesh")
+	headMesh.MeshType = Enum.MeshType.Head
+	headMesh.Scale = Vector3.new(1.25, 1.25, 1.25)
+	headMesh.Parent = head
+
+	local leftUpperArm  = makePart("LeftUpperArm",  Vector3.new(1, 1.2, 1))
+	local leftLowerArm  = makePart("LeftLowerArm",  Vector3.new(1, 1.2, 1))
+	local leftHand       = makePart("LeftHand",      Vector3.new(1, 0.3, 1))
+
+	local rightUpperArm = makePart("RightUpperArm", Vector3.new(1, 1.2, 1))
+	local rightLowerArm = makePart("RightLowerArm", Vector3.new(1, 1.2, 1))
+	local rightHand      = makePart("RightHand",     Vector3.new(1, 0.3, 1))
+
+	local leftUpperLeg  = makePart("LeftUpperLeg",  Vector3.new(1, 1.3, 1))
+	local leftLowerLeg  = makePart("LeftLowerLeg",  Vector3.new(1, 1.3, 1))
+	local leftFoot       = makePart("LeftFoot",      Vector3.new(1, 0.3, 1))
+
+	local rightUpperLeg = makePart("RightUpperLeg", Vector3.new(1, 1.3, 1))
+	local rightLowerLeg = makePart("RightLowerLeg", Vector3.new(1, 1.3, 1))
+	local rightFoot      = makePart("RightFoot",     Vector3.new(1, 0.3, 1))
+
+	---------------------------------------------------------------------------
+	-- Motor6D joints (standard R15 hierarchy)
+	---------------------------------------------------------------------------
+	makeMotor("Root",          hrp,          lowerTorso,
+		CFrame.new(),               CFrame.new())
+
+	makeMotor("Waist",         lowerTorso,   upperTorso,
+		CFrame.new(0, 0.2, 0),      CFrame.new(0, -0.8, 0))
+
+	makeMotor("Neck",          upperTorso,   head,
+		CFrame.new(0, 0.8, 0),      CFrame.new(0, -0.5, 0))
 
 	-- Left Arm
-	local leftArm = Instance.new("Part")
-	leftArm.Name = "LeftArm"
-	leftArm.Size = Vector3.new(0.8, 1.8, 0.8)
-	leftArm.Color = skinColor
-	leftArm.Material = mat
-	leftArm.Anchored = false
-	leftArm.CanCollide = false
-	leftArm.CFrame = torso.CFrame * CFrame.new(-1.4, -0.2, 0)
-	leftArm.Parent = model
-	local laWeld = Instance.new("WeldConstraint")
-	laWeld.Part0 = torso
-	laWeld.Part1 = leftArm
-	laWeld.Parent = leftArm
+	makeMotor("LeftShoulder",  upperTorso,   leftUpperArm,
+		CFrame.new(-1, 0.5, 0),     CFrame.new(0.5, 0.6, 0))
+
+	makeMotor("LeftElbow",     leftUpperArm, leftLowerArm,
+		CFrame.new(0, -0.6, 0),     CFrame.new(0, 0.6, 0))
+
+	makeMotor("LeftWrist",     leftLowerArm, leftHand,
+		CFrame.new(0, -0.6, 0),     CFrame.new(0, 0.15, 0))
 
 	-- Right Arm
-	local rightArm = Instance.new("Part")
-	rightArm.Name = "RightArm"
-	rightArm.Size = Vector3.new(0.8, 1.8, 0.8)
-	rightArm.Color = skinColor
-	rightArm.Material = mat
-	rightArm.Anchored = false
-	rightArm.CanCollide = false
-	rightArm.CFrame = torso.CFrame * CFrame.new(1.4, -0.2, 0)
-	rightArm.Parent = model
-	local raWeld = Instance.new("WeldConstraint")
-	raWeld.Part0 = torso
-	raWeld.Part1 = rightArm
-	raWeld.Parent = rightArm
+	makeMotor("RightShoulder", upperTorso,   rightUpperArm,
+		CFrame.new(1, 0.5, 0),      CFrame.new(-0.5, 0.6, 0))
 
-	-- Club weapon in right hand
-	local club = Instance.new("Part")
-	club.Name = "Club"
-	club.Size = Vector3.new(0.5, 2.5, 0.5)
-	club.Color = Color3.fromRGB(100, 70, 40)
-	club.Material = Enum.Material.Wood
-	club.Anchored = false
-	club.CanCollide = false
-	club.CFrame = rightArm.CFrame * CFrame.new(0, -1.5, 0)
-	club.Parent = model
-	local clubWeld = Instance.new("WeldConstraint")
-	clubWeld.Part0 = rightArm
-	clubWeld.Part1 = club
-	clubWeld.Parent = club
+	makeMotor("RightElbow",    rightUpperArm, rightLowerArm,
+		CFrame.new(0, -0.6, 0),     CFrame.new(0, 0.6, 0))
 
-	-- Club head (bulge at end)
-	local clubHead = Instance.new("Part")
-	clubHead.Name = "ClubHead"
-	clubHead.Shape = Enum.PartType.Ball
-	clubHead.Size = Vector3.new(1, 1, 1)
-	clubHead.Color = Color3.fromRGB(80, 55, 30)
-	clubHead.Material = Enum.Material.Wood
-	clubHead.Anchored = false
-	clubHead.CanCollide = false
-	clubHead.CFrame = club.CFrame * CFrame.new(0, -1.3, 0)
-	clubHead.Parent = model
-	local chWeld = Instance.new("WeldConstraint")
-	chWeld.Part0 = club
-	chWeld.Part1 = clubHead
-	chWeld.Parent = clubHead
+	makeMotor("RightWrist",    rightLowerArm, rightHand,
+		CFrame.new(0, -0.6, 0),     CFrame.new(0, 0.15, 0))
 
 	-- Left Leg
-	local leftLeg = Instance.new("Part")
-	leftLeg.Name = "LeftLeg"
-	leftLeg.Size = Vector3.new(0.9, 1.4, 0.9)
-	leftLeg.Color = darkSkin
-	leftLeg.Material = mat
-	leftLeg.Anchored = false
-	leftLeg.CanCollide = false
-	leftLeg.CFrame = torso.CFrame * CFrame.new(-0.55, -1.8, 0)
-	leftLeg.Parent = model
-	local llWeld = Instance.new("WeldConstraint")
-	llWeld.Part0 = torso
-	llWeld.Part1 = leftLeg
-	llWeld.Parent = leftLeg
+	makeMotor("LeftHip",       lowerTorso,   leftUpperLeg,
+		CFrame.new(-0.5, -0.2, 0),  CFrame.new(0, 0.65, 0))
+
+	makeMotor("LeftKnee",      leftUpperLeg, leftLowerLeg,
+		CFrame.new(0, -0.65, 0),    CFrame.new(0, 0.65, 0))
+
+	makeMotor("LeftAnkle",     leftLowerLeg, leftFoot,
+		CFrame.new(0, -0.65, 0),    CFrame.new(0, 0.15, 0))
 
 	-- Right Leg
-	local rightLeg = Instance.new("Part")
-	rightLeg.Name = "RightLeg"
-	rightLeg.Size = Vector3.new(0.9, 1.4, 0.9)
-	rightLeg.Color = darkSkin
-	rightLeg.Material = mat
-	rightLeg.Anchored = false
-	rightLeg.CanCollide = false
-	rightLeg.CFrame = torso.CFrame * CFrame.new(0.55, -1.8, 0)
-	rightLeg.Parent = model
-	local rlWeld = Instance.new("WeldConstraint")
-	rlWeld.Part0 = torso
-	rlWeld.Part1 = rightLeg
-	rlWeld.Parent = rightLeg
+	makeMotor("RightHip",      lowerTorso,   rightUpperLeg,
+		CFrame.new(0.5, -0.2, 0),   CFrame.new(0, 0.65, 0))
 
-	-- Loincloth / Belt
-	local belt = Instance.new("Part")
-	belt.Name = "Belt"
-	belt.Size = Vector3.new(2.2, 0.4, 1.4)
-	belt.Color = Color3.fromRGB(120, 80, 40)
-	belt.Material = Enum.Material.Leather
-	belt.Anchored = false
-	belt.CanCollide = false
-	belt.CFrame = torso.CFrame * CFrame.new(0, -1.0, 0)
-	belt.Parent = model
-	local beltWeld = Instance.new("WeldConstraint")
-	beltWeld.Part0 = torso
-	beltWeld.Part1 = belt
-	beltWeld.Parent = belt
+	makeMotor("RightKnee",     rightUpperLeg, rightLowerLeg,
+		CFrame.new(0, -0.65, 0),    CFrame.new(0, 0.65, 0))
 
+	makeMotor("RightAnkle",    rightLowerLeg, rightFoot,
+		CFrame.new(0, -0.65, 0),    CFrame.new(0, 0.15, 0))
+
+	---------------------------------------------------------------------------
 	-- Humanoid
+	---------------------------------------------------------------------------
 	local humanoid = Instance.new("Humanoid")
+	humanoid.RigType = Enum.HumanoidRigType.R15
 	humanoid.MaxHealth = maxHealth
 	humanoid.Health = maxHealth
-	humanoid.WalkSpeed = config.moveSpeed or 4
-	humanoid.HipHeight = 1.5
+	humanoid.WalkSpeed = config.moveSpeed or 12
+	humanoid.HipHeight = config.isFlying and 12 or 2
 	humanoid.Parent = model
 
-	model.PrimaryPart = torso
+	-- Animator is required for animations; create explicitly to avoid race conditions
+	local animator = Instance.new("Animator")
+	animator.Parent = humanoid
+
+	model.PrimaryPart = hrp
+
+	-- Position the model
+	hrp.CFrame = CFrame.new(position)
+
+	if config.isFlying then
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, false)
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+		humanoid.AutoRotate = false
+
+		local attachment = Instance.new("Attachment")
+		attachment.Name = "AlignAttachment"
+		attachment.Parent = hrp
+
+		local alignPos = Instance.new("AlignPosition")
+		alignPos.Name = "FlyAlignPosition"
+		alignPos.Attachment0 = attachment
+		alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
+		alignPos.MaxForce = 100000
+		alignPos.MaxVelocity = config.moveSpeed or 12
+		alignPos.Responsiveness = 20
+		alignPos.Position = position
+		alignPos.Parent = hrp
+
+		local alignOri = Instance.new("AlignOrientation")
+		alignOri.Name = "FlyAlignOrientation"
+		alignOri.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		alignOri.Attachment0 = attachment
+		alignOri.MaxTorque = 100000
+		alignOri.Responsiveness = 20
+		alignOri.CFrame = hrp.CFrame
+		alignOri.Parent = hrp
+	end
+
 	model:SetAttribute("EnemyType", config.id)
 	model:SetAttribute("Level", config.level or 1)
 	model:SetAttribute("Rarity", config.rarity or "Common")
@@ -453,7 +448,11 @@ function EnemyService:DamageEnemy(enemy, baseDamage, attackerStats, attacker, da
 	local result = DamageCalculator.ComputeHit(baseDamage, attackerStats, targetStats, damageType or "physical")
 
 	if not result.isMiss then
-		health = math.max(0, health - result.damage)
+		local finalDamage = result.damage
+		if enemy:GetAttribute("IsStunned") then
+			finalDamage = math.floor(finalDamage * 1.2)
+		end
+		health = math.max(0, health - finalDamage)
 		enemy:SetAttribute("Health", health)
 
 		if attacker and attacker:IsA("Player") then
@@ -554,6 +553,12 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 		end
 	end
 
+	if config and config.mobType == "Boss" then
+		if self._treasureChestService then
+			self._treasureChestService:SpawnBossChest(deathPosition, enemyId)
+		end
+	end
+
 	local spawnCenter = enemy:GetAttribute("SpawnCenter") or Vector3.new()
 	local spawnRadius = enemy:GetAttribute("SpawnRadius") or 10
 	local respawnTime = enemy:GetAttribute("RespawnTime") or (config and config.respawnTime) or 5
@@ -606,11 +611,60 @@ function EnemyService:RunAI()
 					-- Guard: enemy or target may have been removed during the delay
 					if not enemy.Parent then return end
 					if not targetPlayer.Parent then return end
+					local targetChar = targetPlayer.Character
+					local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+					local enemyRoot = enemy.PrimaryPart
+					if not targetRoot or not enemyRoot then return end
+					
+					local flatDist = math.sqrt((enemyRoot.Position.X - targetRoot.Position.X)^2 + (enemyRoot.Position.Z - targetRoot.Position.Z)^2)
+					local vertDist = math.abs(enemyRoot.Position.Y - targetRoot.Position.Y)
+
+					-- If the player ran completely out of a reasonable dodge range, the attack misses
+					if flatDist > (enemyConfig.attackRange or 6) * 1.5 or vertDist > 20 then
+						return
+					end
 
 					local attack = enemy:GetAttribute("Attack") or enemyConfig.PhysicalDamage
 					self._playerData:Damage(targetPlayer, attack, enemy, false, enemyConfig.damageType)
 
-					if enemyConfig.statusEffect then
+					if enemyConfig.passiveSkill and enemyConfig.passiveSkill.statusEffect then
+						local skill = enemyConfig.passiveSkill
+						local lastProcTime = enemy:GetAttribute("LastPassiveProc") or 0
+						local currentTime = os.time()
+						if currentTime - lastProcTime >= (skill.cooldown or 5) then
+							if math.random(1, 100) <= (skill.procChance or 3) then
+								local BuffService = self._framework:GetService("BuffService")
+								if BuffService then
+									local customIntensity = 1
+									local targetHumanoid = targetPlayer.Character and targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+									if targetHumanoid then
+										local maxHp = targetHumanoid.MaxHealth
+										if skill.statusEffect == "Burn" then
+											customIntensity = math.max(1, math.floor(maxHp * 0.05))
+										elseif skill.statusEffect == "Poison" then
+											customIntensity = math.max(1, math.floor(maxHp * 0.02))
+										elseif skill.statusEffect == "Bleed" then
+											customIntensity = math.max(1, math.floor(maxHp * 0.01))
+										elseif skill.statusEffect == "WindGust" then
+											local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+											local enemyRoot = enemy:FindFirstChild("HumanoidRootPart")
+											if targetRoot and enemyRoot then
+												local direction = (targetRoot.Position - enemyRoot.Position).Unit
+												targetRoot:ApplyImpulse(direction * 1500 + Vector3.new(0, 1000, 0))
+											end
+										end
+									end
+									
+									if skill.statusEffect == "Screech" then
+										BuffService:ApplyEffect(targetPlayer, "Stun", 3, enemy, customIntensity)
+									elseif skill.statusEffect ~= "WindGust" then
+										BuffService:ApplyEffect(targetPlayer, skill.statusEffect, 3, enemy, customIntensity)
+									end
+									enemy:SetAttribute("LastPassiveProc", currentTime)
+								end
+							end
+						end
+					elseif enemyConfig.statusEffect then
 						local BuffService = self._framework:GetService("BuffService")
 						if BuffService then
 							BuffService:ApplyEffect(targetPlayer, enemyConfig.statusEffect, 3, enemy, 1)
