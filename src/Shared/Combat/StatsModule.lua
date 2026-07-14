@@ -17,6 +17,11 @@ StatsModule.DefaultStats = {
 
 	-- Utility
 	healPower = 1.0,    -- Multiplier for outgoing heals
+	physicalLifeSteal = 0, -- Portion of physical damage restored as health
+	magicLifeSteal = 0,    -- Portion of magic damage restored as health
+	-- Priest/support scaling. These affect only friendly skill buffs in SkillService.
+	buffEffectMultiplier = 1.0, -- Multiplies buff stat bonuses and shields granted by the caster
+	buffDurationMultiplier = 1.0, -- Multiplies the duration of friendly buffs cast by the caster
 	movementSpeed = 16,     -- Base roblox walkspeed
 	maxHp = 100,
 	maxMana = 50,

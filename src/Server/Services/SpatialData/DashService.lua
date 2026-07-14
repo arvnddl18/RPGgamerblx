@@ -46,6 +46,9 @@ function DashService:ApplyDash(player, direction)
 	if not root or not humanoid or humanoid.Health <= 0 then
 		return
 	end
+	if character:GetAttribute("IsStunned") or character:GetAttribute("IsKnockedDown") then
+		return
+	end
 
 	if direction.Magnitude < 0.01 then
 		direction = root.CFrame.LookVector
@@ -95,7 +98,7 @@ function DashService:ApplyDash(player, direction)
 	linearVelocity.Parent = root
 
 	while elapsed < DashConfig.duration do
-		if not root.Parent or humanoid.Health <= 0 then
+		if not root.Parent or humanoid.Health <= 0 or character:GetAttribute("IsStunned") or character:GetAttribute("IsKnockedDown") then
 			break
 		end
 		elapsed += task.wait()
@@ -105,7 +108,7 @@ function DashService:ApplyDash(player, direction)
 		linearVelocity:Destroy()
 	end
 
-	if root.Parent then
+	if root.Parent and not character:GetAttribute("IsStunned") and not character:GetAttribute("IsKnockedDown") then
 		local flatTarget = Vector3.new(targetPos.X, root.Position.Y, targetPos.Z)
 		root.CFrame = CFrame.new(flatTarget, flatTarget + direction)
 	end

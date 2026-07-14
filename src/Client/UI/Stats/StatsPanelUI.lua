@@ -1,331 +1,135 @@
+local TweenService = game:GetService("TweenService")
+
 local StatsPanelUI = {}
 StatsPanelUI.__index = StatsPanelUI
 
 local STAT_LINES = {
-	{ key = "level", label = "Level", format = function(v) return tostring(v) end },
-	{ key = "xp", label = "XP", format = function(v, payload) return v .. " / " .. (payload.requiredXp or 0) end },
-	{ key = "hp", label = "HP", format = function(v, payload) return v .. " / " .. (payload.maxHp or 0) end },
-	{ key = "mana", label = "Mana", format = function(v, payload) return v .. " / " .. (payload.maxMana or 0) end },
-	{ key = "shield", label = "Shield", format = function(v) return tostring(v or 0) end },
-	{ key = "physicalAttack", label = "Physical ATK", stat = true },
-	{ key = "magicAttack", label = "Magic ATK", stat = true },
-	{ key = "defense", label = "Defense", stat = true },
-	{ key = "magicalResistance", label = "Magic RES", stat = true },
-	{ key = "critChance", label = "Crit Chance", stat = true, percent = true },
-	{ key = "evasion", label = "Evasion", stat = true, percent = true },
-	{ key = "healPower", label = "Heal Power", stat = true },
-	{ key = "movementSpeed", label = "Move Speed", stat = true },
+	-- Every supported combat stat, grouped in display order to keep offense, defense, and utility easy to scan.
+	{ key = "physicalAttack", label = "Physical ATK" }, { key = "magicAttack", label = "Magic ATK" },
+	{ key = "critChance", label = "Crit Chance", percent = true }, { key = "critDamage", label = "Crit Damage", multiplier = true },
+	{ key = "accuracy", label = "Accuracy", percent = true }, { key = "defense", label = "Physical Defense" },
+	{ key = "magicalResistance", label = "Magic RES" }, { key = "critReduction", label = "Crit Reduction", percent = true },
+	{ key = "evasion", label = "Evasion", percent = true }, { key = "healPower", label = "Heal Power", multiplier = true },
+	{ key = "buffEffectMultiplier", label = "Buff Effect", multiplier = true }, { key = "buffDurationMultiplier", label = "Buff Duration", multiplier = true },
+	{ key = "movementSpeed", label = "Move Speed" }, { key = "maxHp", label = "Max Health" },
+	{ key = "maxMana", label = "Max Mana" }, { key = "hpRegen", label = "HP Regen" },
+	{ key = "manaRegen", label = "Mana Regen" }, { key = "shield", label = "Shield", payload = true },
 }
 
-local function makeButton(parent, text, size, position, color)
-	local btn = Instance.new("TextButton")
-	btn.Size = size
-	btn.Position = position
-	btn.BackgroundColor3 = color or Color3.fromRGB(50, 50, 70)
-	btn.Text = text
-	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.Font = Enum.Font.GothamBold
-	btn.TextSize = 12
-	btn.BorderSizePixel = 0
-	btn.Parent = parent
+local COLORS = {
+	overlay = Color3.fromRGB(0, 0, 0), panel = Color3.fromRGB(28, 22, 18), panelInner = Color3.fromRGB(36, 30, 24),
+	border = Color3.fromRGB(180, 140, 55), borderDim = Color3.fromRGB(80, 65, 35), text = Color3.fromRGB(245, 235, 215),
+	textDim = Color3.fromRGB(180, 170, 150), slot = Color3.fromRGB(35, 28, 23), slotHover = Color3.fromRGB(50, 42, 34),
+	slotSelected = Color3.fromRGB(60, 50, 40), gold = Color3.fromRGB(255, 215, 65), danger = Color3.fromRGB(180, 70, 60),
+	success = Color3.fromRGB(85, 160, 100), blue = Color3.fromRGB(100, 150, 200), mana = Color3.fromRGB(70, 120, 210),
+}
+local FONTS = { Header = Enum.Font.FredokaOne, Body = Enum.Font.Ubuntu, Bold = Enum.Font.GothamBold }
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 6)
-	corner.Parent = btn
-
-	return btn
+local function corner(parent, radius) local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, radius or 8); c.Parent = parent end
+local function stroke(parent, color, thickness) local s = Instance.new("UIStroke"); s.Color = color or COLORS.borderDim; s.Thickness = thickness or 1.5; s.Parent = parent; return s end
+local function pane(parent, name, size, position)
+	local f = Instance.new("Frame"); f.Name = name; f.Size = size; f.Position = position; f.BackgroundColor3 = COLORS.panelInner; f.BorderSizePixel = 0; f.Parent = parent; corner(f, 10); stroke(f, COLORS.borderDim, 2); return f
+end
+local function button(parent, text, color)
+	local b = Instance.new("TextButton"); b.BackgroundColor3 = color or COLORS.slot; b.BorderSizePixel = 0; b.Text = text; b.TextColor3 = COLORS.text; b.Font = FONTS.Header; b.TextSize = 15; b.TextTruncate = Enum.TextTruncate.AtEnd; b.AutoButtonColor = false; b.Parent = parent; corner(b, 8); stroke(b, COLORS.borderDim, 2)
+	b.MouseEnter:Connect(function() TweenService:Create(b, TweenInfo.new(0.16), { BackgroundColor3 = b.BackgroundColor3 == COLORS.danger and Color3.fromRGB(220, 90, 80) or COLORS.slotHover }):Play() end)
+	b.MouseLeave:Connect(function() TweenService:Create(b, TweenInfo.new(0.16), { BackgroundColor3 = color or COLORS.slot }):Play() end)
+	return b
 end
 
 function StatsPanelUI.new(playerGui)
 	local self = setmetatable({}, StatsPanelUI)
-	self._statLabels = {}
-	self._pvpMode = "Peaceful"
-	self._onSetPvpMode = nil
-	self._flagSecondsRemaining = 0
-	self._countdownThread = nil
+	self._statLabels = {}; self._flagSecondsRemaining = 0; self._pvpMode = "Peaceful"
+	local gui = Instance.new("ScreenGui"); gui.Name = "StatsPanelUI"; gui.ResetOnSpawn = false; gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; gui.DisplayOrder = 100; gui.Parent = playerGui; self._screenGui = gui
+	local overlay = Instance.new("TextButton"); overlay.Size = UDim2.fromScale(1, 1); overlay.BackgroundColor3 = COLORS.overlay; overlay.BackgroundTransparency = 0.5; overlay.Text = ""; overlay.AutoButtonColor = false; overlay.Visible = false; overlay.Parent = gui; self._overlay = overlay
+	local root = Instance.new("Frame"); root.Name = "StatsPanel"; root.AnchorPoint = Vector2.new(0.5, 0.5); root.Position = UDim2.fromScale(0.5, 0.5); root.Size = UDim2.fromScale(0.72, 0.76); root.BackgroundColor3 = COLORS.panel; root.BorderSizePixel = 0; root.Active = true; root.Visible = false; root.Parent = gui; corner(root, 12); stroke(root, COLORS.border, 3); self._panel = root
+	local constraint = Instance.new("UISizeConstraint"); constraint.MinSize = Vector2.new(520, 450); constraint.MaxSize = Vector2.new(1120, 780); constraint.Parent = root
+	local close = button(root, "×", COLORS.danger); close.Size = UDim2.fromOffset(40, 40); close.Position = UDim2.new(1, -50, 0, 10); close.TextSize = 22; close.ZIndex = 5; close.MouseButton1Click:Connect(function() self:SetVisible(false) end); overlay.MouseButton1Click:Connect(function() self:SetVisible(false) end)
 
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "StatsPanelUI"
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = playerGui
-	self._screenGui = screenGui
-
-	local iconBtn = Instance.new("TextButton")
-	iconBtn.Name = "StatsIcon"
-	iconBtn.Size = UDim2.new(0, 36, 0, 36)
-	iconBtn.AnchorPoint = Vector2.new(1, 1)
-	iconBtn.Position = UDim2.new(1, -16, 1, -16)
-	iconBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	iconBtn.BackgroundTransparency = 0.15
-	iconBtn.Text = "S"
-	iconBtn.TextColor3 = Color3.fromRGB(255, 220, 100)
-	iconBtn.Font = Enum.Font.GothamBold
-	iconBtn.TextSize = 16
-	iconBtn.Visible = false
-	iconBtn.Parent = screenGui
-	self._iconBtn = iconBtn
-
-	local iconCorner = Instance.new("UICorner")
-	iconCorner.CornerRadius = UDim.new(0, 8)
-	iconCorner.Parent = iconBtn
-
-	local panel = Instance.new("Frame")
-	panel.Name = "StatsPanel"
-	panel.Size = UDim2.new(0, 240, 0, 440)
-	panel.AnchorPoint = Vector2.new(1, 1)
-	panel.Position = UDim2.new(1, -16, 1, -60)
-	panel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	panel.BackgroundTransparency = 0.15
-	panel.BorderSizePixel = 0
-	panel.Visible = false
-	panel.Parent = screenGui
-	self._panel = panel
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = panel
-
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -16, 0, 28)
-	title.Position = UDim2.new(0, 8, 0, 8)
-	title.BackgroundTransparency = 1
-	title.Text = "Character Stats"
-	title.TextColor3 = Color3.new(1, 1, 1)
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 16
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = panel
-
-	local classLabel = Instance.new("TextLabel")
-	classLabel.Name = "ClassLabel"
-	classLabel.Size = UDim2.new(1, -16, 0, 18)
-	classLabel.Position = UDim2.new(0, 8, 0, 34)
-	classLabel.BackgroundTransparency = 1
-	classLabel.Text = ""
-	classLabel.TextColor3 = Color3.fromRGB(180, 200, 255)
-	classLabel.Font = Enum.Font.Gotham
-	classLabel.TextSize = 12
-	classLabel.TextXAlignment = Enum.TextXAlignment.Left
-	classLabel.Parent = panel
-	self._classLabel = classLabel
-
-	local scroll = Instance.new("ScrollingFrame")
-	scroll.Name = "StatList"
-	scroll.Size = UDim2.new(1, -16, 0, 230)
-	scroll.Position = UDim2.new(0, 8, 0, 56)
-	scroll.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-	scroll.BackgroundTransparency = 0.3
-	scroll.BorderSizePixel = 0
-	scroll.ScrollBarThickness = 4
-	scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	scroll.Parent = panel
-
-	local scrollCorner = Instance.new("UICorner")
-	scrollCorner.CornerRadius = UDim.new(0, 6)
-	scrollCorner.Parent = scroll
-
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 4)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = scroll
-
-	for i, line in STAT_LINES do
-		local row = Instance.new("TextLabel")
-		row.Name = line.key
-		row.Size = UDim2.new(1, -8, 0, 18)
-		row.BackgroundTransparency = 1
-		row.Text = line.label .. ": --"
-		row.TextColor3 = Color3.fromRGB(210, 210, 230)
-		row.Font = Enum.Font.Gotham
-		row.TextSize = 11
-		row.TextXAlignment = Enum.TextXAlignment.Left
-		row.LayoutOrder = i
-		row.Parent = scroll
-		self._statLabels[line.key] = { row = row, config = line }
+	local overview = pane(root, "OverviewPane", UDim2.new(0.36, -16, 1, -24), UDim2.new(0, 12, 0, 12))
+	local heading = Instance.new("TextLabel"); heading.Size = UDim2.new(1, -24, 0, 40); heading.Position = UDim2.new(0, 12, 0, 12); heading.BackgroundTransparency = 1; heading.Text = "CHARACTER"; heading.TextColor3 = COLORS.gold; heading.Font = FONTS.Header; heading.TextSize = 22; heading.TextXAlignment = Enum.TextXAlignment.Left; heading.Parent = overview
+	local class = Instance.new("TextLabel"); class.Size = UDim2.new(1, -24, 0, 28); class.Position = UDim2.new(0, 12, 0, 54); class.BackgroundTransparency = 1; class.Text = "Unknown Class"; class.TextColor3 = COLORS.blue; class.Font = FONTS.Header; class.TextSize = 18; class.TextXAlignment = Enum.TextXAlignment.Left; class.TextTruncate = Enum.TextTruncate.AtEnd; class.Parent = overview; self._classLabel = class
+	local level = Instance.new("TextLabel"); level.Size = UDim2.new(1, -24, 0, 28); level.Position = UDim2.new(0, 12, 0, 87); level.BackgroundTransparency = 1; level.Text = "Level 0"; level.TextColor3 = COLORS.text; level.Font = FONTS.Bold; level.TextSize = 16; level.TextXAlignment = Enum.TextXAlignment.Left; level.Parent = overview; self._levelLabel = level
+	local resources = Instance.new("Frame"); resources.Size = UDim2.new(1, -24, 0, 190); resources.Position = UDim2.new(0, 12, 0, 129); resources.BackgroundColor3 = COLORS.slot; resources.BorderSizePixel = 0; resources.Parent = overview; corner(resources, 8); stroke(resources, COLORS.borderDim, 1.5)
+	local resourceTitle = Instance.new("TextLabel"); resourceTitle.Size = UDim2.new(1, -20, 0, 28); resourceTitle.Position = UDim2.new(0, 10, 0, 8); resourceTitle.BackgroundTransparency = 1; resourceTitle.Text = "RESOURCES"; resourceTitle.TextColor3 = COLORS.text; resourceTitle.Font = FONTS.Header; resourceTitle.TextSize = 16; resourceTitle.TextXAlignment = Enum.TextXAlignment.Left; resourceTitle.Parent = resources
+	local function resourceLine(name, color, y)
+		local label = Instance.new("TextLabel"); label.Size = UDim2.new(1, -20, 0, 18); label.Position = UDim2.new(0, 10, 0, y); label.BackgroundTransparency = 1; label.TextColor3 = COLORS.text; label.Font = FONTS.Body; label.TextSize = 14; label.TextXAlignment = Enum.TextXAlignment.Left; label.Parent = resources
+		local back = Instance.new("Frame"); back.Size = UDim2.new(1, -20, 0, 12); back.Position = UDim2.new(0, 10, 0, y + 19); back.BackgroundColor3 = Color3.fromRGB(20, 16, 14); back.BorderSizePixel = 0; back.Parent = resources; corner(back, 4)
+		local fill = Instance.new("Frame"); fill.Size = UDim2.new(); fill.BackgroundColor3 = color; fill.BorderSizePixel = 0; fill.Parent = back; corner(fill, 4)
+		return { label = label, fill = fill, name = name }
 	end
+	self._hp = resourceLine("HP", COLORS.danger, 40); self._mana = resourceLine("MANA", COLORS.mana, 76); self._xp = resourceLine("XP", COLORS.gold, 112); self._masteryXp = resourceLine("MASTERY XP", COLORS.blue, 148)
+	local karma = Instance.new("TextLabel"); karma.Size = UDim2.new(1, -24, 0, 20); karma.Position = UDim2.new(0, 12, 0, 334); karma.BackgroundTransparency = 1; karma.TextColor3 = COLORS.textDim; karma.Font = FONTS.Body; karma.TextSize = 14; karma.TextXAlignment = Enum.TextXAlignment.Left; karma.TextTruncate = Enum.TextTruncate.AtEnd; karma.Parent = overview; self._karmaLabel = karma
+	local pk = karma:Clone(); pk.Position = UDim2.new(0, 12, 0, 358); pk.Text = "PK Count: 0"; pk.Parent = overview; self._pkLabel = pk
+	local flag = karma:Clone(); flag.Position = UDim2.new(0, 12, 0, 382); flag.TextColor3 = Color3.fromRGB(225, 125, 225); flag.Font = FONTS.Bold; flag.Visible = false; flag.Parent = overview; self._flagLabel = flag
 
-	local pvpLabel = Instance.new("TextLabel")
-	pvpLabel.Size = UDim2.new(1, -16, 0, 18)
-	pvpLabel.Position = UDim2.new(0, 8, 1, -134)
-	pvpLabel.BackgroundTransparency = 1
-	pvpLabel.Text = "PvP Mode"
-	pvpLabel.TextColor3 = Color3.fromRGB(255, 200, 120)
-	pvpLabel.Font = Enum.Font.GothamBold
-	pvpLabel.TextSize = 12
-	pvpLabel.TextXAlignment = Enum.TextXAlignment.Left
-	pvpLabel.Parent = panel
-
-	self._peacefulBtn = makeButton(panel, "Peaceful", UDim2.new(0.48, -6, 0, 26), UDim2.new(0, 8, 1, -112), Color3.fromRGB(50, 100, 70))
-	self._hostileBtn = makeButton(panel, "Hostile", UDim2.new(0.48, -6, 0, 26), UDim2.new(0.52, 0, 1, -112), Color3.fromRGB(120, 50, 50))
-
-	local karmaLabel = Instance.new("TextLabel")
-	karmaLabel.Name = "KarmaLabel"
-	karmaLabel.Size = UDim2.new(1, -16, 0, 16)
-	karmaLabel.Position = UDim2.new(0, 8, 1, -78)
-	karmaLabel.BackgroundTransparency = 1
-	karmaLabel.Text = "Karma: Innocent"
-	karmaLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
-	karmaLabel.Font = Enum.Font.Gotham
-	karmaLabel.TextSize = 11
-	karmaLabel.TextXAlignment = Enum.TextXAlignment.Left
-	karmaLabel.Parent = panel
-	self._karmaLabel = karmaLabel
-
-	local pkLabel = Instance.new("TextLabel")
-	pkLabel.Name = "PkLabel"
-	pkLabel.Size = UDim2.new(1, -16, 0, 16)
-	pkLabel.Position = UDim2.new(0, 8, 1, -60)
-	pkLabel.BackgroundTransparency = 1
-	pkLabel.Text = "PK Count: 0"
-	pkLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
-	pkLabel.Font = Enum.Font.Gotham
-	pkLabel.TextSize = 11
-	pkLabel.TextXAlignment = Enum.TextXAlignment.Left
-	pkLabel.Parent = panel
-	self._pkLabel = pkLabel
-
-	local flagLabel = Instance.new("TextLabel")
-	flagLabel.Name = "FlagLabel"
-	flagLabel.Size = UDim2.new(1, -16, 0, 16)
-	flagLabel.Position = UDim2.new(0, 8, 1, -42)
-	flagLabel.BackgroundTransparency = 1
-	flagLabel.Text = ""
-	flagLabel.TextColor3 = Color3.fromRGB(200, 80, 200)
-	flagLabel.Font = Enum.Font.GothamBold
-	flagLabel.TextSize = 11
-	flagLabel.TextXAlignment = Enum.TextXAlignment.Left
-	flagLabel.Visible = false
-	flagLabel.Parent = panel
-	self._flagLabel = flagLabel
-
-	self._peacefulBtn.MouseButton1Click:Connect(function()
-		if self._onSetPvpMode then
-			self._onSetPvpMode("Peaceful")
-		end
-	end)
-
-	self._hostileBtn.MouseButton1Click:Connect(function()
-		if self._onSetPvpMode then
-			self._onSetPvpMode("Hostile")
-		end
-	end)
-
-	iconBtn.MouseButton1Click:Connect(function()
-		self:TogglePanel()
-	end)
-
+	local detail = pane(root, "StatsPane", UDim2.new(0.64, -20, 1, -24), UDim2.new(0.36, 4, 0, 12))
+	local detailTitle = Instance.new("TextLabel"); detailTitle.Size = UDim2.new(1, -82, 0, 40); detailTitle.Position = UDim2.new(0, 16, 0, 12); detailTitle.BackgroundTransparency = 1; detailTitle.Text = "COMBAT STATS"; detailTitle.TextColor3 = COLORS.gold; detailTitle.Font = FONTS.Header; detailTitle.TextSize = 22; detailTitle.TextXAlignment = Enum.TextXAlignment.Left; detailTitle.Parent = detail
+	local scroll = Instance.new("ScrollingFrame"); scroll.Name = "StatList"; scroll.Size = UDim2.new(1, -32, 1, -146); scroll.Position = UDim2.new(0, 16, 0, 58); scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0; scroll.ScrollBarThickness = 8; scroll.ScrollBarImageColor3 = COLORS.gold; scroll.CanvasSize = UDim2.new(); scroll.Parent = detail
+	local layout = Instance.new("UIGridLayout"); layout.CellSize = UDim2.new(0.5, -5, 0, 38); layout.CellPadding = UDim2.new(0, 8, 0, 8); layout.FillDirectionMaxCells = 2; layout.SortOrder = Enum.SortOrder.LayoutOrder; layout.Parent = scroll; layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8) end)
+	for _, line in STAT_LINES do
+		local row = Instance.new("Frame"); row.Size = UDim2.new(); row.BackgroundColor3 = COLORS.slot; row.BorderSizePixel = 0; row.Parent = scroll; corner(row, 7); stroke(row, COLORS.borderDim, 1.5)
+		local label = Instance.new("TextLabel"); label.Size = UDim2.new(0.64, -8, 1, 0); label.Position = UDim2.new(0, 8, 0, 0); label.BackgroundTransparency = 1; label.Text = line.label; label.TextColor3 = COLORS.textDim; label.Font = FONTS.Body; label.TextSize = 13; label.TextXAlignment = Enum.TextXAlignment.Left; label.TextTruncate = Enum.TextTruncate.AtEnd; label.Parent = row
+		local value = Instance.new("TextLabel"); value.Size = UDim2.new(0.36, -8, 1, 0); value.Position = UDim2.new(0.64, 0, 0, 0); value.BackgroundTransparency = 1; value.Text = "--"; value.TextColor3 = COLORS.text; value.Font = FONTS.Bold; value.TextSize = 14; value.TextXAlignment = Enum.TextXAlignment.Right; value.TextTruncate = Enum.TextTruncate.AtEnd; value.Parent = row
+		self._statLabels[line.key] = { value = value, config = line }
+	end
+	local pvpTitle = Instance.new("TextLabel"); pvpTitle.Size = UDim2.new(1, -32, 0, 20); pvpTitle.Position = UDim2.new(0, 16, 1, -78); pvpTitle.BackgroundTransparency = 1; pvpTitle.Text = "PVP MODE"; pvpTitle.TextColor3 = COLORS.text; pvpTitle.Font = FONTS.Header; pvpTitle.TextSize = 16; pvpTitle.TextXAlignment = Enum.TextXAlignment.Left; pvpTitle.Parent = detail
+	self._peacefulBtn = button(detail, "PEACEFUL", COLORS.success); self._peacefulBtn.Size = UDim2.new(0.48, 0, 0, 38); self._peacefulBtn.Position = UDim2.new(0, 16, 1, -52)
+	self._hostileBtn = button(detail, "HOSTILE", COLORS.danger); self._hostileBtn.Size = UDim2.new(0.48, 0, 0, 38); self._hostileBtn.Position = UDim2.new(0.52, -16, 1, -52)
+	self._peacefulBtn.MouseButton1Click:Connect(function() if self._onSetPvpMode then self._onSetPvpMode("Peaceful") end end)
+	self._hostileBtn.MouseButton1Click:Connect(function() if self._onSetPvpMode then self._onSetPvpMode("Hostile") end end)
 	return self
 end
 
-function StatsPanelUI:OnSetPvpMode(callback)
-	self._onSetPvpMode = callback
-end
-
-function StatsPanelUI:SetHudVisible(visible)
-	self._iconBtn.Visible = visible
-	if not visible then
-		self._panel.Visible = false
-	end
-end
-
-function StatsPanelUI:TogglePanel()
-	self._panel.Visible = not self._panel.Visible
-end
-
+function StatsPanelUI:OnSetPvpMode(callback) self._onSetPvpMode = callback end
+function StatsPanelUI:SetHudVisible(visible) if not visible then self:SetVisible(false) end end
+function StatsPanelUI:TogglePanel() self:SetVisible(not self._panel.Visible) end
 function StatsPanelUI:SetVisible(visible)
-	self._panel.Visible = visible
+	if visible then self._overlay.Visible = true; self._panel.Visible = true; self._panel.Size = UDim2.fromScale(0.67, 0.71); TweenService:Create(self._panel, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(0.72, 0.76) }):Play()
+	else self._overlay.Visible = false; self._panel.Visible = false end
 end
-
 function StatsPanelUI:UpdatePvpButtons(mode)
 	self._pvpMode = mode or "Peaceful"
-	self._peacefulBtn.BackgroundColor3 = self._pvpMode == "Peaceful"
-		and Color3.fromRGB(50, 100, 70) or Color3.fromRGB(50, 50, 70)
-	self._hostileBtn.BackgroundColor3 = self._pvpMode == "Hostile"
-		and Color3.fromRGB(120, 50, 50) or Color3.fromRGB(50, 50, 70)
+	self._peacefulBtn.BackgroundColor3 = self._pvpMode == "Peaceful" and COLORS.success or COLORS.slot
+	self._hostileBtn.BackgroundColor3 = self._pvpMode == "Hostile" and COLORS.danger or COLORS.slot
 end
-
-local function formatFlagTime(seconds)
-	local mins = math.floor(seconds / 60)
-	local secs = seconds % 60
-	return string.format("%d:%02d", mins, secs)
-end
-
+local function flagTime(seconds) return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60) end
 function StatsPanelUI:UpdateKarmaDisplay(payload)
-	local karmaPoints = payload.karmaPoints or 0
-	local pkCount = payload.pkCount or 0
-	local karmaState = payload.karmaState or "Innocent"
-	local displayState = karmaState == "Chaotic" and "Outlaw" or "Innocent"
-
-	self._karmaLabel.Text = string.format("Karma: %s (%d pts)", displayState, karmaPoints)
-	self._pkLabel.Text = "PK Count: " .. tostring(pkCount)
-
+	local state = payload.karmaState == "Chaotic" and "Outlaw" or "Innocent"
+	self._karmaLabel.Text = string.format("Karma: %s (%d pts)", state, payload.karmaPoints or 0)
+	self._pkLabel.Text = "PK Count: " .. tostring(payload.pkCount or 0)
 	self._flagSecondsRemaining = payload.karmaFlagSecondsRemaining or 0
-	if self._flagSecondsRemaining > 0 then
-		self._flagLabel.Visible = true
-		self._flagLabel.Text = "Outlaw timer: " .. formatFlagTime(self._flagSecondsRemaining)
-	else
-		self._flagLabel.Visible = false
-		self._flagLabel.Text = ""
-	end
+	self._flagLabel.Visible = self._flagSecondsRemaining > 0
+	self._flagLabel.Text = self._flagSecondsRemaining > 0 and "Outlaw timer: " .. flagTime(self._flagSecondsRemaining) or ""
 end
-
 function StatsPanelUI:StartFlagCountdown()
-	if self._countdownThread then
-		return
-	end
+	if self._countdownThread then return end
 	self._countdownThread = task.spawn(function()
-		while self._screenGui.Parent do
-			task.wait(1)
-			if self._flagSecondsRemaining > 0 then
-				self._flagSecondsRemaining -= 1
-				if self._flagSecondsRemaining > 0 then
-					self._flagLabel.Text = "Outlaw timer: " .. formatFlagTime(self._flagSecondsRemaining)
-				else
-					self._flagLabel.Visible = false
-					self._flagLabel.Text = ""
-				end
-			end
-		end
+		while self._screenGui.Parent do task.wait(1); if self._flagSecondsRemaining > 0 then self._flagSecondsRemaining -= 1; self._flagLabel.Visible = self._flagSecondsRemaining > 0; self._flagLabel.Text = self._flagSecondsRemaining > 0 and "Outlaw timer: " .. flagTime(self._flagSecondsRemaining) or "" end end
 	end)
 end
-
-function StatsPanelUI:Update(payload, classesConfig)
-	if not payload then
-		return
-	end
-
-	local className = payload.classId
-	if classesConfig and classesConfig[payload.classId] then
-		className = classesConfig[payload.classId].displayName
-	end
-	self._classLabel.Text = className or "Unknown Class"
-
-	for key, entry in self._statLabels do
-		local line = entry.config
-		local value
-		if line.stat then
-			value = payload.combatStats and payload.combatStats[key]
-		else
-			value = payload[key]
-		end
-
-		if value ~= nil then
-			local text
-			if line.format then
-				text = line.format(value, payload)
-			elseif line.percent then
-				text = string.format("%.0f%%", value * 100)
-			else
-				text = tostring(math.floor(value * 10) / 10)
-			end
-			entry.row.Text = line.label .. ": " .. text
-		end
-	end
-
-	self:UpdatePvpButtons(payload.pvpMode)
-	self:UpdateKarmaDisplay(payload)
-	self:StartFlagCountdown()
+local function updateResource(resource, current, maximum)
+	current, maximum = current or 0, math.max(maximum or 0, 1)
+	resource.label.Text = resource.name .. "  " .. tostring(current) .. " / " .. tostring(maximum)
+	resource.fill.Size = UDim2.new(math.clamp(current / maximum, 0, 1), 0, 1, 0)
 end
-
+function StatsPanelUI:Update(payload, classesConfig)
+	if not payload then return end
+	local class = classesConfig and classesConfig[payload.classId] and classesConfig[payload.classId].displayName or payload.classId or "Unknown Class"
+	local masteryRank = payload.classMastery and payload.classMastery.rank or 1
+	self._classLabel.Text = string.format("%s — Mastery Rank %d", class, masteryRank)
+	self._levelLabel.Text = "Level " .. tostring(payload.level or 0)
+	local mastery = payload.classMastery or { rank = 1, xp = 0, requiredXp = 0 }
+	updateResource(self._hp, payload.hp, payload.maxHp); updateResource(self._mana, payload.mana, payload.maxMana); updateResource(self._xp, payload.xp, payload.requiredXp); updateResource(self._masteryXp, mastery.xp, mastery.requiredXp)
+	for key, entry in self._statLabels do
+		local config = entry.config
+		local value = config.payload and payload[key] or payload.combatStats and payload.combatStats[key]
+		if value ~= nil then
+			entry.value.Text = config.percent and string.format("%.0f%%", value * 100)
+				or config.multiplier and string.format("%.2fx", value)
+				or tostring(math.floor(value * 10) / 10)
+		end
+	end
+	self:UpdatePvpButtons(payload.pvpMode); self:UpdateKarmaDisplay(payload); self:StartFlagCountdown()
+end
 return StatsPanelUI

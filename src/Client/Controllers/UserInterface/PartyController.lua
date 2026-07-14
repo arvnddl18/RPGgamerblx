@@ -71,6 +71,16 @@ partyUI:OnDeclineInvite(function(fromUserId)
 	remotes.PartyRespondInvite:FireServer(fromUserId, false)
 end)
 
+player:WaitForChild("PlayerGui"):WaitForChild("HUDAction").Event:Connect(function(actionId)
+	if actionId == "Party" and hasSelectedClass then
+		partyVisible = not partyVisible
+		partyUI:SetVisible(partyVisible)
+		if partyVisible then
+			refreshPlayerList()
+		end
+	end
+end)
+
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or not hasSelectedClass then
 		return

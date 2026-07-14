@@ -25,7 +25,8 @@ StatusEffectModule.EffectTypes = {
 		id = "Slow",
 		stackBehavior = "Refresh",
 		appliesAttribute = "IsSlowed",
-		-- The exact % reduction is defined by the skill/buff applying it
+		-- A target runs at 50% speed unless the source supplies a multiplier.
+		slowMultiplier = 0.5,
 	},
 	Silence = {
 		id = "Silence",

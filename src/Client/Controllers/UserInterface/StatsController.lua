@@ -13,6 +13,12 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local statsPanelUI = StatsPanelUI.new(player:WaitForChild("PlayerGui"))
 
+player:WaitForChild("PlayerGui"):WaitForChild("HUDAction").Event:Connect(function(actionId)
+	if actionId == "Stats" then
+		statsPanelUI:TogglePanel()
+	end
+end)
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.K then

@@ -12,6 +12,55 @@ function BuffService:Init()
 	self._enemyService = Framework:GetService("EnemyService")
 end
 
+-- Status attributes are derived from the active effects instead of being toggled
+-- independently.  This prevents one expiring control effect from clearing another
+-- one which is still active (for example, Stun while Knockdown is active).
+function BuffService:SyncControlState(target)
+	local character = target:IsA("Player") and target.Character or target
+	if not character or not character:IsA("Model") then
+		return
+	end
+
+	local state = {
+		IsStunned = false,
+		IsKnockedDown = false,
+		IsSilenced = false,
+		IsSlowed = false,
+		slowMultiplier = 1,
+	}
+	for effectId, effect in pairs(self._activeBuffs[target] or {}) do
+		local config = StatusEffectModule.EffectTypes[effectId]
+		if config then
+			if config.disablesInput or config.appliesAttribute == "IsStunned" then state.IsStunned = true end
+			if config.forceRagdoll or config.appliesAttribute == "IsKnockedDown" then state.IsKnockedDown = true end
+			if config.disablesSkills and not config.disablesInput then state.IsSilenced = true end
+			if config.appliesAttribute == "IsSlowed" then
+				state.IsSlowed = true
+				state.slowMultiplier = math.min(state.slowMultiplier, effect.slowMultiplier or config.slowMultiplier or 0.5)
+			end
+		end
+	end
+
+	character:SetAttribute("IsStunned", state.IsStunned)
+	character:SetAttribute("IsKnockedDown", state.IsKnockedDown)
+	character:SetAttribute("IsSilenced", state.IsSilenced)
+	character:SetAttribute("IsSlowed", state.IsSlowed)
+	character:SetAttribute("StatusSlowMultiplier", state.slowMultiplier)
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		if state.IsStunned or state.IsKnockedDown then
+			humanoid:Move(Vector3.zero)
+			humanoid.WalkSpeed = 0
+			humanoid.JumpPower = 0
+		else
+			local baseSpeed = humanoid:GetAttribute("BaseWalkSpeed") or humanoid.WalkSpeed
+			humanoid.WalkSpeed = math.max(0, baseSpeed * state.slowMultiplier)
+			humanoid.JumpPower = humanoid:GetAttribute("BaseJumpPower") or 50
+		end
+	end
+end
+
 function BuffService:ApplyEffect(target, effectId, duration, instigator, customIntensity, extraData)
 	local config = StatusEffectModule.EffectTypes[effectId]
 	if not config then
@@ -38,9 +87,14 @@ function BuffService:ApplyEffect(target, effectId, duration, instigator, customI
 				if extraData.shieldAmount then
 					existing.shieldRemaining = extraData.shieldAmount
 				end
+				if extraData.slowMultiplier then
+					existing.slowMultiplier = extraData.slowMultiplier
+				end
 			end
+			self:SyncControlState(target)
 			if target:IsA("Player") then
 				self._playerData:RecalculateStats(target)
+				self._playerData:SyncCharacterMovement(target)
 				self._playerData:FireStatsUpdated(target)
 			end
 			return true
@@ -48,6 +102,7 @@ function BuffService:ApplyEffect(target, effectId, duration, instigator, customI
 			existing.intensity = (existing.intensity or 1) + (customIntensity or 1)
 			existing.duration = duration
 			existing.startTime = tick()
+			self:SyncControlState(target)
 			return true
 		end
 	end
@@ -61,34 +116,14 @@ function BuffService:ApplyEffect(target, effectId, duration, instigator, customI
 		lastTick = tick(),
 		statBonuses = extraData and extraData.statBonuses or nil,
 		shieldRemaining = extraData and extraData.shieldAmount or nil,
+		slowMultiplier = extraData and extraData.slowMultiplier or config.slowMultiplier,
 	}
 
-	if config.appliesAttribute then
-		if target:IsA("Player") and target.Character then
-			target.Character:SetAttribute(config.appliesAttribute, true)
-		elseif typeof(target) == "Instance" then
-			target:SetAttribute(config.appliesAttribute, true)
-		end
-	end
-
-	if config.disablesInput then
-		if target:IsA("Player") and target.Character then
-			target.Character:SetAttribute("IsStunned", true)
-		elseif typeof(target) == "Instance" then
-			target:SetAttribute("IsStunned", true)
-		end
-	end
-
-	if config.forceRagdoll then
-		if target:IsA("Player") and target.Character then
-			target.Character:SetAttribute("IsKnockedDown", true)
-		elseif typeof(target) == "Instance" then
-			target:SetAttribute("IsKnockedDown", true)
-		end
-	end
+	self:SyncControlState(target)
 
 	if target:IsA("Player") then
 		self._playerData:RecalculateStats(target)
+		self._playerData:SyncCharacterMovement(target)
 		self._playerData:FireStatsUpdated(target)
 	end
 
@@ -205,32 +240,12 @@ function BuffService:RemoveEffect(target, effectId)
 	local config = StatusEffectModule.EffectTypes[effectId]
 	self._activeBuffs[target][effectId] = nil
 
-	if config and config.appliesAttribute then
-		if target:IsA("Player") and target.Character then
-			target.Character:SetAttribute(config.appliesAttribute, false)
-		elseif typeof(target) == "Instance" then
-			target:SetAttribute(config.appliesAttribute, false)
-		end
-	end
 
-	if config and config.disablesInput then
-		if target:IsA("Player") and target.Character then
-			target.Character:SetAttribute("IsStunned", false)
-		elseif typeof(target) == "Instance" then
-			target:SetAttribute("IsStunned", false)
-		end
-	end
-
-	if config and config.forceRagdoll then
-		if target:IsA("Player") and target.Character then
-			target.Character:SetAttribute("IsKnockedDown", false)
-		elseif typeof(target) == "Instance" then
-			target:SetAttribute("IsKnockedDown", false)
-		end
-	end
+	self:SyncControlState(target)
 
 	if target:IsA("Player") then
 		self._playerData:RecalculateStats(target)
+		self._playerData:SyncCharacterMovement(target)
 		self._playerData:FireStatsUpdated(target)
 	end
 end

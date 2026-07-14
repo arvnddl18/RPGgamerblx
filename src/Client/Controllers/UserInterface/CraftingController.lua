@@ -47,6 +47,7 @@ end)
 remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	classId = payload.classId
 	equipped = payload.equipped or {}
+	craftingUI:SetGold(payload.gold or payload.coins or 0)
 	craftingUI:SetClassId(classId)
 	craftingUI:SetEquipped(equipped)
 end)

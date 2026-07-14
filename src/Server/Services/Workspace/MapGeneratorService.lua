@@ -1539,8 +1539,30 @@ function MapGeneratorService:GetMarketplaceNpcCFrame(slotName)
 
 	local x = market.x + slot.offsetX
 	local z = market.z + slot.offsetZ
-	local y = self:GetGroundHeight(x, z)
-	return CFrame.new(x, y + 2, z) * CFrame.Angles(0, slot.yaw, 0)
+
+	-- The marketplace floor is a 2-stud-thick raised plaza. Resolve the actual
+	-- floor created during world generation instead of using terrain height,
+	-- which would put the NPC's feet inside the plaza slab.
+	local floorY = nil
+	local structures = workspace:FindFirstChild("RPG_World")
+		and workspace.RPG_World:FindFirstChild("Structures")
+	if structures then
+		for _, structure in structures:GetChildren() do
+			local plaza = structure.Name == "RomanMarketplace" and structure:FindFirstChild("PlazaFloor")
+			if plaza and plaza:IsA("BasePart") then
+				local halfX = plaza.Size.X / 2
+				local halfZ = plaza.Size.Z / 2
+				if math.abs(x - plaza.Position.X) <= halfX and math.abs(z - plaza.Position.Z) <= halfZ then
+					floorY = plaza.Position.Y + plaza.Size.Y / 2
+					break
+				end
+			end
+		end
+	end
+
+	-- Fallback keeps this safe if the marketplace is replaced by a different map.
+	floorY = floorY or (self:GetGroundHeight(x, z) + 2)
+	return CFrame.new(x, floorY, z) * CFrame.Angles(0, slot.yaw, 0)
 end
 
 function MapGeneratorService:GetMarketplaceShopCFrame()

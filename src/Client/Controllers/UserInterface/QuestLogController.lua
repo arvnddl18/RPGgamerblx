@@ -101,6 +101,19 @@ function Controller:Start()
 		end
 	end
 
+	player:WaitForChild("PlayerGui"):WaitForChild("HUDAction").Event:Connect(function(actionId)
+		if actionId ~= "QuestLog" or not hasSelectedClass then
+			return
+		end
+		if ui:IsVisible() then
+			ui:SetVisible(false)
+		else
+			ui._lastNpcName = nil
+			ui:Populate("log", buildQuestList("log"))
+			ui:SetVisible(true)
+		end
+	end)
+
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or not hasSelectedClass then
 			return

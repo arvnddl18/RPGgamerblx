@@ -15,7 +15,7 @@ local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local hasSelectedClass = false
-local playerLevel = 1
+local masteryRank = 1
 local skillBar = SkillBarUI.new(player:WaitForChild("PlayerGui"))
 local currentLoadout = {} -- slotIndex → skillId
 local localCooldowns = {} -- skillId → tick() when cooldown expires
@@ -130,8 +130,8 @@ local function castSlot(slotIndex)
 		return
 	end
 
-	local requiredLevel = skillConfig.requiredLevel or 1
-	if playerLevel < requiredLevel then
+	local requiredMasteryRank = skillConfig.requiredMasteryRank or 1
+	if masteryRank < requiredMasteryRank then
 		return
 	end
 
@@ -190,9 +190,9 @@ remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	if payload.mana ~= nil then
 		skillBar:SetMana(payload.mana)
 	end
-	if payload.level ~= nil then
-		playerLevel = payload.level
-		skillBar:SetLevel(payload.level)
+	if payload.classMastery then
+		masteryRank = payload.classMastery.rank or 1
+		skillBar:SetMasteryRank(masteryRank)
 	end
 end)
 

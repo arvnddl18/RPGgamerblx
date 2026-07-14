@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Shop = require(Shared.Config.Shop)
 local Items = require(Shared.Config.Items)
+local R15NPCUtil = require(Shared.Util.R15NPCUtil)
 
 local ShopService = {}
 ShopService._playerData = nil
@@ -38,7 +39,7 @@ function ShopService:BuildShopPayload(shopType)
 	return shopItems
 end
 
-function ShopService:CreateNPC(cframe, shopType)
+function ShopService:_CreateLegacyNPC(cframe, shopType)
 	local model = Instance.new("Model")
 	local isEnhancementShop = shopType == "enhancement"
 	local merchantName = isEnhancementShop and "Enhancement Scribe" or "Equipment Merchant"
@@ -339,6 +340,58 @@ function ShopService:CreateNPC(cframe, shopType)
 		self._remotes.OpenShop:FireClient(player, shopItems, shopType)
 	end)
 
+	return model
+end
+
+-- R15 replacement for the original decorative merchant.  Keeping the prompt on
+-- HumanoidRootPart makes its interaction range independent of accessories.
+function ShopService:CreateNPC(cframe, shopType)
+	local isEnhancementShop = shopType == "enhancement"
+	local merchantName = isEnhancementShop and "Enhancement Scribe" or "Equipment Merchant"
+	local skinColor = Color3.fromRGB(200, 160, 120)
+	local shirtColor = isEnhancementShop and Color3.fromRGB(100, 80, 140) or Color3.fromRGB(180, 140, 60)
+	local pantsColor = Color3.fromRGB(100, 80, 50)
+	local model, root, head = R15NPCUtil.Build(cframe, skinColor, shirtColor, pantsColor)
+	model.Name = merchantName
+
+	local coinMarker = Instance.new("BillboardGui")
+	coinMarker.Name = "CoinMarker"
+	coinMarker.Size = UDim2.new(0, 36, 0, 36)
+	coinMarker.StudsOffset = Vector3.new(0, 6, 0)
+	coinMarker.AlwaysOnTop = true
+	coinMarker.Parent = root
+	local coinIcon = Instance.new("TextLabel")
+	coinIcon.Size = UDim2.new(1, 0, 1, 0)
+	coinIcon.BackgroundTransparency = 1
+	coinIcon.Text = "💰"
+	coinIcon.TextSize = 28
+	coinIcon.Font = Enum.Font.GothamBold
+	coinIcon.Parent = coinMarker
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 170, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = root
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = merchantName
+	label.TextColor3 = Color3.fromRGB(255, 210, 80)
+	label.TextStrokeTransparency = 0.3
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 16
+	label.Parent = billboard
+
+	local npcsFolder = workspace:FindFirstChild("NPCs") or Instance.new("Folder")
+	npcsFolder.Name = "NPCs"
+	npcsFolder.Parent = workspace
+	model.Parent = npcsFolder
+
+	local shopItems = self:BuildShopPayload(shopType)
+	R15NPCUtil.AddInteraction(head, "Shop", merchantName, function(player)
+		self._remotes.OpenShop:FireClient(player, shopItems, shopType)
+	end)
 	return model
 end
 

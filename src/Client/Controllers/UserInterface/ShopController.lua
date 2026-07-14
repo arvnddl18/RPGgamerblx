@@ -26,6 +26,7 @@ end)
 remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	playerLevel = payload.level or 1
 	shopUI:SetPlayerLevel(playerLevel)
+	shopUI:SetGold(payload.gold or payload.coins or 0)
 end)
 
 end

@@ -7,6 +7,7 @@ local Skills = require(Shared.Config.Skills)
 local SkillConfig = require(Shared.Config.SkillConfig)
 local TargetingUtil = require(Shared.Combat.TargetingUtil)
 local SkillVfxConfig = require(Shared.Config.SkillVfxConfig)
+local ClassMasteryConfig = require(Shared.Config.ClassMasteryConfig)
 
 local SkillService = {}
 SkillService._playerData = nil
@@ -278,12 +279,36 @@ function SkillService:ResolveDamageType(skill)
 	return "physical"
 end
 
+function SkillService:ApplyMasteryUpgrade(skill, masteryRank, slotIndex)
+	-- Slots 2-5 are Skill 1, Skill 2, Skill 3, and Ultimate respectively.
+	-- Their upgrades unlock at Mastery Ranks 6-9.
+	if slotIndex < 2 or slotIndex > 5 or masteryRank < slotIndex + 4 then
+		return skill
+	end
+
+	local multiplier = ClassMasteryConfig.skillUpgradeMultiplier
+	for _, key in { "damage", "healAmount", "shieldAmount" } do
+		if skill[key] then
+			skill[key] *= multiplier
+		end
+	end
+	if skill.buffStats then
+		local upgradedStats = {}
+		for stat, value in pairs(skill.buffStats) do
+			upgradedStats[stat] = value * multiplier
+		end
+		skill.buffStats = upgradedStats
+	end
+	return skill
+end
+
 function SkillService:ApplySkillDamage(player, skill, enemyTargets, playerTargets)
 	local baseDamage = skill.damage or 0
 	local damageType = self:ResolveDamageType(skill)
 
 	for _, enemy in enemyTargets do
-		self._enemyService:DamageEnemy(enemy, baseDamage, self:GetAttackerStats(player), player, damageType)
+		local damageDealt = self._enemyService:DamageEnemy(enemy, baseDamage, self:GetAttackerStats(player), player, damageType)
+		self._playerData:ApplyLifeSteal(player, damageDealt, damageType)
 
 		if skill.statusEffect and self._buffService then
 			self._buffService:ApplyEffect(enemy, skill.statusEffect, skill.statusDuration or 3, player, skill.statusIntensity)
@@ -291,7 +316,8 @@ function SkillService:ApplySkillDamage(player, skill, enemyTargets, playerTarget
 	end
 
 	for _, targetPlayer in playerTargets do
-		self._combatService:DamagePlayer(player, targetPlayer, baseDamage, damageType)
+		local damageDealt = self._combatService:DamagePlayer(player, targetPlayer, baseDamage, damageType)
+		self._playerData:ApplyLifeSteal(player, damageDealt or 0, damageType)
 
 		if skill.statusEffect and self._buffService then
 			self._buffService:ApplyEffect(targetPlayer, skill.statusEffect, skill.statusDuration or 3, player, skill.statusIntensity)
@@ -313,7 +339,7 @@ function SkillService:ApplyFriendlyHeal(caster, skill, targets)
 	end
 
 	for _, target in targets do
-		self._playerData:Heal(target, amountPerTarget)
+		self._playerData:Heal(target, amountPerTarget, "Heal · " .. skill.name)
 	end
 end
 
@@ -322,19 +348,28 @@ function SkillService:ApplyFriendlyBuff(caster, skill, targets)
 		return
 	end
 
+	-- These are caster stats: a support build makes the buffs it casts stronger
+	-- and longer, without changing item/enemy status effects or hostile debuffs.
+	local casterStats = self:GetAttackerStats(caster)
+	local effectMultiplier = math.max(0, casterStats.buffEffectMultiplier or 1)
+	local durationMultiplier = math.max(0, casterStats.buffDurationMultiplier or 1)
 	local extraData = {}
 	if skill.buffStats then
-		extraData.statBonuses = skill.buffStats
+		extraData.statBonuses = {}
+		for stat, value in pairs(skill.buffStats) do
+			extraData.statBonuses[stat] = value * effectMultiplier
+		end
 	end
 	if skill.shieldAmount then
-		extraData.shieldAmount = skill.shieldAmount
+		extraData.shieldAmount = skill.shieldAmount * effectMultiplier
 	end
+	local duration = math.max(0.1, (skill.statusDuration or 8) * durationMultiplier)
 
 	for _, target in targets do
 		self._buffService:ApplyEffect(
 			target,
 			skill.statusEffect,
-			skill.statusDuration or 8,
+			duration,
 			caster,
 			skill.statusIntensity,
 			extraData
@@ -498,11 +533,12 @@ function SkillService:HandleCastSkill(player, slotIndex, targetData)
 	end
 
 	local data = self._playerData:GetData(player)
-	local requiredLevel = skill.requiredLevel or 1
-	if not data or data.level < requiredLevel then
-		self._remotes.Notification:FireClient(player, "Requires Level " .. requiredLevel .. "!")
+	local requiredMasteryRank = skill.requiredMasteryRank or 1
+	if not data or (data.classMasteryRank or 1) < requiredMasteryRank then
+		self._remotes.Notification:FireClient(player, "Requires Mastery Rank " .. requiredMasteryRank .. "!")
 		return
 	end
+	skill = self:ApplyMasteryUpgrade(skill, data.classMasteryRank, slotIndex)
 
 	if self:IsOnCooldown(player, skillId) then
 		return

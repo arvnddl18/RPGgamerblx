@@ -97,8 +97,7 @@ function CombatService:DamagePlayer(attacker, target, baseDamage, damageType)
 	end
 
 	local hit = DamageCalculator.ComputeHit(baseDamage, attackerData.combatStats, targetData.combatStats, damageType or "physical")
-	self._playerData:Damage(target, hit.damage, attacker, true)
-	return true
+	return self._playerData:Damage(target, hit.damage, attacker, true, damageType)
 end
 
 function CombatService:FindAttackTargets(character)
@@ -186,11 +185,13 @@ function CombatService:HandleAttack(player)
 	local targets = self:FindAttackTargets(character)
 
 	for _, enemy in targets.enemies do
-		self._enemyService:DamageEnemy(enemy, 0, attackerStats, player, "physical")
+		local damageDealt = self._enemyService:DamageEnemy(enemy, 0, attackerStats, player, "physical")
+		self._playerData:ApplyLifeSteal(player, damageDealt, "physical")
 	end
 
 	for _, targetPlayer in targets.players do
-		self:DamagePlayer(player, targetPlayer, 0, "physical")
+		local damageDealt = self:DamagePlayer(player, targetPlayer, 0, "physical")
+		self._playerData:ApplyLifeSteal(player, damageDealt or 0, "physical")
 	end
 end
 

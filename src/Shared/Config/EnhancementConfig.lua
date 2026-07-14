@@ -16,6 +16,7 @@ local EnhancementConfig = {
 		defense = 0.015, magicalResistance = 0.015,
 		critChance = 0.00015, critDamage = 0.0003, critReduction = 0.00015,
 		accuracy = 0.00015, evasion = 0.0001, healPower = 0.00015,
+		buffEffectMultiplier = 0.00005, buffDurationMultiplier = 0.00005,
 		movementSpeed = 0.002, hpRegen = 0.005, manaRegen = 0.005,
 	},
 	ScrollCategories = {
@@ -29,7 +30,7 @@ local EnhancementConfig = {
 		},
 		Healer = {
 			label = "Healer", description = "All stats, heavily favoring Heal Power, Max Mana, Magic Attack, and recovery.",
-			biasBonuses = { magicAttack = 0.08, maxMana = 0.25, healPower = 0.0015, hpRegen = 0.02, critReduction = 0.0002 },
+			biasBonuses = { magicAttack = 0.08, maxMana = 0.25, healPower = 0.0015, buffEffectMultiplier = 0.002, buffDurationMultiplier = 0.003, hpRegen = 0.02, critReduction = 0.0002 },
 		},
 		Lucky = {
 			label = "Lucky", description = "All stats, heavily favoring Critical Chance, Critical Damage, Accuracy, and Evasion.",

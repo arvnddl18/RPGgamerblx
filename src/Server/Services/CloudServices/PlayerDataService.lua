@@ -7,6 +7,7 @@ local Items = require(Shared.Config.Items)
 local Classes = require(Shared.Config.Classes)
 local LevelGrowth = require(Shared.Config.LevelGrowth)
 local ExperienceConfig = require(Shared.Config.ExperienceConfig)
+local ClassMasteryConfig = require(Shared.Config.ClassMasteryConfig)
 local CombatConfig = require(Shared.Config.CombatConfig)
 local DamageCalculator = require(Shared.Combat.DamageCalculator)
 local RarityConfig = require(Shared.Config.RarityConfig)
@@ -124,6 +125,9 @@ local function createEmptyData()
 		level = 1,
 		xp = 0,
 		requiredXp = LevelGrowth.GetRequiredXp(1),
+		classMasteryRank = ClassMasteryConfig.startingRank,
+		classMasteryXp = 0,
+		classMasteryRequiredXp = ClassMasteryConfig.GetRequiredXp(ClassMasteryConfig.startingRank),
 		coins = 0,
 		combatStats = baseStats,
 		equipped = createEmptyEquipped(),
@@ -251,13 +255,15 @@ local function syncHumanoid(player, data)
 
 	humanoid.MaxHealth = math.max(1, data.combatStats.maxHp)
 	humanoid.Health = math.clamp(data.hp, 0, data.combatStats.maxHp)
-	if character:GetAttribute("IsResting") or character:GetAttribute("IsStunned") then
+	humanoid:SetAttribute("BaseWalkSpeed", math.max(0, data.combatStats.movementSpeed))
+	humanoid:SetAttribute("BaseJumpPower", 50)
+	if character:GetAttribute("IsResting") or character:GetAttribute("IsStunned") or character:GetAttribute("IsKnockedDown") then
 		humanoid.WalkSpeed = 0
 		humanoid.JumpPower = 0
 	else
-		local baseSpeed = math.max(0, data.combatStats.movementSpeed)
+		local baseSpeed = humanoid:GetAttribute("BaseWalkSpeed")
 		if character:GetAttribute("IsSlowed") then
-			baseSpeed = math.floor(baseSpeed * 0.8)
+			baseSpeed *= math.clamp(character:GetAttribute("StatusSlowMultiplier") or 0.5, 0, 1)
 		end
 		humanoid.WalkSpeed = baseSpeed
 		humanoid.JumpPower = 50
@@ -280,6 +286,12 @@ local function buildStatsPayload(player, data)
 		maxHp = data.combatStats.maxHp,
 		maxMana = data.combatStats.maxMana,
 		combatStats = data.combatStats,
+		classMastery = {
+			rank = data.classMasteryRank,
+			xp = data.classMasteryXp,
+			requiredXp = data.classMasteryRequiredXp,
+			maxRank = ClassMasteryConfig.maxRank,
+		},
 		level = leaderstats and leaderstats.Level.Value or data.level,
 		xp = leaderstats and leaderstats.XP.Value or data.xp,
 		requiredXp = data.requiredXp,
@@ -312,6 +324,7 @@ function PlayerDataService:RecalculateStats(player)
 
 	local levelBonuses = LevelGrowth.GetLevelBonuses(data.level)
 	local equipBonuses = sumEquipmentBonuses(data.equipped)
+	local masteryBonuses = ClassMasteryConfig.GetPassiveBonuses(classConfig, data.classMasteryRank)
 	local base = classConfig.baseStats
 	
 	local combinedBase = {}
@@ -323,10 +336,20 @@ function PlayerDataService:RecalculateStats(player)
 	local buffService = getBuffService()
 	local buffBonuses = buffService and buffService:GetActiveStatBonuses(player) or nil
 	if ok then
-		data.combatStats = StatsModule.CombineStats(combinedBase, equipBonuses, buffBonuses, nil)
+		local combinedBonuses = {}
+		for stat, value in pairs(equipBonuses) do
+			combinedBonuses[stat] = value
+		end
+		for stat, value in pairs(masteryBonuses) do
+			combinedBonuses[stat] = (combinedBonuses[stat] or 0) + value
+		end
+		data.combatStats = StatsModule.CombineStats(combinedBase, combinedBonuses, buffBonuses, nil)
 	end
 	
 	data.requiredXp = LevelGrowth.GetRequiredXp(data.level)
+	data.classMasteryRank = math.clamp(math.floor(data.classMasteryRank or ClassMasteryConfig.startingRank), ClassMasteryConfig.startingRank, ClassMasteryConfig.maxRank)
+	data.classMasteryXp = math.max(0, math.floor(data.classMasteryXp or 0))
+	data.classMasteryRequiredXp = ClassMasteryConfig.GetRequiredXp(data.classMasteryRank)
 
 	data.hp = math.clamp(data.hp, 0, data.combatStats.maxHp)
 	data.mana = math.clamp(data.mana, 0, data.combatStats.maxMana)
@@ -353,6 +376,9 @@ function PlayerDataService:ApplyClass(player, classId)
 	data.hasSelectedClass = true
 	data.level = 1
 	data.xp = 0
+	data.classMasteryRank = ClassMasteryConfig.startingRank
+	data.classMasteryXp = 0
+	data.classMasteryRequiredXp = ClassMasteryConfig.GetRequiredXp(data.classMasteryRank)
 	data.coins = 0
 	data.pvpMode = data.pvpMode or "Peaceful"
 	data.equipped = createEmptyEquipped()
@@ -407,11 +433,14 @@ function PlayerDataService:GetSaveSnapshot(player)
 	end
 
 	return {
-		version = 2,
+		version = 3,
 		classId = data.classId,
 		hasSelectedClass = data.hasSelectedClass,
 		level = data.level,
 		xp = data.xp,
+		classMasteryRank = data.classMasteryRank,
+		classMasteryXp = data.classMasteryXp,
+		classMasteryRequiredXp = data.classMasteryRequiredXp,
 		coins = data.coins,
 		hp = data.hp,
 		mana = data.mana,
@@ -439,6 +468,9 @@ function PlayerDataService:LoadFromSnapshot(player, snapshot)
 	data.hasSelectedClass = snapshot.hasSelectedClass == true
 	data.level = snapshot.level or 1
 	data.xp = snapshot.xp or 0
+	data.classMasteryRank = math.clamp(math.floor(snapshot.classMasteryRank or ClassMasteryConfig.startingRank), ClassMasteryConfig.startingRank, ClassMasteryConfig.maxRank)
+	data.classMasteryXp = math.max(0, math.floor(snapshot.classMasteryXp or 0))
+	data.classMasteryRequiredXp = ClassMasteryConfig.GetRequiredXp(data.classMasteryRank)
 	data.coins = snapshot.coins or 0
 	data.hp = snapshot.hp or 1
 	data.mana = snapshot.mana or 0
@@ -697,6 +729,48 @@ function PlayerDataService:AddXP(player, amount)
 	self:FireStatsUpdated(player)
 end
 
+function PlayerDataService:SyncCharacterMovement(player)
+	local data = self._data[player]
+	if data then
+		syncHumanoid(player, data)
+	end
+end
+
+function PlayerDataService:AddClassMasteryXP(player, amount)
+	local data = self._data[player]
+	if not data or not data.hasSelectedClass then
+		return false
+	end
+
+	amount = math.floor(amount or 0)
+	if amount <= 0 or ClassMasteryConfig.IsMaxRank(data.classMasteryRank) then
+		return false
+	end
+
+	data.classMasteryXp += amount
+	local rankedUp = false
+	while data.classMasteryXp >= data.classMasteryRequiredXp and not ClassMasteryConfig.IsMaxRank(data.classMasteryRank) do
+		data.classMasteryXp -= data.classMasteryRequiredXp
+		data.classMasteryRank += 1
+		data.classMasteryRequiredXp = ClassMasteryConfig.GetRequiredXp(data.classMasteryRank)
+		rankedUp = true
+		getRemotes().Notification:FireClient(player, string.format("Class Mastery Rank %d reached!", data.classMasteryRank))
+	end
+
+	if ClassMasteryConfig.IsMaxRank(data.classMasteryRank) then
+		-- Rank 10 is terminal: discard any overflow and prevent all future gains.
+		data.classMasteryXp = 0
+		data.classMasteryRequiredXp = 0
+	end
+
+	if rankedUp then
+		self:RecalculateStats(player)
+		syncHumanoid(player, data)
+	end
+	self:FireStatsUpdated(player)
+	return true
+end
+
 function PlayerDataService:AddCoins(player, amount)
 	local data = self._data[player]
 	if not data then
@@ -758,7 +832,7 @@ function PlayerDataService:Damage(player, amount, attacker, skipMitigation, dama
 
 	if amount <= 0 then
 		self:FireStatsUpdated(player)
-		return
+		return 0
 	end
 
 	local mitigated
@@ -835,27 +909,47 @@ function PlayerDataService:Damage(player, amount, attacker, skipMitigation, dama
 			end
 		end
 	end
+
+	return mitigated
 end
 
-function PlayerDataService:Heal(player, amount)
+function PlayerDataService:ApplyLifeSteal(player, damageDealt, damageType)
+	local data = self._data[player]
+	if not data or damageDealt <= 0 then
+		return 0
+	end
+	local statKey = damageType == "magic" and "magicLifeSteal" or "physicalLifeSteal"
+	local percentage = math.max(0, data.combatStats[statKey] or 0)
+	if percentage <= 0 then
+		return 0
+	end
+	local restored = damageDealt * percentage
+	return self:Heal(player, restored, "Lifesteal")
+end
+
+function PlayerDataService:Heal(player, amount, sourceLabel)
 	local data = self._data[player]
 	if not data then
-		return false
+		return 0
 	end
 
-	data.hp = math.min(data.combatStats.maxHp, data.hp + amount)
+	local restored = math.max(0, math.min(amount, data.combatStats.maxHp - data.hp))
+	if restored <= 0 then
+		return 0
+	end
+	data.hp += restored
 	syncHumanoid(player, data)
 	self:FireStatsUpdated(player)
 	
-	if player.Character and amount > 0 then
+	if player.Character then
 		local ok, Framework = pcall(function() return require(game:GetService("ReplicatedStorage").Shared.Framework) end)
 		if ok then
 			local combatEvent = Framework:GetRemote("CombatEvents")
-			combatEvent:FireAllClients("Heal", player.Character, amount)
+			combatEvent:FireAllClients("Heal", player.Character, restored, sourceLabel or "Heal")
 		end
 	end
 	
-	return true
+	return restored
 end
 
 function PlayerDataService:RestoreMana(player, amount)

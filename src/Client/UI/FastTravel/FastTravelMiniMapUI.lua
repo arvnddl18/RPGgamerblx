@@ -1,4 +1,3 @@
-local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -17,7 +16,7 @@ function FastTravelMiniMapUI.new(playerGui)
 	self._unlocked = {}
 	self._playerPosition = Vector3.zero
 	self._baseSize = MINIMAP_SIZE
-	self._basePosition = UDim2.new(1, -(MINIMAP_SIZE + MINIMAP_MARGIN), 0, MINIMAP_MARGIN)
+	self._basePosition = UDim2.new(1, -10, 0, 10)
 
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "FastTravelMiniMapUI"
@@ -31,7 +30,7 @@ function FastTravelMiniMapUI.new(playerGui)
 	container.Name = "MiniMapButton"
 	container.Size = UDim2.fromOffset(MINIMAP_SIZE, MINIMAP_SIZE)
 	container.AnchorPoint = Vector2.new(1, 0)
-	container.Position = UDim2.new(1, -10, 0, 10)
+	container.Position = self._basePosition
 	container.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	container.Text = ""
 	container.AutoButtonColor = false
@@ -103,23 +102,6 @@ function FastTravelMiniMapUI.new(playerGui)
 
 	container.MouseButton1Click:Connect(openMap)
 	container.Activated:Connect(openMap)
-
-	local hoverSize = MINIMAP_SIZE + 8
-	local hoverPosition = UDim2.new(1, -(hoverSize + MINIMAP_MARGIN), 0, MINIMAP_MARGIN - 4)
-
-	container.MouseEnter:Connect(function()
-		TweenService:Create(container, TweenInfo.new(0.15), {
-			Size = UDim2.fromOffset(hoverSize, hoverSize),
-			Position = hoverPosition,
-		}):Play()
-	end)
-
-	container.MouseLeave:Connect(function()
-		TweenService:Create(container, TweenInfo.new(0.15), {
-			Size = UDim2.fromOffset(MINIMAP_SIZE, MINIMAP_SIZE),
-			Position = self._basePosition,
-		}):Play()
-	end)
 
 	return self
 end

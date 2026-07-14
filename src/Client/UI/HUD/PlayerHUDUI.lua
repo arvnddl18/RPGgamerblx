@@ -69,9 +69,10 @@ function PlayerHUDUI.new(playerGui)
 
 	local root = Instance.new("Frame")
 	root.Name = "PlayerHUD"
-	root.Size = UDim2.new(0, 240, 0, 90)
+	-- Keep this frame at a stable size so status effects never move the bars.
+	root.Size = UDim2.new(0, 320, 0, 78)
 	root.AnchorPoint = Vector2.new(0, 1)
-	root.Position = UDim2.new(0, 20, 1, -60)
+	root.Position = UDim2.new(0, 16, 1, -16)
 	root.BackgroundTransparency = 1
 	root.Visible = false
 	root.Parent = screenGui
@@ -79,7 +80,7 @@ function PlayerHUDUI.new(playerGui)
 
 	local barsFrame = Instance.new("Frame")
 	barsFrame.Name = "Bars"
-	barsFrame.Size = UDim2.new(1, 0, 0, 64)
+	barsFrame.Size = UDim2.new(0, 240, 0, 84)
 	barsFrame.Position = UDim2.new(0, 0, 0, 22)
 	barsFrame.BackgroundTransparency = 1
 	barsFrame.Parent = root
@@ -119,6 +120,21 @@ function PlayerHUDUI.new(playerGui)
 	self._shieldBar = makeBar(barsFrame, "Shield", 58, 10, Color3.fromRGB(80, 180, 255))
 	self._shieldBar.bg.Visible = false
 
+	local goldLabel = Instance.new("TextLabel")
+	goldLabel.Name = "GoldLabel"
+	goldLabel.Size = UDim2.new(0, 70, 0, 40)
+	goldLabel.Position = UDim2.new(0, 250, 0, 0)
+	goldLabel.BackgroundTransparency = 1
+	goldLabel.Text = "Gold 0"
+	goldLabel.TextColor3 = Color3.fromRGB(255, 210, 80)
+	goldLabel.Font = Enum.Font.GothamBold
+	goldLabel.TextSize = 11
+	goldLabel.TextXAlignment = Enum.TextXAlignment.Left
+	goldLabel.TextYAlignment = Enum.TextYAlignment.Center
+	goldLabel.TextStrokeTransparency = 0.6
+	goldLabel.Parent = barsFrame
+	self._goldLabel = goldLabel
+
 	local statusFrame = Instance.new("Frame")
 	statusFrame.Name = "StatusEffects"
 	statusFrame.Size = UDim2.new(1, 0, 0, 32)
@@ -135,11 +151,63 @@ function PlayerHUDUI.new(playerGui)
 	statusLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	statusLayout.Parent = statusFrame
 
+	local actionBar = Instance.new("Frame")
+	actionBar.Name = "HUDActionBar"
+	actionBar.Size = UDim2.new(0, 350, 0, 46)
+	actionBar.AnchorPoint = Vector2.new(1, 1)
+	actionBar.Position = UDim2.new(1, -16, 1, -16)
+	actionBar.BackgroundTransparency = 1
+	actionBar.Visible = false
+	actionBar.Parent = screenGui
+	self._actionBar = actionBar
+
+	local actionLayout = Instance.new("UIListLayout")
+	actionLayout.FillDirection = Enum.FillDirection.Horizontal
+	actionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	actionLayout.Padding = UDim.new(0, 5)
+	actionLayout.Parent = actionBar
+
+	for _, action in {
+		{ id = "Inventory", label = "Inventory", key = "I" },
+		{ id = "Party", label = "Party", key = "P" },
+		{ id = "QuestLog", label = "Quest Log", key = "J" },
+		{ id = "Rest", label = "Rest", key = "M" },
+		{ id = "Stats", label = "Stats", key = "K" },
+	} do
+		local button = Instance.new("TextButton")
+		button.Name = action.id .. "Button"
+		button.Size = UDim2.new(0, 66, 0, 46)
+		button.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+		button.BackgroundTransparency = 0.12
+		button.BorderSizePixel = 0
+		button.AutoButtonColor = true
+		button.Text = action.label .. "\n[" .. action.key .. "]"
+		button.TextColor3 = Color3.fromRGB(225, 225, 235)
+		button.Font = Enum.Font.GothamBold
+		button.TextSize = 10
+		button.Parent = actionBar
+
+		local buttonCorner = Instance.new("UICorner")
+		buttonCorner.CornerRadius = UDim.new(0, 6)
+		buttonCorner.Parent = button
+
+		button.Activated:Connect(function()
+			if self._onAction then
+				self._onAction(action.id)
+			end
+		end)
+	end
+
 	return self
 end
 
 function PlayerHUDUI:SetVisible(visible)
 	self._root.Visible = visible
+	self._actionBar.Visible = visible
+end
+
+function PlayerHUDUI:OnAction(callback)
+	self._onAction = callback
 end
 
 function PlayerHUDUI:UpdateBar(bar, current, max, prefix)
@@ -270,10 +338,6 @@ function PlayerHUDUI:UpdateStatusEffects(effects)
 
 	self._activeEffects = incoming
 
-	local hasEffects = #self._activeEffects > 0
-	local hasShield = self._shieldBar.bg.Visible
-	local barHeight = hasShield and 70 or 58
-	self._root.Size = UDim2.new(0, 240, 0, barHeight + (hasEffects and 34 or 0))
 end
 
 function PlayerHUDUI:StartStatusCountdown()
@@ -303,11 +367,6 @@ function PlayerHUDUI:StartStatusCountdown()
 					end
 				end
 			end
-			if not anyActive and #self._activeEffects == 0 then
-				local hasShield = self._shieldBar.bg.Visible
-				local barHeight = hasShield and 70 or 58
-				self._root.Size = UDim2.new(0, 240, 0, barHeight)
-			end
 		end
 	end)
 end
@@ -326,6 +385,7 @@ function PlayerHUDUI:Update(payload)
 	self:UpdateBar(self._hpBar, payload.hp or 0, payload.maxHp or 1, "HP")
 	self:UpdateBar(self._manaBar, payload.mana or 0, payload.maxMana or 1, "MP")
 	self:UpdateBar(self._xpBar, payload.xp or 0, payload.requiredXp or 1, "XP")
+	self._goldLabel.Text = "Gold " .. tostring(math.max(0, math.floor(payload.gold or payload.coins or 0)))
 
 	if payload.level then
 		self._levelLabel.Text = "Lv." .. tostring(payload.level)

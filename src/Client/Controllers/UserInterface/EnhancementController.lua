@@ -12,11 +12,23 @@ function Controller:Start()
 	ui:OnApply(function(scrollId, targetUid)
 		if busy or not remotes:FindFirstChild("ApplyEnhancement") then return end
 		busy = true
-		remotes.ApplyEnhancement:InvokeServer(scrollId, targetUid)
+		local invoked, ok, result = pcall(function()
+			return remotes.ApplyEnhancement:InvokeServer(scrollId, targetUid)
+		end)
 		busy = false
+		if not invoked then
+			ui:ShowMessage("Enhancement request failed. Please try again.", true)
+		elseif not ok then
+			ui:ShowMessage((result and result.message) or "Enhancement could not be applied.", true)
+		else
+			remotes.RequestInventory:FireServer()
+		end
 	end)
 	remotes.InventoryUpdated.OnClientEvent:Connect(function(inventory) ui:SetInventory(inventory) end)
-	remotes.StatsUpdated.OnClientEvent:Connect(function(payload) ui:SetEquipped(payload.equipped or {}) end)
+	remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
+		ui:SetGold(payload.gold or payload.coins or 0)
+		ui:SetEquipped(payload.equipped or {})
+	end)
 	remotes.EnhancementResult.OnClientEvent:Connect(function() busy = false end)
 
 	local openEvent = Instance.new("BindableEvent")

@@ -15,7 +15,7 @@ function SkillBarUI.new(playerGui)
 	self._slots = {}
 	self._cooldownEnds = {}
 	self._mana = 0
-	self._playerLevel = 1
+	self._masteryRank = 1
 	self._hasSelectedClass = false
 
 	local screenGui = Instance.new("ScreenGui")
@@ -143,7 +143,7 @@ function SkillBarUI.new(playerGui)
 			lockLabel = lockLabel,
 			skillId = nil,
 			manaCost = 0,
-			requiredLevel = 1,
+			requiredMasteryRank = 1,
 		}
 	end
 
@@ -176,9 +176,9 @@ function SkillBarUI:UpdateLoadout(skillLoadout)
 			slot.nameLabel.Text = name
 			slot.icon.BackgroundColor3 = color
 			slot.manaCost = manaCost
-			-- Store the required level from the skill config
+			-- Mastery, rather than character level, controls class skill availability.
 			local skillConfig = Skills[skillId]
-			slot.requiredLevel = skillConfig and skillConfig.requiredLevel or 1
+			slot.requiredMasteryRank = skillConfig and skillConfig.requiredMasteryRank or 1
 		end
 	end
 	self:RefreshAvailability()
@@ -189,8 +189,8 @@ function SkillBarUI:SetMana(mana)
 	self:RefreshAvailability()
 end
 
-function SkillBarUI:SetLevel(level)
-	self._playerLevel = level or 1
+function SkillBarUI:SetMasteryRank(rank)
+	self._masteryRank = rank or 1
 	self:RefreshAvailability()
 end
 
@@ -203,13 +203,13 @@ function SkillBarUI:RefreshAvailability()
 	for i = 1, 7 do
 		local slot = self._slots[i]
 		local onCooldown = slot.skillId and self._cooldownEnds[slot.skillId] and tick() < self._cooldownEnds[slot.skillId]
-		local locked = slot.requiredLevel > self._playerLevel
+		local locked = slot.requiredMasteryRank > (self._masteryRank or 1)
 		local notEnoughMana = slot.manaCost > 0 and self._mana < slot.manaCost
 
 		if locked and self._hasSelectedClass then
 			slot.grayOverlay.Visible = true
 			slot.lockLabel.Visible = true
-			slot.lockLabel.Text = "Lv." .. slot.requiredLevel
+			slot.lockLabel.Text = "Rank " .. slot.requiredMasteryRank
 		else
 			slot.lockLabel.Visible = false
 			slot.grayOverlay.Visible = not onCooldown and notEnoughMana and self._hasSelectedClass

@@ -41,6 +41,11 @@ function EnemyStateMachine.Tick(enemy, humanoid, root, config, context)
 	if not enemy.Parent or (enemy:GetAttribute("Health") or 0) <= 0 then
 		return
 	end
+	if enemy:GetAttribute("IsStunned") or enemy:GetAttribute("IsKnockedDown") then
+		humanoid:Move(Vector3.zero)
+		humanoid.WalkSpeed = 0
+		return
+	end
 
 	local state = enemy:GetAttribute("AIState") or STATES.Idle
 	local spawnPos = EnemyStateMachine.GetSpawnPosition(enemy)
@@ -61,8 +66,10 @@ function EnemyStateMachine.Tick(enemy, humanoid, root, config, context)
 
 	if targetPlayer and targetPlayer.Character then
 		local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-		local targetHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-		if not targetRoot or not targetHumanoid or targetHumanoid.Health <= 0 then
+		-- PlayerDataService owns RPG life state.  Do not make enemy targeting
+		-- depend on the Humanoid state, which can transiently change while a
+		-- control effect updates movement properties.
+		if not targetRoot then
 			enemy:SetAttribute("AggroTarget", nil)
 			targetPlayer = nil
 		else

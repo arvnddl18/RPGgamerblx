@@ -27,7 +27,7 @@ combatEvent.OnClientEvent:Connect(function(eventType, ...)
 	elseif eventType == "Heal" then
 		local character = args[1]
 		local amount = args[2]
-		FloatingText.ShowHeal(character, amount)
+		FloatingText.ShowHeal(character, amount, args[3])
 		
 	elseif eventType == "Skill" then
 		local character = args[1]

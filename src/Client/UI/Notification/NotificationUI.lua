@@ -3,7 +3,7 @@ NotificationUI.__index = NotificationUI
 
 local MAX_TOASTS = 4
 local TOAST_DURATION = 4
-local TOAST_HEIGHT = 36
+local TOAST_HEIGHT = 48
 local TOAST_PADDING = 6
 
 function NotificationUI.new(playerGui)
@@ -13,14 +13,18 @@ function NotificationUI.new(playerGui)
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "NotificationUI"
 	screenGui.ResetOnSpawn = false
-	screenGui.DisplayOrder = 50
+	-- Modals (inventory, shop, crafting, and enhancement) use orders 100–102.
+	-- Keep action feedback above them so it cannot be hidden by an open panel.
+	screenGui.DisplayOrder = 1000
+	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screenGui.Parent = playerGui
 	self._screenGui = screenGui
 
 	local container = Instance.new("Frame")
 	container.Name = "ToastContainer"
-	container.Size = UDim2.new(0, 360, 1, 0)
-	container.Position = UDim2.new(0.5, -180, 0, 80)
+	container.AnchorPoint = Vector2.new(0.5, 0)
+	container.Size = UDim2.new(0.42, 0, 0, 280)
+	container.Position = UDim2.new(0.5, 0, 0, 18)
 	container.BackgroundTransparency = 1
 	container.Parent = screenGui
 	self._container = container
@@ -44,8 +48,9 @@ function NotificationUI:Show(message)
 
 	local toast = Instance.new("Frame")
 	toast.Size = UDim2.new(1, 0, 0, TOAST_HEIGHT)
-	toast.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	toast.BackgroundTransparency = 0.1
+	local success = message:find("Purchased", 1, true) or message:find("Crafted", 1, true) or message:find("success", 1, true) or message:find("complete", 1, true)
+	toast.BackgroundColor3 = success and Color3.fromRGB(31, 86, 54) or Color3.fromRGB(98, 48, 40)
+	toast.BackgroundTransparency = 0.04
 	toast.BorderSizePixel = 0
 	toast.LayoutOrder = tick()
 	toast.Parent = self._container
@@ -53,17 +58,31 @@ function NotificationUI:Show(message)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 8)
 	corner.Parent = toast
+	local outline = Instance.new("UIStroke")
+	outline.Color = success and Color3.fromRGB(110, 220, 135) or Color3.fromRGB(235, 125, 95)
+	outline.Thickness = 1.5
+	outline.Parent = toast
 
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -16, 1, 0)
-	label.Position = UDim2.new(0, 8, 0, 0)
+	label.Size = UDim2.new(1, -30, 1, 0)
+	label.Position = UDim2.new(0, 24, 0, 0)
 	label.BackgroundTransparency = 1
 	label.Text = message
-	label.TextColor3 = Color3.fromRGB(255, 230, 180)
+	label.TextColor3 = Color3.fromRGB(255, 250, 235)
 	label.Font = Enum.Font.GothamBold
-	label.TextSize = 13
+	label.TextSize = 14
 	label.TextWrapped = true
 	label.Parent = toast
+
+	local marker = Instance.new("TextLabel")
+	marker.Size = UDim2.fromOffset(18, 18)
+	marker.Position = UDim2.new(0, 6, 0.5, -9)
+	marker.BackgroundTransparency = 1
+	marker.Text = success and "+" or "!"
+	marker.TextColor3 = success and Color3.fromRGB(160, 255, 180) or Color3.fromRGB(255, 175, 140)
+	marker.Font = Enum.Font.GothamBold
+	marker.TextSize = 18
+	marker.Parent = toast
 
 	table.insert(self._toasts, { frame = toast })
 

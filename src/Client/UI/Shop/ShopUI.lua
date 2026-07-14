@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -62,9 +63,9 @@ local STAT_DISPLAY_NAMES = {
 	physicalAttack = "Physical Attack", magicAttack = "Magic Attack", maxHp = "Max HP", maxMana = "Max Mana",
 	defense = "Defense", magicalResistance = "Magic Resistance", movementSpeed = "Move Speed",
 	critChance = "Critical Chance", critDamage = "Critical Damage", critReduction = "Critical Reduction",
-	accuracy = "Accuracy", evasion = "Evasion", healPower = "Heal Power", hpRegen = "HP Regen", manaRegen = "Mana Regen",
+	accuracy = "Accuracy", evasion = "Evasion", healPower = "Heal Power", buffEffectMultiplier = "Buff Effect", buffDurationMultiplier = "Buff Duration", hpRegen = "HP Regen", manaRegen = "Mana Regen",
 }
-local PERCENT_STATS = { critChance = true, critDamage = true, critReduction = true, accuracy = true, evasion = true, healPower = true }
+local PERCENT_STATS = { critChance = true, critDamage = true, critReduction = true, accuracy = true, evasion = true, healPower = true, buffEffectMultiplier = true, buffDurationMultiplier = true }
 
 local function formatStatBonus(statName, value)
 	local label = STAT_DISPLAY_NAMES[statName] or statName:gsub("(%u)", " %1"):gsub("^%s+", "")
@@ -174,7 +175,7 @@ function ShopUI.new(playerGui)
 	self._root.Name = "Root"
 	self._root.AnchorPoint = Vector2.new(0.5, 0.5)
 	self._root.Position = UDim2.fromScale(0.5, 0.5)
-	self._root.Size = UDim2.fromScale(1, 1)
+	self._root.Size = UDim2.fromScale(0.94, 0.90)
 	self._root.BackgroundColor3 = COLORS.panel
 	self._root.BorderSizePixel = 0
 	self._root.Active = true
@@ -182,6 +183,22 @@ function ShopUI.new(playerGui)
 	self._root.Parent = self._screenGui
 	addCorner(self._root, 10)
 	addStroke(self._root, COLORS.border, 2)
+	local rootConstraint = Instance.new("UISizeConstraint")
+	rootConstraint.MinSize = Vector2.new(760, 500)
+	rootConstraint.MaxSize = Vector2.new(1500, 900)
+	rootConstraint.Parent = self._root
+	self._currentGold = Instance.new("TextLabel")
+	self._currentGold.Name = "CurrentGold"
+	self._currentGold.Size = UDim2.fromOffset(140, 28)
+	self._currentGold.Position = UDim2.new(1, -190, 0, 10)
+	self._currentGold.BackgroundTransparency = 1
+	self._currentGold.Text = "GOLD: 0"
+	self._currentGold.TextColor3 = Color3.fromRGB(255, 210, 80)
+	self._currentGold.Font = Enum.Font.GothamBold
+	self._currentGold.TextSize = 14
+	self._currentGold.TextXAlignment = Enum.TextXAlignment.Right
+	self._currentGold.ZIndex = 11
+	self._currentGold.Parent = self._root
 
 	-- ── Close Button ──
 	self._closeBtn = Instance.new("TextButton")
@@ -229,6 +246,8 @@ function ShopUI.new(playerGui)
 	self._rarityDropdown.Position = UDim2.new(1, -142, 0, 8)
 	self._rarityDropdown.BackgroundColor3 = COLORS.slot
 	self._rarityDropdown.BorderSizePixel = 0
+	self._rarityDropdown.ZIndex = 100
+	self._rarityDropdown.Active = true
 	self._rarityDropdown.Parent = self._inventoryPanel
 	addCorner(self._rarityDropdown, 4)
 	addStroke(self._rarityDropdown, COLORS.borderDim)
@@ -240,6 +259,7 @@ function ShopUI.new(playerGui)
 	self._rarityButton.TextColor3 = COLORS.text
 	self._rarityButton.Font = Enum.Font.GothamBold
 	self._rarityButton.TextSize = 11
+	self._rarityButton.ZIndex = 101
 	self._rarityButton.Parent = self._rarityDropdown
 
 	self._rarityList = Instance.new("Frame")
@@ -249,7 +269,8 @@ function ShopUI.new(playerGui)
 	self._rarityList.BackgroundColor3 = Color3.fromRGB(18, 15, 12)
 	self._rarityList.BorderSizePixel = 0
 	self._rarityList.Visible = false
-	self._rarityList.ZIndex = 30
+	self._rarityList.ZIndex = 102
+	self._rarityList.Active = true
 	self._rarityList.Parent = self._rarityDropdown
 	addCorner(self._rarityList, 4)
 	addStroke(self._rarityList, COLORS.borderDim)
@@ -266,6 +287,7 @@ function ShopUI.new(playerGui)
 		opt.TextColor3 = rarityId == "All" and COLORS.text or RarityConfig.GetColor(rarityId)
 		opt.Font = Enum.Font.Gotham
 		opt.TextSize = 11
+		opt.ZIndex = 103
 		opt.Parent = self._rarityList
 		addCorner(opt, 3)
 		opt.MouseButton1Click:Connect(function()
@@ -292,13 +314,15 @@ function ShopUI.new(playerGui)
 
 	local filterLayout = Instance.new("UIListLayout")
 	filterLayout.FillDirection = Enum.FillDirection.Horizontal
+	filterLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	filterLayout.Padding = UDim.new(0, 2)
 	filterLayout.Parent = self._filterBar
 
 	self._filterButtons = {}
-	for _, filter in CATEGORY_FILTERS do
+	for filterIndex, filter in CATEGORY_FILTERS do
 		local btn = Instance.new("TextButton")
 		btn.Name = "Filter_" .. filter.id
+		btn.LayoutOrder = filterIndex
 		btn.Size = UDim2.fromOffset(math.max(48, #filter.label * 6 + 10), 24)
 		btn.BackgroundColor3 = filter.id == "all" and COLORS.accent or COLORS.slot
 		btn.Text = filter.label
@@ -505,7 +529,12 @@ function ShopUI.new(playerGui)
 	end)
 
 	self._overlay.MouseButton1Click:Connect(function()
-		self:SetVisible(false)
+		local mouse = UserInputService:GetMouseLocation()
+		local inset = GuiService:GetGuiInset()
+		local point = Vector2.new(mouse.X, mouse.Y - inset.Y)
+		local position, size = self._root.AbsolutePosition, self._root.AbsoluteSize
+		local insideRoot = point.X >= position.X and point.X <= position.X + size.X and point.Y >= position.Y and point.Y <= position.Y + size.Y
+		if not insideRoot then self:SetVisible(false) end
 	end)
 
 	self._qtyMinus.MouseButton1Click:Connect(function()
@@ -632,10 +661,26 @@ function ShopUI:_createSlot(parent, index)
 	lockIcon.Parent = frame
 	addCorner(lockIcon, 5)
 
+	local countLabel = Instance.new("TextLabel")
+	countLabel.Name = "Count"
+	countLabel.Size = UDim2.new(1, -4, 0, 14)
+	countLabel.Position = UDim2.new(0, 2, 1, -16)
+	countLabel.BackgroundTransparency = 1
+	countLabel.Text = ""
+	countLabel.TextColor3 = COLORS.text
+	countLabel.Font = Enum.Font.GothamBold
+	countLabel.TextSize = 10
+	countLabel.TextXAlignment = Enum.TextXAlignment.Right
+	countLabel.TextStrokeTransparency = 0.45
+	countLabel.ZIndex = 4
+	countLabel.Visible = false
+	countLabel.Parent = frame
+
 	local slotData = {
 		frame = frame,
 		icon = icon,
 		lockIcon = lockIcon,
+		countLabel = countLabel,
 		stroke = stroke,
 		index = index,
 		shopEntry = nil,
@@ -896,8 +941,7 @@ function ShopUI:_refreshDetails()
 			statLabel.Size = UDim2.new(1, 0, 0, 16)
 			statLabel.BackgroundTransparency = 1
 			-- Format stat name: "PhysicalDamage" → "Physical Damage"
-			local formatted = statName:gsub("(%u)", " %1"):gsub("^%s+", "")
-			statLabel.Text = "  + " .. statValue .. " " .. formatted
+			statLabel.Text = "  " .. formatStatBonus(statName, statValue)
 			statLabel.TextColor3 = COLORS.success
 			statLabel.Font = Enum.Font.Gotham
 			statLabel.TextSize = 12
@@ -1184,10 +1228,12 @@ function ShopUI:_refreshGrid()
 		local frame = slotData.frame
 		local icon = slotData.icon
 		local lockIcon = slotData.lockIcon
+		local countLabel = slotData.countLabel
 
 		if not entry then
 			icon.Visible = false
 			lockIcon.Visible = false
+			countLabel.Visible = false
 			frame.BackgroundColor3 = COLORS.slotEmpty
 			slotData.stroke.Color = COLORS.borderDim
 			frame.Text = ""
@@ -1200,6 +1246,9 @@ function ShopUI:_refreshGrid()
 
 				local locked = entry.requiredLevel and self._playerLevel < entry.requiredLevel
 				lockIcon.Visible = locked == true
+				local quantity = entry.count or entry.amount or entry.quantity or entry.stock
+				countLabel.Text = quantity and tostring(quantity) or ""
+				countLabel.Visible = quantity ~= nil and quantity > 1
 
 				if self._selectedIndex == idx then
 					frame.BackgroundColor3 = COLORS.slotSelected
@@ -1268,6 +1317,10 @@ function ShopUI:SetPlayerLevel(level)
 	if self._visible then
 		self:Refresh()
 	end
+end
+
+function ShopUI:SetGold(amount)
+	self._currentGold.Text = "GOLD: " .. tostring(math.max(0, math.floor(amount or 0)))
 end
 
 function ShopUI:OnPurchase(callback)

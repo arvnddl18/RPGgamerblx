@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MonsterConfig = require(Shared.Config.MonsterConfig)
@@ -20,6 +21,53 @@ EnemyService._framework = nil
 EnemyService._playMonsterAnimRemote = nil
 EnemyService._enemies = {}
 EnemyService._attackCooldowns = {}
+
+-- Keep a defeated model around long enough for the final floating damage
+-- number (and the player’s visual confirmation) to be seen.
+local DEATH_DISPLAY_TIME = 1.5
+
+function EnemyService:PlayDeathCrumble(enemy)
+	enemy:SetAttribute("IsDead", true)
+	local humanoid = enemy:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid:Move(Vector3.zero)
+		humanoid.WalkSpeed = 0
+		humanoid.JumpPower = 0
+		humanoid.AutoRotate = false
+		for _, track in humanoid:GetPlayingAnimationTracks() do
+			track:Stop(0)
+		end
+	end
+
+	local healthBar = enemy.PrimaryPart and enemy.PrimaryPart:FindFirstChild("HealthBar")
+	if healthBar then
+		healthBar.Enabled = false
+	end
+
+	-- Remove the rig joints and let the R15 parts drop into a short-lived pile.
+	for _, descendant in enemy:GetDescendants() do
+		if descendant:IsA("Motor6D") then
+			descendant:Destroy()
+		end
+	end
+	for _, descendant in enemy:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			if descendant.Name == "HumanoidRootPart" then
+				descendant.CanCollide = false
+			else
+				descendant.CanCollide = true
+				descendant.Massless = false
+				descendant.AssemblyLinearVelocity = Vector3.new(math.random(-4, 4), math.random(2, 6), math.random(-4, 4))
+				descendant.AssemblyAngularVelocity = Vector3.new(math.random(-8, 8), math.random(-8, 8), math.random(-8, 8))
+			end
+			task.delay(0.65, function()
+			if descendant.Parent then
+				TweenService:Create(descendant, TweenInfo.new(DEATH_DISPLAY_TIME - 0.65), { Transparency = 1 }):Play()
+			end
+		end)
+		end
+	end
+end
 
 local SPAWN_GROUPS = {
 	---------------------------------------------------------------------------
@@ -316,6 +364,7 @@ function EnemyService:CreateEnemy(enemyId, position, spawnCenter, spawnRadius)
 	humanoid.MaxHealth = maxHealth
 	humanoid.Health = maxHealth
 	humanoid.WalkSpeed = config.moveSpeed or 12
+	humanoid:SetAttribute("BaseWalkSpeed", humanoid.WalkSpeed)
 	humanoid.HipHeight = config.isFlying and 12 or 2
 	humanoid.Parent = model
 
@@ -430,11 +479,11 @@ end
 
 function EnemyService:DamageEnemy(enemy, baseDamage, attackerStats, attacker, damageType)
 	if not enemy.Parent then
-		return
+		return 0
 	end
 
 	local health = enemy:GetAttribute("Health") or 0
-	if health <= 0 then return end
+	if health <= 0 then return 0 end
 
 	local targetStats = {
 		maxHp = enemy:GetAttribute("MaxHealth") or 50,
@@ -464,7 +513,7 @@ function EnemyService:DamageEnemy(enemy, baseDamage, attackerStats, attacker, da
 		local ok, Framework = pcall(function() return require(game:GetService("ReplicatedStorage").Shared.Framework) end)
 		if ok then
 			local combatEvent = Framework:GetRemote("CombatEvents")
-			combatEvent:FireAllClients("Damage", enemy, result.damage, result.isCrit, attacker)
+			combatEvent:FireAllClients("Damage", enemy, finalDamage, result.isCrit, attacker)
 		end
 		
 		-- Optionally fire a remote to show damage numbers here
@@ -472,7 +521,10 @@ function EnemyService:DamageEnemy(enemy, baseDamage, attackerStats, attacker, da
 		if health <= 0 then
 			self:OnEnemyKilled(enemy, attacker)
 		end
+		return finalDamage
 	end
+
+	return 0
 end
 
 function EnemyService:CreatePickup(position, itemId, rarity)
@@ -516,6 +568,7 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 	local config = MonsterConfig.Get(enemyId)
 	local root = enemy.PrimaryPart
 	local deathPosition = root and root.Position or Vector3.new()
+	self:PlayDeathCrumble(enemy)
 
 	if killer and config then
 		local xpReward = enemy:GetAttribute("XpReward") or config.experienceReward or 0
@@ -525,6 +578,7 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 			self._experienceService:GrantExperience(killer, xpReward, "monster")
 		else
 			self._playerData:AddXP(killer, xpReward)
+			self._playerData:AddClassMasteryXP(killer, xpReward)
 		end
 		self._playerData:AddCoins(killer, goldReward)
 		if self._questService then
@@ -570,7 +624,13 @@ function EnemyService:OnEnemyKilled(enemy, killer)
 		end
 	end
 
-	enemy:Destroy()
+	-- Health is already zero and the model has been removed from the AI list,
+	-- so it cannot act or receive another hit during this display window.
+	task.delay(DEATH_DISPLAY_TIME, function()
+		if enemy.Parent then
+			enemy:Destroy()
+		end
+	end)
 
 	-- Respawn near the original group spawn point after a delay
 	task.delay(respawnTime, function()
@@ -609,8 +669,12 @@ function EnemyService:RunAI()
 				local hitTime = enemyConfig.attackHitTime or 0.3
 				task.delay(hitTime, function()
 					-- Guard: enemy or target may have been removed during the delay
-					if not enemy.Parent then return end
+					if not enemy.Parent or (enemy:GetAttribute("Health") or 0) <= 0 then return end
 					if not targetPlayer.Parent then return end
+					local targetData = self._playerData:GetData(targetPlayer)
+					-- RPG HP is authoritative. A stunned player is still a valid,
+					-- damageable target even if Roblox is updating their Humanoid.
+					if not targetData or targetData.hp <= 0 then return end
 					local targetChar = targetPlayer.Character
 					local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
 					local enemyRoot = enemy.PrimaryPart

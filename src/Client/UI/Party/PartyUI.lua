@@ -1,451 +1,475 @@
-local StatBar = require(script.Parent.Parent.HUD.StatBar)
+local TweenService = game:GetService("TweenService")
 
 local PartyUI = {}
 PartyUI.__index = PartyUI
 
-local function makeButton(parent, text, size, position, color)
-	local btn = Instance.new("TextButton")
-	btn.Size = size
-	btn.Position = position
-	btn.BackgroundColor3 = color or Color3.fromRGB(50, 50, 70)
-	btn.Text = text
-	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.Font = Enum.Font.GothamBold
-	btn.TextSize = 12
-	btn.BorderSizePixel = 0
-	btn.Parent = parent
+local COLORS = {
+	overlay = Color3.fromRGB(0, 0, 0),
+	panel = Color3.fromRGB(28, 22, 18),
+	panelInner = Color3.fromRGB(36, 30, 24),
+	border = Color3.fromRGB(180, 140, 55),
+	borderDim = Color3.fromRGB(80, 65, 35),
+	text = Color3.fromRGB(245, 235, 215),
+	textDim = Color3.fromRGB(180, 170, 150),
+	slot = Color3.fromRGB(35, 28, 23),
+	slotHover = Color3.fromRGB(50, 42, 34),
+	slotSelected = Color3.fromRGB(60, 50, 40),
+	gold = Color3.fromRGB(255, 215, 65),
+	danger = Color3.fromRGB(180, 70, 60),
+	success = Color3.fromRGB(85, 160, 100),
+	blue = Color3.fromRGB(100, 150, 200),
+}
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 6)
-	corner.Parent = btn
+local FONTS = { Header = Enum.Font.FredokaOne, Body = Enum.Font.Ubuntu, Bold = Enum.Font.GothamBold }
 
-	return btn
+local function corner(parent, radius)
+	local value = Instance.new("UICorner")
+	value.CornerRadius = UDim.new(0, radius or 8)
+	value.Parent = parent
+end
+
+local function stroke(parent, color, thickness)
+	local value = Instance.new("UIStroke")
+	value.Color = color or COLORS.borderDim
+	value.Thickness = thickness or 1.5
+	value.Parent = parent
+	return value
+end
+
+local function button(parent, text, color)
+	local value = Instance.new("TextButton")
+	value.BackgroundColor3 = color or COLORS.slot
+	value.BorderSizePixel = 0
+	value.Text = text
+	value.TextColor3 = COLORS.text
+	value.TextTruncate = Enum.TextTruncate.AtEnd
+	value.Font = FONTS.Header
+	value.TextSize = 15
+	value.AutoButtonColor = false
+	value.Parent = parent
+	corner(value, 8)
+	stroke(value, color == COLORS.danger and Color3.fromRGB(100, 30, 20) or COLORS.borderDim, 2)
+	value.MouseEnter:Connect(function()
+		TweenService:Create(value, TweenInfo.new(0.16), { BackgroundColor3 = color == COLORS.danger and Color3.fromRGB(220, 90, 80) or COLORS.slotHover }):Play()
+	end)
+	value.MouseLeave:Connect(function()
+		TweenService:Create(value, TweenInfo.new(0.16), { BackgroundColor3 = color or COLORS.slot }):Play()
+	end)
+	return value
+end
+
+local function pane(parent, name, size, position)
+	local value = Instance.new("Frame")
+	value.Name = name
+	value.Size = size
+	value.Position = position
+	value.BackgroundColor3 = COLORS.panelInner
+	value.BorderSizePixel = 0
+	value.Parent = parent
+	corner(value, 10)
+	stroke(value, COLORS.borderDim, 2)
+	return value
 end
 
 function PartyUI.new(playerGui)
 	local self = setmetatable({}, PartyUI)
 	self._memberRows = {}
+	self._playerButtons = {}
 	self._selectedUserId = nil
 	self._localUserId = nil
 	self._isLeader = false
-	self._inParty = false
 
-	self._onInvite = nil
-	self._onLeave = nil
-	self._onKick = nil
-	self._onAcceptInvite = nil
-	self._onDeclineInvite = nil
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "PartyUI"
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.DisplayOrder = 100
+	gui.Parent = playerGui
+	self._screenGui = gui
 
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "PartyUI"
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = playerGui
-	self._screenGui = screenGui
+	local overlay = Instance.new("TextButton")
+	overlay.Size = UDim2.fromScale(1, 1)
+	overlay.BackgroundColor3 = COLORS.overlay
+	overlay.BackgroundTransparency = 0.5
+	overlay.Text = ""
+	overlay.AutoButtonColor = false
+	overlay.Visible = false
+	overlay.Parent = gui
+	self._overlay = overlay
 
-	local panel = Instance.new("Frame")
-	panel.Name = "PartyPanel"
-	panel.Size = UDim2.new(0, 260, 0, 320)
-	panel.Position = UDim2.new(0, 16, 0, 176)
-	panel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	panel.BackgroundTransparency = 0.15
-	panel.BorderSizePixel = 0
-	panel.Visible = false
-	panel.Parent = screenGui
-	self._panel = panel
+	local root = Instance.new("Frame")
+	root.Name = "PartyPanel"
+	root.AnchorPoint = Vector2.new(0.5, 0.5)
+	root.Position = UDim2.fromScale(0.5, 0.5)
+	root.Size = UDim2.fromScale(0.76, 0.72)
+	root.BackgroundColor3 = COLORS.panel
+	root.BorderSizePixel = 0
+	root.Active = true
+	root.Visible = false
+	root.Parent = gui
+	corner(root, 12)
+	stroke(root, COLORS.border, 3)
+	self._panel = root
+	local constraint = Instance.new("UISizeConstraint")
+	constraint.MinSize = Vector2.new(520, 360)
+	constraint.MaxSize = Vector2.new(1180, 760)
+	constraint.Parent = root
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = panel
+	local close = button(root, "×", COLORS.danger)
+	close.Size = UDim2.fromOffset(40, 40)
+	close.Position = UDim2.new(1, -50, 0, 10)
+	close.TextSize = 22
+	close.ZIndex = 5
+	close.MouseButton1Click:Connect(function() self:SetVisible(false) end)
+	overlay.MouseButton1Click:Connect(function() self:SetVisible(false) end)
 
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -16, 0, 28)
-	title.Position = UDim2.new(0, 8, 0, 8)
-	title.BackgroundTransparency = 1
-	title.Text = "Party (P)"
-	title.TextColor3 = Color3.new(1, 1, 1)
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 16
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = panel
+	local listPane = pane(root, "MemberPane", UDim2.new(0.38, -16, 1, -24), UDim2.new(0, 12, 0, 12))
+	local listTitle = Instance.new("TextLabel")
+	listTitle.Size = UDim2.new(1, -24, 0, 40)
+	listTitle.Position = UDim2.new(0, 12, 0, 12)
+	listTitle.BackgroundTransparency = 1
+	listTitle.Text = "PARTY"
+	listTitle.TextColor3 = COLORS.gold
+	listTitle.Font = FONTS.Header
+	listTitle.TextSize = 22
+	listTitle.TextXAlignment = Enum.TextXAlignment.Left
+	listTitle.Parent = listPane
 
 	local memberList = Instance.new("ScrollingFrame")
 	memberList.Name = "MemberList"
-	memberList.Size = UDim2.new(1, -16, 0, 180)
-	memberList.Position = UDim2.new(0, 8, 0, 40)
-	memberList.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-	memberList.BackgroundTransparency = 0.3
+	memberList.Size = UDim2.new(1, -24, 1, -78)
+	memberList.Position = UDim2.new(0, 12, 0, 58)
+	memberList.BackgroundTransparency = 1
 	memberList.BorderSizePixel = 0
-	memberList.ScrollBarThickness = 4
-	memberList.CanvasSize = UDim2.new(0, 0, 0, 0)
-	memberList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	memberList.Parent = panel
+	memberList.ScrollBarThickness = 8
+	memberList.ScrollBarImageColor3 = COLORS.gold
+	memberList.CanvasSize = UDim2.new()
+	memberList.Parent = listPane
 	self._memberList = memberList
-
-	local memberCorner = Instance.new("UICorner")
-	memberCorner.CornerRadius = UDim.new(0, 6)
-	memberCorner.Parent = memberList
-
 	local memberLayout = Instance.new("UIListLayout")
-	memberLayout.Padding = UDim.new(0, 4)
-	memberLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	memberLayout.Padding = UDim.new(0, 9)
 	memberLayout.Parent = memberList
-
-	local emptyLabel = Instance.new("TextLabel")
-	emptyLabel.Name = "EmptyLabel"
-	emptyLabel.Size = UDim2.new(1, -8, 0, 40)
-	emptyLabel.BackgroundTransparency = 1
-	emptyLabel.Text = "No party members"
-	emptyLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
-	emptyLabel.Font = Enum.Font.Gotham
-	emptyLabel.TextSize = 12
-	emptyLabel.Parent = memberList
-	self._emptyLabel = emptyLabel
-
-	local statusLabel = Instance.new("TextLabel")
-	statusLabel.Name = "StatusLabel"
-	statusLabel.Size = UDim2.new(1, -16, 0, 18)
-	statusLabel.Position = UDim2.new(0, 8, 0, 224)
-	statusLabel.BackgroundTransparency = 1
-	statusLabel.Text = ""
-	statusLabel.TextColor3 = Color3.fromRGB(180, 220, 180)
-	statusLabel.Font = Enum.Font.Gotham
-	statusLabel.TextSize = 11
-	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-	statusLabel.TextWrapped = true
-	statusLabel.Parent = panel
-	self._statusLabel = statusLabel
-
-	local inviteBtn = makeButton(panel, "Invite", UDim2.new(0.32, -4, 0, 28), UDim2.new(0, 8, 1, -36))
-	self._inviteBtn = inviteBtn
-	inviteBtn.MouseButton1Click:Connect(function()
-		self:SetInvitePanelVisible(not self._invitePanel.Visible)
+	memberLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		memberList.CanvasSize = UDim2.new(0, 0, 0, memberLayout.AbsoluteContentSize.Y + 10)
 	end)
 
-	local leaveBtn = makeButton(panel, "Leave", UDim2.new(0.32, -4, 0, 28), UDim2.new(0.34, 0, 1, -36), Color3.fromRGB(120, 50, 50))
-	self._leaveBtn = leaveBtn
-	leaveBtn.MouseButton1Click:Connect(function()
-		if self._onLeave then
-			self._onLeave()
-		end
-	end)
+	local empty = Instance.new("TextLabel")
+	empty.Name = "EmptyLabel"
+	empty.Size = UDim2.new(1, 0, 0, 42)
+	empty.BackgroundTransparency = 1
+	empty.Text = "No party members yet."
+	empty.TextColor3 = COLORS.textDim
+	empty.Font = FONTS.Body
+	empty.TextSize = 16
+	empty.Parent = memberList
+	self._emptyLabel = empty
 
-	local closeBtn = makeButton(panel, "Close", UDim2.new(0.32, -4, 0, 28), UDim2.new(0.68, -4, 1, -36), Color3.fromRGB(60, 60, 80))
-	closeBtn.MouseButton1Click:Connect(function()
-		self:SetVisible(false)
-	end)
+	local detailPane = pane(root, "DetailPane", UDim2.new(0.62, -20, 1, -24), UDim2.new(0.38, 4, 0, 12))
+	self._detailPane = detailPane
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -82, 0, 40)
+	title.Position = UDim2.new(0, 16, 0, 12)
+	title.BackgroundTransparency = 1
+	title.Text = "PARTY MANAGEMENT"
+	title.TextColor3 = COLORS.gold
+	title.Font = FONTS.Header
+	title.TextSize = 22
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.TextTruncate = Enum.TextTruncate.AtEnd
+	title.Parent = detailPane
+
+	local status = Instance.new("TextLabel")
+	status.Size = UDim2.new(1, -32, 0, 42)
+	status.Position = UDim2.new(0, 16, 0, 56)
+	status.BackgroundTransparency = 1
+	status.Text = "Invite nearby players and adventure together."
+	status.TextColor3 = COLORS.textDim
+	status.Font = FONTS.Body
+	status.TextSize = 16
+	status.TextWrapped = true
+	status.TextXAlignment = Enum.TextXAlignment.Left
+	status.TextYAlignment = Enum.TextYAlignment.Top
+	status.Parent = detailPane
+	self._statusLabel = status
+
+	local divider = Instance.new("Frame")
+	divider.Size = UDim2.new(1, -32, 0, 2)
+	divider.Position = UDim2.new(0, 16, 0, 108)
+	divider.BackgroundColor3 = COLORS.borderDim
+	divider.BorderSizePixel = 0
+	divider.Parent = detailPane
+
+	local idleLabel = Instance.new("TextLabel")
+	idleLabel.Size = UDim2.new(1, -32, 0, 80)
+	idleLabel.Position = UDim2.new(0, 16, 0, 128)
+	idleLabel.BackgroundTransparency = 1
+	idleLabel.Text = "Create a party to invite other players.\nParty members appear in the list on the left."
+	idleLabel.TextColor3 = COLORS.textDim
+	idleLabel.Font = FONTS.Body
+	idleLabel.TextSize = 17
+	idleLabel.TextWrapped = true
+	idleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	idleLabel.TextYAlignment = Enum.TextYAlignment.Top
+	idleLabel.Parent = detailPane
+	self._idleLabel = idleLabel
 
 	local invitePanel = Instance.new("Frame")
 	invitePanel.Name = "InvitePanel"
-	invitePanel.Size = UDim2.new(0, 240, 0, 280)
-	invitePanel.Position = UDim2.new(0, 280, 0, 176)
-	invitePanel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	invitePanel.BackgroundTransparency = 0.1
-	invitePanel.BorderSizePixel = 0
+	invitePanel.Size = UDim2.new(1, -32, 1, -188)
+	invitePanel.Position = UDim2.new(0, 16, 0, 118)
+	invitePanel.BackgroundTransparency = 1
 	invitePanel.Visible = false
-	invitePanel.Parent = screenGui
+	invitePanel.Parent = detailPane
 	self._invitePanel = invitePanel
 
-	local inviteCorner = Instance.new("UICorner")
-	inviteCorner.CornerRadius = UDim.new(0, 8)
-	inviteCorner.Parent = invitePanel
-
 	local inviteTitle = Instance.new("TextLabel")
-	inviteTitle.Size = UDim2.new(1, -16, 0, 24)
-	inviteTitle.Position = UDim2.new(0, 8, 0, 8)
+	inviteTitle.Size = UDim2.new(1, 0, 0, 24)
 	inviteTitle.BackgroundTransparency = 1
-	inviteTitle.Text = "Invite Player"
-	inviteTitle.TextColor3 = Color3.new(1, 1, 1)
-	inviteTitle.Font = Enum.Font.GothamBold
-	inviteTitle.TextSize = 14
+	inviteTitle.Text = "INVITE A PLAYER"
+	inviteTitle.TextColor3 = COLORS.text
+	inviteTitle.Font = FONTS.Header
+	inviteTitle.TextSize = 17
 	inviteTitle.TextXAlignment = Enum.TextXAlignment.Left
 	inviteTitle.Parent = invitePanel
 
-	local usernameBox = Instance.new("TextBox")
-	usernameBox.Name = "UsernameBox"
-	usernameBox.Size = UDim2.new(1, -16, 0, 28)
-	usernameBox.Position = UDim2.new(0, 8, 0, 36)
-	usernameBox.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-	usernameBox.Text = ""
-	usernameBox.PlaceholderText = "Type username..."
-	usernameBox.TextColor3 = Color3.new(1, 1, 1)
-	usernameBox.PlaceholderColor3 = Color3.fromRGB(140, 140, 160)
-	usernameBox.Font = Enum.Font.Gotham
-	usernameBox.TextSize = 12
-	usernameBox.ClearTextOnFocus = false
-	usernameBox.Parent = invitePanel
-	self._usernameBox = usernameBox
-
-	local usernameCorner = Instance.new("UICorner")
-	usernameCorner.CornerRadius = UDim.new(0, 6)
-	usernameCorner.Parent = usernameBox
+	local username = Instance.new("TextBox")
+	username.Name = "UsernameBox"
+	username.Size = UDim2.new(1, 0, 0, 38)
+	username.Position = UDim2.new(0, 0, 0, 31)
+	username.BackgroundColor3 = COLORS.slot
+	username.BorderSizePixel = 0
+	username.PlaceholderText = "Type a username or choose a player below"
+	username.PlaceholderColor3 = COLORS.textDim
+	username.TextColor3 = COLORS.text
+	username.TextTruncate = Enum.TextTruncate.AtEnd
+	username.Font = FONTS.Body
+	username.TextSize = 15
+	username.ClearTextOnFocus = false
+	username.Parent = invitePanel
+	corner(username, 7)
+	stroke(username, COLORS.borderDim, 1.5)
+	self._usernameBox = username
 
 	local playerList = Instance.new("ScrollingFrame")
 	playerList.Name = "PlayerList"
-	playerList.Size = UDim2.new(1, -16, 0, 160)
-	playerList.Position = UDim2.new(0, 8, 0, 72)
-	playerList.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-	playerList.BackgroundTransparency = 0.3
+	playerList.Size = UDim2.new(1, 0, 1, -122)
+	playerList.Position = UDim2.new(0, 0, 0, 80)
+	playerList.BackgroundTransparency = 1
 	playerList.BorderSizePixel = 0
-	playerList.ScrollBarThickness = 4
-	playerList.CanvasSize = UDim2.new(0, 0, 0, 0)
-	playerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	playerList.ScrollBarThickness = 8
+	playerList.ScrollBarImageColor3 = COLORS.gold
+	playerList.CanvasSize = UDim2.new()
 	playerList.Parent = invitePanel
 	self._playerList = playerList
-
-	local playerListCorner = Instance.new("UICorner")
-	playerListCorner.CornerRadius = UDim.new(0, 6)
-	playerListCorner.Parent = playerList
-
 	local playerLayout = Instance.new("UIListLayout")
-	playerLayout.Padding = UDim.new(0, 4)
-	playerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	playerLayout.Padding = UDim.new(0, 7)
 	playerLayout.Parent = playerList
+	playerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		playerList.CanvasSize = UDim2.new(0, 0, 0, playerLayout.AbsoluteContentSize.Y + 8)
+	end)
 
-	self._playerButtons = {}
-
-	local sendInviteBtn = makeButton(invitePanel, "Send Invite", UDim2.new(1, -16, 0, 30), UDim2.new(0, 8, 1, -38), Color3.fromRGB(50, 100, 70))
-	sendInviteBtn.MouseButton1Click:Connect(function()
-		if self._onInvite then
-			self._onInvite(self._selectedUserId, usernameBox.Text)
+	local footer = Instance.new("Frame")
+	footer.Size = UDim2.new(1, -32, 0, 48)
+	footer.Position = UDim2.new(0, 16, 1, -64)
+	footer.BackgroundTransparency = 1
+	footer.Parent = detailPane
+	local invite = button(footer, "INVITE PLAYER", COLORS.success)
+	invite.Size = UDim2.new(0.48, 0, 1, 0)
+	invite.MouseButton1Click:Connect(function()
+		if self._invitePanel.Visible then
+			if self._onInvite then self._onInvite(self._selectedUserId, username.Text) end
+		else
+			self:SetInvitePanelVisible(true)
 		end
 	end)
+	self._inviteBtn = invite
+	local leave = button(footer, "LEAVE PARTY", COLORS.danger)
+	leave.Size = UDim2.new(0.48, 0, 1, 0)
+	leave.Position = UDim2.new(0.52, 0, 0, 0)
+	leave.MouseButton1Click:Connect(function() if self._onLeave then self._onLeave() end end)
+	self._leaveBtn = leave
 
-	local inviteCloseBtn = makeButton(invitePanel, "Cancel", UDim2.new(1, -16, 0, 24), UDim2.new(0, 8, 1, -72), Color3.fromRGB(60, 60, 80))
-	inviteCloseBtn.MouseButton1Click:Connect(function()
-		self:SetInvitePanelVisible(false)
-	end)
-
-	local inviteToast = Instance.new("Frame")
-	inviteToast.Name = "InviteToast"
-	inviteToast.Size = UDim2.new(0, 320, 0, 72)
-	inviteToast.Position = UDim2.new(0.5, -160, 0, 120)
-	inviteToast.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-	inviteToast.BackgroundTransparency = 0.1
-	inviteToast.BorderSizePixel = 0
-	inviteToast.Visible = false
-	inviteToast.Parent = screenGui
-	self._inviteToast = inviteToast
-
-	local toastCorner = Instance.new("UICorner")
-	toastCorner.CornerRadius = UDim.new(0, 8)
-	toastCorner.Parent = inviteToast
-
+	local toast = Instance.new("Frame")
+	toast.Name = "InviteToast"
+	toast.AnchorPoint = Vector2.new(0.5, 0)
+	toast.Position = UDim2.fromScale(0.5, 0.08)
+	toast.Size = UDim2.fromScale(0.34, 0.13)
+	toast.BackgroundColor3 = COLORS.panel
+	toast.BorderSizePixel = 0
+	toast.Visible = false
+	toast.Parent = gui
+	corner(toast, 10)
+	stroke(toast, COLORS.border, 2)
+	self._inviteToast = toast
+	local toastConstraint = Instance.new("UISizeConstraint")
+	toastConstraint.MinSize = Vector2.new(300, 90)
+	toastConstraint.MaxSize = Vector2.new(500, 130)
+	toastConstraint.Parent = toast
 	local toastLabel = Instance.new("TextLabel")
-	toastLabel.Size = UDim2.new(1, -16, 0, 32)
-	toastLabel.Position = UDim2.new(0, 8, 0, 8)
+	toastLabel.Size = UDim2.new(1, -24, 0, 38)
+	toastLabel.Position = UDim2.new(0, 12, 0, 8)
 	toastLabel.BackgroundTransparency = 1
-	toastLabel.Text = "Party invite"
-	toastLabel.TextColor3 = Color3.new(1, 1, 1)
-	toastLabel.Font = Enum.Font.GothamBold
-	toastLabel.TextSize = 14
+	toastLabel.TextColor3 = COLORS.text
+	toastLabel.Font = FONTS.Body
+	toastLabel.TextSize = 15
+	toastLabel.TextWrapped = true
 	toastLabel.TextXAlignment = Enum.TextXAlignment.Left
-	toastLabel.Parent = inviteToast
+	toastLabel.Parent = toast
 	self._toastLabel = toastLabel
-
-	local acceptBtn = makeButton(inviteToast, "Accept", UDim2.new(0.45, -8, 0, 24), UDim2.new(0, 8, 1, -32), Color3.fromRGB(50, 120, 70))
-	acceptBtn.MouseButton1Click:Connect(function()
-		if self._pendingInviteFromUserId and self._onAcceptInvite then
-			self._onAcceptInvite(self._pendingInviteFromUserId)
-		end
+	local accept = button(toast, "ACCEPT", COLORS.success)
+	accept.Size = UDim2.new(0.48, -6, 0, 28)
+	accept.Position = UDim2.new(0, 12, 1, -36)
+	accept.TextSize = 13
+	accept.MouseButton1Click:Connect(function()
+		if self._pendingInviteFromUserId and self._onAcceptInvite then self._onAcceptInvite(self._pendingInviteFromUserId) end
 		self:HideInviteToast()
 	end)
-
-	local declineBtn = makeButton(inviteToast, "Decline", UDim2.new(0.45, -8, 0, 24), UDim2.new(0.55, 0, 1, -32), Color3.fromRGB(120, 50, 50))
-	declineBtn.MouseButton1Click:Connect(function()
-		if self._pendingInviteFromUserId and self._onDeclineInvite then
-			self._onDeclineInvite(self._pendingInviteFromUserId)
-		end
+	local decline = button(toast, "DECLINE", COLORS.danger)
+	decline.Size = UDim2.new(0.48, -6, 0, 28)
+	decline.Position = UDim2.new(0.52, -6, 1, -36)
+	decline.TextSize = 13
+	decline.MouseButton1Click:Connect(function()
+		if self._pendingInviteFromUserId and self._onDeclineInvite then self._onDeclineInvite(self._pendingInviteFromUserId) end
 		self:HideInviteToast()
 	end)
-
-	self._pendingInviteFromUserId = nil
 
 	return self
 end
 
-function PartyUI:OnInvite(callback)
-	self._onInvite = callback
-end
-
-function PartyUI:OnLeave(callback)
-	self._onLeave = callback
-end
-
-function PartyUI:OnKick(callback)
-	self._onKick = callback
-end
-
-function PartyUI:OnAcceptInvite(callback)
-	self._onAcceptInvite = callback
-end
-
-function PartyUI:OnDeclineInvite(callback)
-	self._onDeclineInvite = callback
-end
+function PartyUI:OnInvite(callback) self._onInvite = callback end
+function PartyUI:OnLeave(callback) self._onLeave = callback end
+function PartyUI:OnKick(callback) self._onKick = callback end
+function PartyUI:OnAcceptInvite(callback) self._onAcceptInvite = callback end
+function PartyUI:OnDeclineInvite(callback) self._onDeclineInvite = callback end
+function PartyUI:OnRefreshPlayers(callback) self._onRefreshPlayers = callback end
 
 function PartyUI:SetVisible(visible)
-	self._panel.Visible = visible
-	if not visible then
+	if visible then
+		self._overlay.Visible = true
+		self._panel.Visible = true
+		self._panel.Size = UDim2.fromScale(0.71, 0.67)
+		TweenService:Create(self._panel, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromScale(0.76, 0.72) }):Play()
+	else
+		self._overlay.Visible = false
+		self._panel.Visible = false
 		self:SetInvitePanelVisible(false)
 	end
 end
 
 function PartyUI:SetInvitePanelVisible(visible)
 	self._invitePanel.Visible = visible
-	if visible and self._onRefreshPlayers then
-		self._onRefreshPlayers()
-	end
+	self._idleLabel.Visible = not visible
+	if visible and self._onRefreshPlayers then self._onRefreshPlayers() end
 end
-
-function PartyUI:OnRefreshPlayers(callback)
-	self._onRefreshPlayers = callback
-end
-
-function PartyUI:IsInvitePanelOpen()
-	return self._invitePanel.Visible
-end
-
+function PartyUI:IsInvitePanelOpen() return self._invitePanel.Visible end
 function PartyUI:ShowStatusMessage(message, isError)
 	self._statusLabel.Text = message or ""
-	self._statusLabel.TextColor3 = isError and Color3.fromRGB(220, 120, 120) or Color3.fromRGB(180, 220, 180)
+	self._statusLabel.TextColor3 = isError and COLORS.danger or COLORS.success
 end
-
 function PartyUI:ShowInviteToast(fromUserId, fromName)
 	self._pendingInviteFromUserId = fromUserId
-	self._toastLabel.Text = fromName .. " invited you to their party"
+	self._toastLabel.Text = fromName .. " invited you to their party."
 	self._inviteToast.Visible = true
 end
-
-function PartyUI:HideInviteToast()
-	self._pendingInviteFromUserId = nil
-	self._inviteToast.Visible = false
-end
+function PartyUI:HideInviteToast() self._pendingInviteFromUserId = nil self._inviteToast.Visible = false end
 
 function PartyUI:ClearMemberRows()
-	for _, row in self._memberRows do
-		row.frame:Destroy()
-	end
+	for _, row in self._memberRows do row.frame:Destroy() end
 	self._memberRows = {}
 end
 
 function PartyUI:UpdateMemberRow(memberData, isLeader, showKick)
 	local userId = memberData.userId
-	local row = self._memberRows[userId]
-
-	if not row then
-		local frame = Instance.new("Frame")
-		frame.Name = "Member_" .. userId
-		frame.Size = UDim2.new(1, -8, 0, 52)
-		frame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-		frame.BorderSizePixel = 0
-		frame.Parent = self._memberList
-
-		local rowCorner = Instance.new("UICorner")
-		rowCorner.CornerRadius = UDim.new(0, 6)
-		rowCorner.Parent = frame
-
-		local nameLabel = Instance.new("TextLabel")
-		nameLabel.Name = "NameLabel"
-		nameLabel.Size = UDim2.new(1, showKick and -56 or -8, 0, 16)
-		nameLabel.Position = UDim2.new(0, 6, 0, 4)
-		nameLabel.BackgroundTransparency = 1
-		nameLabel.TextColor3 = Color3.new(1, 1, 1)
-		nameLabel.Font = Enum.Font.GothamBold
-		nameLabel.TextSize = 11
-		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-		nameLabel.Parent = frame
-
-		local hpBar = StatBar.new(frame, {
-			name = "HP",
-			position = UDim2.new(0, 6, 0, 22),
-			size = UDim2.new(1, showKick and -62 or -12, 0, 14),
-			fillColor = Color3.fromRGB(220, 60, 60),
-			textSize = 10,
-		})
-
-		local kickBtn = makeButton(frame, "X", UDim2.new(0, 24, 0, 24), UDim2.new(1, -30, 0, 4), Color3.fromRGB(120, 50, 50))
-		kickBtn.Visible = showKick
-		kickBtn.MouseButton1Click:Connect(function()
-			if self._onKick then
-				self._onKick(userId)
-			end
-		end)
-
-		row = {
-			frame = frame,
-			nameLabel = nameLabel,
-			hpBar = hpBar,
-			kickBtn = kickBtn,
-		}
-		self._memberRows[userId] = row
+	local row = Instance.new("Frame")
+	row.Name = "Member_" .. userId
+	row.Size = UDim2.new(1, 0, 0, 70)
+	row.BackgroundColor3 = COLORS.slot
+	row.BorderSizePixel = 0
+	row.Parent = self._memberList
+	corner(row, 8)
+	stroke(row, isLeader and COLORS.border or COLORS.borderDim, isLeader and 2 or 1.5)
+	local name = Instance.new("TextLabel")
+	name.Size = UDim2.new(1, showKick and -54 or -20, 0, 24)
+	name.Position = UDim2.new(0, 10, 0, 7)
+	name.BackgroundTransparency = 1
+	name.Text = (isLeader and "★ " or "") .. memberData.displayName .. "  Lv." .. tostring(memberData.level or 0) .. " (" .. (memberData.classId or "?") .. ")"
+	name.TextColor3 = isLeader and COLORS.gold or COLORS.text
+	name.Font = FONTS.Bold
+	name.TextSize = 14
+	name.TextXAlignment = Enum.TextXAlignment.Left
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	name.Parent = row
+	local hpBack = Instance.new("Frame")
+	hpBack.Size = UDim2.new(1, showKick and -58 or -20, 0, 17)
+	hpBack.Position = UDim2.new(0, 10, 0, 39)
+	hpBack.BackgroundColor3 = Color3.fromRGB(55, 35, 32)
+	hpBack.BorderSizePixel = 0
+	hpBack.Parent = row
+	corner(hpBack, 5)
+	local ratio = math.clamp((memberData.hp or 0) / math.max(memberData.maxHp or 1, 1), 0, 1)
+	local hp = Instance.new("Frame")
+	hp.Size = UDim2.new(ratio, 0, 1, 0)
+	hp.BackgroundColor3 = COLORS.danger
+	hp.BorderSizePixel = 0
+	hp.Parent = hpBack
+	corner(hp, 5)
+	local hpText = Instance.new("TextLabel")
+	hpText.Size = UDim2.fromScale(1, 1)
+	hpText.BackgroundTransparency = 1
+	hpText.Text = "HP " .. tostring(memberData.hp or 0) .. " / " .. tostring(memberData.maxHp or 0)
+	hpText.TextColor3 = COLORS.text
+	hpText.Font = FONTS.Bold
+	hpText.TextSize = 10
+	hpText.Parent = hpBack
+	if showKick then
+		local kick = button(row, "×", COLORS.danger)
+		kick.Size = UDim2.fromOffset(28, 28)
+		kick.Position = UDim2.new(1, -38, 0, 8)
+		kick.TextSize = 17
+		kick.MouseButton1Click:Connect(function() if self._onKick then self._onKick(userId) end end)
 	end
-
-	local classText = memberData.classId or "?"
-	local leaderPrefix = isLeader and "[L] " or ""
-	row.nameLabel.Text = string.format("%s%s  Lv.%d (%s)", leaderPrefix, memberData.displayName, memberData.level, classText)
-	row.hpBar:Update(memberData.hp, memberData.maxHp)
-	row.kickBtn.Visible = showKick and userId ~= self._localUserId
+	self._memberRows[userId] = { frame = row }
 end
 
 function PartyUI:Update(partyPayload, localUserId)
 	self._localUserId = localUserId
 	self:ClearMemberRows()
-
-	if not partyPayload or not partyPayload.members or #partyPayload.members == 0 then
-		self._inParty = false
-		self._isLeader = false
+	local members = partyPayload and partyPayload.members
+	if not members or #members == 0 then
 		self._emptyLabel.Visible = true
 		self._leaveBtn.Visible = false
+		self._inviteBtn.Text = "CREATE PARTY"
 		self._inviteBtn.Visible = true
 		return
 	end
-
-	self._inParty = true
-	self._isLeader = partyPayload.leaderUserId == localUserId
 	self._emptyLabel.Visible = false
+	self._isLeader = partyPayload.leaderUserId == localUserId
 	self._leaveBtn.Visible = true
-	self._inviteBtn.Visible = self._isLeader or not self._inParty
-
-	for _, memberData in partyPayload.members do
-		local isLeader = memberData.userId == partyPayload.leaderUserId
-		local showKick = self._isLeader and memberData.userId ~= localUserId
-		self:UpdateMemberRow(memberData, isLeader, showKick)
+	self._inviteBtn.Visible = self._isLeader
+	self._inviteBtn.Text = "INVITE PLAYER"
+	for _, memberData in members do
+		self:UpdateMemberRow(memberData, memberData.userId == partyPayload.leaderUserId, self._isLeader and memberData.userId ~= localUserId)
 	end
 end
 
 function PartyUI:RefreshPlayerList(players, localPlayer)
-	for _, btn in self._playerButtons do
-		btn:Destroy()
-	end
+	for _, value in self._playerButtons do value:Destroy() end
 	self._playerButtons = {}
 	self._selectedUserId = nil
-
-	for _, otherPlayer in players do
-		if otherPlayer ~= localPlayer then
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1, -8, 0, 28)
-			btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-			btn.Text = otherPlayer.DisplayName .. " (@" .. otherPlayer.Name .. ")"
-			btn.TextColor3 = Color3.fromRGB(200, 200, 220)
-			btn.Font = Enum.Font.Gotham
-			btn.TextSize = 11
-			btn.BorderSizePixel = 0
-			btn.Parent = self._playerList
-
-			local btnCorner = Instance.new("UICorner")
-			btnCorner.CornerRadius = UDim.new(0, 6)
-			btnCorner.Parent = btn
-
-			btn.MouseButton1Click:Connect(function()
-				self._selectedUserId = otherPlayer.UserId
-				self._usernameBox.Text = otherPlayer.Name
-				for _, otherBtn in self._playerButtons do
-					otherBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-				end
-				btn.BackgroundColor3 = Color3.fromRGB(60, 80, 110)
+	for _, other in players do
+		if other ~= localPlayer then
+			local value = button(self._playerList, other.DisplayName .. " (@" .. other.Name .. ")", COLORS.slot)
+			value.Size = UDim2.new(1, 0, 0, 38)
+			value.Font = FONTS.Body
+			value.TextSize = 14
+			value.TextXAlignment = Enum.TextXAlignment.Left
+			value.MouseButton1Click:Connect(function()
+				self._selectedUserId = other.UserId
+				self._usernameBox.Text = other.Name
+				for _, item in self._playerButtons do item.BackgroundColor3 = COLORS.slot end
+				value.BackgroundColor3 = COLORS.slotSelected
 			end)
-
-			table.insert(self._playerButtons, btn)
+			table.insert(self._playerButtons, value)
 		end
 	end
 end

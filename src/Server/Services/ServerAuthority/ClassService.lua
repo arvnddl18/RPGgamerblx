@@ -41,6 +41,10 @@ function ClassService:BuildClassPayload(classId)
 		accentColor = classConfig.accentColor,
 		baseStats = classConfig.baseStats,
 		skills = skillNames,
+		masteryPassive = classConfig.masteryPassive and {
+			name = classConfig.masteryPassive.name,
+			description = classConfig.masteryPassive.description,
+		},
 	}
 end
 

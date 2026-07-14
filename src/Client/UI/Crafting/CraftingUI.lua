@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -140,7 +141,7 @@ function CraftingUI.new(playerGui)
 	self._root.Name = "Root"
 	self._root.AnchorPoint = Vector2.new(0.5, 0.5)
 	self._root.Position = UDim2.fromScale(0.5, 0.5)
-	self._root.Size = UDim2.fromScale(0.9, 0.9)
+	self._root.Size = UDim2.fromScale(0.94, 0.90)
 	self._root.BackgroundColor3 = COLORS.panel
 	self._root.BorderSizePixel = 0
 	self._root.Active = true
@@ -148,6 +149,22 @@ function CraftingUI.new(playerGui)
 	self._root.Parent = self._screenGui
 	addCorner(self._root, 10)
 	addStroke(self._root, COLORS.border, 2)
+	local rootConstraint = Instance.new("UISizeConstraint")
+	rootConstraint.MinSize = Vector2.new(760, 500)
+	rootConstraint.MaxSize = Vector2.new(1500, 900)
+	rootConstraint.Parent = self._root
+	self._currentGold = Instance.new("TextLabel")
+	self._currentGold.Name = "CurrentGold"
+	self._currentGold.Size = UDim2.fromOffset(140, 28)
+	self._currentGold.Position = UDim2.new(1, -190, 0, 10)
+	self._currentGold.BackgroundTransparency = 1
+	self._currentGold.Text = "GOLD: 0"
+	self._currentGold.TextColor3 = Color3.fromRGB(255, 210, 80)
+	self._currentGold.Font = Enum.Font.GothamBold
+	self._currentGold.TextSize = 14
+	self._currentGold.TextXAlignment = Enum.TextXAlignment.Right
+	self._currentGold.ZIndex = 11
+	self._currentGold.Parent = self._root
 
 	self._closeBtn = Instance.new("TextButton")
 	self._closeBtn.Size = UDim2.new(0, 36, 0, 36)
@@ -161,7 +178,14 @@ function CraftingUI.new(playerGui)
 	self._closeBtn.Parent = self._root
 	addCorner(self._closeBtn, 6)
 	self._closeBtn.MouseButton1Click:Connect(function() self:SetVisible(false) end)
-	self._overlay.MouseButton1Click:Connect(function() self:SetVisible(false) end)
+	self._overlay.MouseButton1Click:Connect(function()
+		local mouse = UserInputService:GetMouseLocation()
+		local inset = GuiService:GetGuiInset()
+		local point = Vector2.new(mouse.X, mouse.Y - inset.Y)
+		local position, size = self._root.AbsolutePosition, self._root.AbsoluteSize
+		local insideRoot = point.X >= position.X and point.X <= position.X + size.X and point.Y >= position.Y and point.Y <= position.Y + size.Y
+		if not insideRoot then self:SetVisible(false) end
+	end)
 
 	-- Inventory Panel (Left)
 	self._inventoryPanel = Instance.new("Frame")
@@ -189,6 +213,8 @@ function CraftingUI.new(playerGui)
 	self._rarityDropdown.Size = UDim2.new(0, 130, 0, 28)
 	self._rarityDropdown.Position = UDim2.new(1, -142, 0, 8)
 	self._rarityDropdown.BackgroundColor3 = COLORS.slot
+	self._rarityDropdown.ZIndex = 100
+	self._rarityDropdown.Active = true
 	self._rarityDropdown.Parent = self._inventoryPanel
 	addCorner(self._rarityDropdown, 4)
 	addStroke(self._rarityDropdown, COLORS.borderDim)
@@ -200,6 +226,7 @@ function CraftingUI.new(playerGui)
 	self._rarityButton.TextColor3 = COLORS.text
 	self._rarityButton.Font = Enum.Font.GothamBold
 	self._rarityButton.TextSize = 11
+	self._rarityButton.ZIndex = 101
 	self._rarityButton.Parent = self._rarityDropdown
 
 	self._rarityList = Instance.new("Frame")
@@ -207,7 +234,8 @@ function CraftingUI.new(playerGui)
 	self._rarityList.Position = UDim2.new(0, 0, 1, 4)
 	self._rarityList.BackgroundColor3 = Color3.fromRGB(18, 15, 12)
 	self._rarityList.Visible = false
-	self._rarityList.ZIndex = 30
+	self._rarityList.ZIndex = 102
+	self._rarityList.Active = true
 	self._rarityList.Parent = self._rarityDropdown
 	addCorner(self._rarityList, 4)
 	addStroke(self._rarityList, COLORS.borderDim)
@@ -224,6 +252,7 @@ function CraftingUI.new(playerGui)
 		opt.TextColor3 = rarityId == "All" and COLORS.text or RarityConfig.GetColor(rarityId)
 		opt.Font = Enum.Font.Gotham
 		opt.TextSize = 11
+		opt.ZIndex = 103
 		opt.Parent = self._rarityList
 		addCorner(opt, 3)
 		opt.MouseButton1Click:Connect(function()
@@ -247,12 +276,14 @@ function CraftingUI.new(playerGui)
 
 	local filterLayout = Instance.new("UIListLayout")
 	filterLayout.FillDirection = Enum.FillDirection.Horizontal
+	filterLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	filterLayout.Padding = UDim.new(0, 2)
 	filterLayout.Parent = self._filterBar
 
 	self._filterButtons = {}
-	for _, filter in CATEGORY_FILTERS do
+	for filterIndex, filter in CATEGORY_FILTERS do
 		local btn = Instance.new("TextButton")
+		btn.LayoutOrder = filterIndex
 		btn.Size = UDim2.fromOffset(math.max(48, #filter.label * 6 + 10), 24)
 		btn.BackgroundColor3 = filter.id == "all" and COLORS.accent or COLORS.slot
 		btn.Text = filter.label
@@ -513,8 +544,9 @@ function CraftingUI:_createSlot(parent, config)
 	countLabel.Font = Enum.Font.GothamBold
 	countLabel.TextSize = 10
 	countLabel.TextXAlignment = Enum.TextXAlignment.Right
+	countLabel.TextStrokeTransparency = 0.45
 	countLabel.Visible = false
-	countLabel.ZIndex = 2
+	countLabel.ZIndex = 4
 	countLabel.Parent = frame
 
 	local slotData = { frame = frame, icon = icon, countLabel = countLabel, config = config }
@@ -979,6 +1011,10 @@ function CraftingUI:SetClassId(classId)
 	if self._visible then
 		self:_renderCrafting()
 	end
+end
+
+function CraftingUI:SetGold(amount)
+	self._currentGold.Text = "GOLD: " .. tostring(math.max(0, math.floor(amount or 0)))
 end
 
 function CraftingUI:SetRecipes(recipes)

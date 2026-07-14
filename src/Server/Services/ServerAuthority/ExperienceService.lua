@@ -63,6 +63,9 @@ function ExperienceService:GrantExperience(player, amount, _source)
 	end
 
 	self._playerData:AddXP(player, finalAmount)
+	-- Mastery mirrors every finalized XP reward (monsters and quest turn-ins)
+	-- until its independent Rank 10 cap is reached.
+	self._playerData:AddClassMasteryXP(player, finalAmount)
 end
 
 function ExperienceService:Start()

@@ -121,6 +121,12 @@ if player.Character then
 	syncRestFromCharacter(player.Character)
 end
 
+player:WaitForChild("PlayerGui"):WaitForChild("HUDAction").Event:Connect(function(actionId)
+	if actionId == "Rest" then
+		remotes.SetResting:FireServer(not isResting)
+	end
+end)
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return

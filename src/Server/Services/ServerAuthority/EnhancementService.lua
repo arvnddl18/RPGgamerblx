@@ -93,16 +93,13 @@ function EnhancementService:ApplyEnhancement(player, scrollItemId, targetUid)
 
 	local scrollTier = scrollItem.scrollTier
 	local enhanceLevel = targetEntry.enhanceLevel or 0
-	local data = self._playerData:GetData(player)
-	if scrollItem.requiredLevel and (not data or data.level < scrollItem.requiredLevel) then
-		return false, { outcome = "error", message = "Requires player level " .. scrollItem.requiredLevel .. "." }
-	end
 	if not scrollTier or scrollTier < 1 then
 		return false, { outcome = "error", message = "Invalid enhancement scroll level." }
 	end
 
 	-- The selected scroll determines both the risk and the resulting imprint
-	-- level. It can be applied directly to an unenhanced or already-enhanced item.
+	-- level. Any scroll rank can be applied directly; there is no player-level
+	-- or sequential-enhancement requirement.
 	local tier = EnhancementConfig.GetTierForLevel(scrollTier)
 	if not self._playerData:TakeCoins(player, tier.applyGoldCost) then
 		return false, { outcome = "error", message = "Not enough gold to apply scroll." }
@@ -113,7 +110,9 @@ function EnhancementService:ApplyEnhancement(player, scrollItemId, targetUid)
 		return false, { outcome = "error", message = "Could not consume scroll." }
 	end
 
-	local outcome = self:_rollOutcome(tier)
+	-- Enhancement is deterministic after validation: it never fails, downgrades,
+	-- or destroys the item.
+	local outcome = "success"
 	local resultPayload = {
 		outcome = outcome,
 		targetUid = targetUid,
@@ -155,7 +154,7 @@ function EnhancementService:ApplyEnhancement(player, scrollItemId, targetUid)
 
 	self._remotes.EnhancementResult:FireClient(player, resultPayload)
 	if outcome == "success" then
-		self._remotes.Notification:FireClient(player, "Enhancement success! +" .. resultPayload.enhanceLevel)
+		self._remotes.Notification:FireClient(player, "Enhancement complete! Item is now +" .. resultPayload.enhanceLevel)
 	elseif outcome == "fail" then
 		self._remotes.Notification:FireClient(player, "Enhancement failed.")
 	elseif outcome == "downgrade" then

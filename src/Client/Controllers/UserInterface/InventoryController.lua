@@ -276,6 +276,12 @@ toggleEvent.Event:Connect(function()
 	setVisible(not visible)
 end)
 
+player:WaitForChild("PlayerGui"):WaitForChild("HUDAction").Event:Connect(function(actionId)
+	if actionId == "Inventory" then
+		setVisible(not visible)
+	end
+end)
+
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed or not hasSelectedClass then
 		return
@@ -294,6 +300,7 @@ remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	hasSelectedClass = payload.hasSelectedClass == true
 	classId = payload.classId
 	equipped = payload.equipped or {}
+	ui:SetGold(payload.gold or payload.coins or 0)
 	ui:SetEquipped(equipped)
 	if not hasSelectedClass then
 		setVisible(false)

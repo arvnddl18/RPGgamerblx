@@ -2,6 +2,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Quests = require(Shared.Config.Quests)
+local R15NPCUtil = require(Shared.Util.R15NPCUtil)
 
 local QuestService = {}
 QuestService._playerData = nil
@@ -21,7 +22,7 @@ end
 ---------------------------------------------------------------------------
 -- Shared R15 rig builder (same skeleton structure as monster rigs)
 ---------------------------------------------------------------------------
-function QuestService:_BuildR15Rig(cframe, skinColor)
+function QuestService:_BuildLegacyR15Rig(cframe, skinColor)
 	local mat = Enum.Material.SmoothPlastic
 	local model = Instance.new("Model")
 
@@ -153,83 +154,20 @@ function QuestService:_BuildR15Rig(cframe, skinColor)
 	return model, hrp, head, rightHand
 end
 
+-- Reuse the stationary rig builder so all NPCs share the same R15 skeleton.
+-- This replaces the older inline builder above, which anchored every limb.
+function QuestService:_BuildR15Rig(cframe, skinColor, outfitColor, pantsColor)
+	return R15NPCUtil.Build(cframe, skinColor, outfitColor, pantsColor)
+end
+
 function QuestService:CreateNPC(cframe)
 	local config = Quests.GoblinMenace
 
 	local robeColor = Color3.fromRGB(50, 60, 140)
 	local skinColor = Color3.fromRGB(220, 180, 140)
 
-	local model, hrp, head, rHand = self:_BuildR15Rig(cframe, skinColor)
+	local model, hrp, head = self:_BuildR15Rig(cframe, skinColor, robeColor, Color3.fromRGB(35, 40, 100))
 	model.Name = config.npcName
-
-	-- Recolour torso parts to robe colour
-	local upperTorso = model:FindFirstChild("UpperTorso")
-	local lowerTorso = model:FindFirstChild("LowerTorso")
-	if upperTorso then upperTorso.Color = robeColor; upperTorso.Material = Enum.Material.Fabric end
-	if lowerTorso then lowerTorso.Color = robeColor; lowerTorso.Material = Enum.Material.Fabric end
-
-	-- Recolour arms to robe
-	for _, partName in {"LeftUpperArm", "LeftLowerArm", "RightUpperArm", "RightLowerArm"} do
-		local part = model:FindFirstChild(partName)
-		if part then part.Color = robeColor; part.Material = Enum.Material.Fabric end
-	end
-
-	-- Recolour legs to dark robe
-	local robeDark = Color3.fromRGB(35, 40, 100)
-	for _, partName in {"LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg", "RightFoot"} do
-		local part = model:FindFirstChild(partName)
-		if part then part.Color = robeDark; part.Material = Enum.Material.Fabric end
-	end
-
-	---------------------------------------------------------------------------
-	-- Wizard accessories (welded to head / right hand)
-	---------------------------------------------------------------------------
-	local function makeAccessory(name, size, color, material, parent, offset)
-		local p = Instance.new("Part")
-		p.Name = name
-		p.Size = size
-		p.Color = color
-		p.Material = material or Enum.Material.SmoothPlastic
-		p.Anchored = true
-		p.CanCollide = false
-		p.CFrame = parent.CFrame * offset
-		p.Parent = model
-		local w = Instance.new("WeldConstraint")
-		w.Part0 = parent
-		w.Part1 = p
-		w.Parent = p
-		return p
-	end
-
-	-- Beard
-	makeAccessory("Beard", Vector3.new(1.2, 1.0, 0.6),
-		Color3.fromRGB(200, 200, 210), Enum.Material.Fabric,
-		head, CFrame.new(0, -0.8, -0.2))
-
-	-- Wizard Hat
-	local hatBrim = makeAccessory("HatBrim", Vector3.new(0.4, 2.8, 2.8),
-		Color3.fromRGB(40, 30, 100), Enum.Material.Fabric,
-		head, CFrame.new(0, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90)))
-	hatBrim.Shape = Enum.PartType.Cylinder
-
-	local hatTop = makeAccessory("HatTop", Vector3.new(1.4, 2.0, 1.4),
-		Color3.fromRGB(40, 30, 100), Enum.Material.Fabric,
-		head, CFrame.new(0, 1.6, 0))
-
-	local star = makeAccessory("HatStar", Vector3.new(0.5, 0.5, 0.5),
-		Color3.fromRGB(255, 220, 80), Enum.Material.Neon,
-		hatTop, CFrame.new(0, 1.1, 0))
-	star.Shape = Enum.PartType.Ball
-
-	-- Staff in right hand
-	local staff = makeAccessory("Staff", Vector3.new(0.3, 4.5, 0.3),
-		Color3.fromRGB(110, 80, 50), Enum.Material.Wood,
-		rHand, CFrame.new(0, 2.0, 0))
-
-	local crystal = makeAccessory("StaffCrystal", Vector3.new(0.7, 0.7, 0.7),
-		Color3.fromRGB(100, 180, 255), Enum.Material.Neon,
-		staff, CFrame.new(0, 2.5, 0))
-	crystal.Shape = Enum.PartType.Ball
 
 	---------------------------------------------------------------------------
 	-- Glowing quest exclamation mark (!)
@@ -269,12 +207,12 @@ function QuestService:CreateNPC(cframe)
 	label.TextSize = 16
 	label.Parent = billboard
 
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Talk"
-	prompt.ObjectText = config.npcName
-	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = 10
-	prompt.Parent = hrp
+	local prompt = R15NPCUtil.AddInteraction(head, "Talk", config.npcName, function(player)
+		local data = self._playerData:GetData(player)
+		if data then
+			self._remotes.OpenQuest:FireClient(player, config.npcName)
+		end
+	end)
 
 	local npcsFolder = workspace:FindFirstChild("NPCs")
 	if not npcsFolder then
@@ -283,14 +221,6 @@ function QuestService:CreateNPC(cframe)
 		npcsFolder.Parent = workspace
 	end
 	model.Parent = npcsFolder
-
-	prompt.Triggered:Connect(function(player)
-		local data = self._playerData:GetData(player)
-		if not data then
-			return
-		end
-		self._remotes.OpenQuest:FireClient(player, config.npcName)
-	end)
 
 	return model
 end
@@ -314,6 +244,7 @@ function QuestService:CompleteQuest(player, config)
 		self._experienceService:GrantExperience(player, rewards.experience or 0, "quest")
 	else
 		self._playerData:AddXP(player, rewards.experience or 0)
+		self._playerData:AddClassMasteryXP(player, rewards.experience or 0)
 	end
 	self._playerData:AddCoins(player, rewards.gold or 0)
 
@@ -449,7 +380,7 @@ end
 
 function QuestService:CreateSimpleNPC(name, cframe, promptText, color)
 	local npcColor = color or Color3.fromRGB(100, 120, 180)
-	local model, hrp = self:_BuildR15Rig(cframe, npcColor)
+	local model, hrp, head = self:_BuildR15Rig(cframe, npcColor, npcColor)
 	model.Name = name
 
 	local billboard = Instance.new("BillboardGui")
@@ -467,12 +398,7 @@ function QuestService:CreateSimpleNPC(name, cframe, promptText, color)
 	label.TextSize = 16
 	label.Parent = billboard
 
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = promptText or "Talk"
-	prompt.ObjectText = name
-	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = 10
-	prompt.Parent = hrp
+	local prompt = R15NPCUtil.AddInteraction(head, promptText or "Talk", name, function() end)
 
 	local npcsFolder = workspace:FindFirstChild("NPCs") or Instance.new("Folder")
 	npcsFolder.Name = "NPCs"

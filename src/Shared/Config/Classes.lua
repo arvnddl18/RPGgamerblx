@@ -30,6 +30,12 @@ local Classes = {
 			skill3 = "Warrior_Whirlwind",
 			ultimate = "Warrior_Berserk",
 		},
+		masteryPassive = {
+			name = "Bloodlust",
+			description = "Restore health from physical damage dealt.",
+			rank5Bonuses = { physicalLifeSteal = 0.08 },
+			rank10Bonuses = { physicalLifeSteal = 0.15 },
+		},
 	},
 	Mage = {
 		id = "Mage",
@@ -61,6 +67,12 @@ local Classes = {
 			skill2 = "Mage_IceSpike",
 			skill3 = "Mage_LightningStorm",
 			ultimate = "Mage_Meteor",
+		},
+		masteryPassive = {
+			name = "Arcane Siphon",
+			description = "Restore health from magic damage dealt.",
+			rank5Bonuses = { magicLifeSteal = 0.08 },
+			rank10Bonuses = { magicLifeSteal = 0.15 },
 		},
 	},
 	Archer = {
@@ -94,6 +106,12 @@ local Classes = {
 			skill3 = "Archer_RainOfArrows",
 			ultimate = "Archer_SniperShot",
 		},
+		masteryPassive = {
+			name = "Eagle Eye",
+			description = "Increase critical-hit chance.",
+			rank5Bonuses = { critChance = 0.10 },
+			rank10Bonuses = { critChance = 0.20 },
+		},
 	},
 	Priest = {
 		id = "Priest",
@@ -126,6 +144,12 @@ local Classes = {
 			skill3 = "Priest_HolyNova",
 			ultimate = "Priest_DivineProtection",
 		},
+		masteryPassive = {
+			name = "Divine Grace",
+			description = "Increase the effect and duration of friendly buffs.",
+			rank5Bonuses = { buffEffectMultiplier = 0.15, buffDurationMultiplier = 0.15 },
+			rank10Bonuses = { buffEffectMultiplier = 0.30, buffDurationMultiplier = 0.30 },
+		},
 	},
 	Kavalier = {
 		id = "Kavalier",
@@ -157,6 +181,12 @@ local Classes = {
 			skill2 = "Kavalier_SpearThrow",
 			skill3 = "Kavalier_LanceSpin",
 			ultimate = "Kavalier_DragonCharge",
+		},
+		masteryPassive = {
+			name = "Cavalier's Momentum",
+			description = "Increase movement speed while fighting on foot.",
+			rank5Bonuses = { movementSpeed = 2 },
+			rank10Bonuses = { movementSpeed = 4 },
 		},
 	},
 }

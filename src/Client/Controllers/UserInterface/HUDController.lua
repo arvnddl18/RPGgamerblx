@@ -10,7 +10,16 @@ local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local hasSelectedClass = false
-local playerHUD = PlayerHUDUI.new(player:WaitForChild("PlayerGui"))
+local playerGui = player:WaitForChild("PlayerGui")
+local playerHUD = PlayerHUDUI.new(playerGui)
+
+local actionEvent = Instance.new("BindableEvent")
+actionEvent.Name = "HUDAction"
+actionEvent.Parent = playerGui
+
+playerHUD:OnAction(function(actionId)
+	actionEvent:Fire(actionId)
+end)
 
 remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	hasSelectedClass = payload.hasSelectedClass == true

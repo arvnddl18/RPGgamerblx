@@ -11,7 +11,7 @@ local LocalAnimationBuilder = require(script.Parent.Parent.Util.LocalAnimationBu
 local Skills = {
 	Warrior_AutoAttack = {
 		id = "Warrior_AutoAttack",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Auto Attack",
 		description = "A basic melee strike.",
 		slotType = "autoAttack",
@@ -34,7 +34,7 @@ local Skills = {
 	},
 	Warrior_Slash = {
 		id = "Warrior_Slash",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Slash",
 		description = "A powerful horizontal slash.",
 		cooldown = 4,
@@ -48,7 +48,7 @@ local Skills = {
 	},
 	Warrior_Charge = {
 		id = "Warrior_Charge",
-		requiredLevel = 5,
+		requiredMasteryRank = 2,
 		name = "Leap Strike",
 		description = "Leap forward and strike the enemy.",
 		cooldown = 8,
@@ -62,7 +62,7 @@ local Skills = {
 	},
 	Warrior_Whirlwind = {
 		id = "Warrior_Whirlwind",
-		requiredLevel = 10,
+		requiredMasteryRank = 3,
 		name = "Whirlwind",
 		description = "Spin and damage all nearby enemies.",
 		cooldown = 12,
@@ -77,7 +77,7 @@ local Skills = {
 	},
 	Warrior_Berserk = {
 		id = "Warrior_Berserk",
-		requiredLevel = 15,
+		requiredMasteryRank = 4,
 		name = "Berserk",
 		description = "Enter a rage, greatly increasing attack power.",
 		cooldown = 30,
@@ -91,7 +91,7 @@ local Skills = {
 	},
 	Mage_AutoAttack = {
 		id = "Mage_AutoAttack",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Magic Bolt",
 		description = "Fire a bolt of arcane energy.",
 		slotType = "autoAttack",
@@ -114,7 +114,7 @@ local Skills = {
 	},
 	Mage_Fireball = {
 		id = "Mage_Fireball",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Fireball",
 		description = "Hurl a ball of fire at the target.",
 		cooldown = 5,
@@ -129,7 +129,7 @@ local Skills = {
 	},
 	Mage_IceSpike = {
 		id = "Mage_IceSpike",
-		requiredLevel = 5,
+		requiredMasteryRank = 2,
 		name = "Ice Spike",
 		description = "Summon a spike of ice from the ground.",
 		cooldown = 7,
@@ -144,7 +144,7 @@ local Skills = {
 	},
 	Mage_LightningStorm = {
 		id = "Mage_LightningStorm",
-		requiredLevel = 10,
+		requiredMasteryRank = 3,
 		name = "Staff Lightning",
 		description = "Call down lightning on nearby enemies.",
 		cooldown = 14,
@@ -158,7 +158,7 @@ local Skills = {
 	},
 	Mage_Meteor = {
 		id = "Mage_Meteor",
-		requiredLevel = 15,
+		requiredMasteryRank = 4,
 		name = "Meteor",
 		description = "Summon a devastating meteor from the sky.",
 		cooldown = 35,
@@ -173,7 +173,7 @@ local Skills = {
 	},
 	Archer_AutoAttack = {
 		id = "Archer_AutoAttack",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Arrow Shot",
 		description = "Fire a single arrow.",
 		slotType = "autoAttack",
@@ -196,7 +196,7 @@ local Skills = {
 	},
 	Archer_MultiShot = {
 		id = "Archer_MultiShot",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Multi Shot",
 		description = "Fire multiple arrows at once.",
 		cooldown = 6,
@@ -211,7 +211,7 @@ local Skills = {
 	},
 	Archer_PiercingArrow = {
 		id = "Archer_PiercingArrow",
-		requiredLevel = 5,
+		requiredMasteryRank = 2,
 		name = "Piercing Arrow",
 		description = "An arrow that pierces through enemies.",
 		cooldown = 8,
@@ -226,7 +226,7 @@ local Skills = {
 	},
 	Archer_RainOfArrows = {
 		id = "Archer_RainOfArrows",
-		requiredLevel = 10,
+		requiredMasteryRank = 3,
 		name = "Rain of Arrows",
 		description = "Shower an area with arrows.",
 		cooldown = 14,
@@ -240,7 +240,7 @@ local Skills = {
 	},
 	Archer_SniperShot = {
 		id = "Archer_SniperShot",
-		requiredLevel = 15,
+		requiredMasteryRank = 4,
 		name = "Long Shot",
 		description = "A precise shot that deals massive damage.",
 		cooldown = 30,
@@ -255,7 +255,7 @@ local Skills = {
 	},
 	Priest_AutoAttack = {
 		id = "Priest_AutoAttack",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Holy Attack",
 		description = "Strike with holy light.",
 		slotType = "autoAttack",
@@ -278,7 +278,7 @@ local Skills = {
 	},
 	Priest_Heal = {
 		id = "Priest_Heal",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Heal",
 		description = "Restore health to yourself and nearby party members.",
 		cooldown = 6,
@@ -291,7 +291,7 @@ local Skills = {
 	},
 	Priest_Blessing = {
 		id = "Priest_Blessing",
-		requiredLevel = 5,
+		requiredMasteryRank = 2,
 		name = "Blessing",
 		description = "Bless yourself and nearby party members, increasing defense.",
 		cooldown = 12,
@@ -306,7 +306,7 @@ local Skills = {
 	},
 	Priest_HolyNova = {
 		id = "Priest_HolyNova",
-		requiredLevel = 10,
+		requiredMasteryRank = 3,
 		name = "Holy Nova",
 		description = "Burst of holy energy damaging nearby enemies.",
 		cooldown = 10,
@@ -322,7 +322,7 @@ local Skills = {
 	},
 	Priest_DivineProtection = {
 		id = "Priest_DivineProtection",
-		requiredLevel = 15,
+		requiredMasteryRank = 4,
 		name = "Divine Protection",
 		description = "Shield yourself and nearby party members with divine power.",
 		cooldown = 35,
@@ -337,7 +337,7 @@ local Skills = {
 	},
 	Kavalier_AutoAttack = {
 		id = "Kavalier_AutoAttack",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Spear Thrust",
 		description = "Thrust your spear forward.",
 		slotType = "autoAttack",
@@ -360,7 +360,7 @@ local Skills = {
 	},
 	Kavalier_DashStrike = {
 		id = "Kavalier_DashStrike",
-		requiredLevel = 1,
+		requiredMasteryRank = 1,
 		name = "Dash Strike",
 		description = "Dash forward and impale the enemy.",
 		cooldown = 7,
@@ -375,7 +375,7 @@ local Skills = {
 	},
 	Kavalier_SpearThrow = {
 		id = "Kavalier_SpearThrow",
-		requiredLevel = 5,
+		requiredMasteryRank = 2,
 		name = "Spear Throw",
 		description = "Throw your spear at a distant target.",
 		cooldown = 9,
@@ -390,7 +390,7 @@ local Skills = {
 	},
 	Kavalier_LanceSpin = {
 		id = "Kavalier_LanceSpin",
-		requiredLevel = 10,
+		requiredMasteryRank = 3,
 		name = "Lance Spin",
 		description = "Spin your lance, damaging all around you.",
 		cooldown = 12,
@@ -406,7 +406,7 @@ local Skills = {
 	},
 	Kavalier_DragonCharge = {
 		id = "Kavalier_DragonCharge",
-		requiredLevel = 15,
+		requiredMasteryRank = 4,
 		name = "Dragon Charge",
 		description = "Charge like a dragon, devastating all in your path.",
 		cooldown = 32,

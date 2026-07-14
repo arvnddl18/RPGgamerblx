@@ -182,7 +182,7 @@ function FloatingText.ShowDamage(character, amount, isCritical)
 	
 	if isCritical then
 		textLabel.TextColor3 = Color3.fromRGB(255, 170, 0) -- Orange/Gold
-		textLabel.Text = text .. "!"
+		textLabel.Text = "CRIT " .. text .. "!"
 	else
 		textLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Bright Red
 	end
@@ -194,8 +194,8 @@ end
 	2. HEAL NUMBERS
 	Shows healing with a green color and "+" prefix.
 ]]
-function FloatingText.ShowHeal(character, amount)
-	local text = "+" .. tostring(math.floor(amount))
+function FloatingText.ShowHeal(character, amount, sourceLabel)
+	local text = string.upper(sourceLabel or "Heal") .. " +" .. tostring(math.floor(amount))
 	
 	local billboard, textLabel = createBaseBillboard(character, text)
 	if not billboard then return end

@@ -5,6 +5,7 @@ local CraftingRecipes = require(Shared.Config.CraftingRecipes)
 local CraftingConfig = require(Shared.Config.CraftingConfig)
 local RarityConfig = require(Shared.Config.RarityConfig)
 local Items = require(Shared.Config.Items)
+local R15NPCUtil = require(Shared.Util.R15NPCUtil)
 
 local CraftingService = {}
 CraftingService._playerData = nil
@@ -102,6 +103,7 @@ function CraftingService:CraftItem(player, recipeId)
 	if self._playerData:AddItem(player, resultId, recipe.resultAmount) then
 		local payload = { outcome = "success", recipeId = recipeId, resultItem = resultId }
 		self._remotes.CraftResult:FireClient(player, payload)
+		self._remotes.Notification:FireClient(player, "Crafted " .. (recipe.resultAmount or 1) .. "x " .. itemConfig.name .. "!")
 		return true, payload
 	else
 		for _, mat in recipe.materials do
@@ -231,7 +233,7 @@ function CraftingService:BuildRecipePayload()
 	return list
 end
 
-function CraftingService:CreateNPC(cframe)
+function CraftingService:_CreateLegacyNPC(cframe)
 	local model = Instance.new("Model")
 	model.Name = "Crafting Master"
 
@@ -296,6 +298,38 @@ function CraftingService:CreateNPC(cframe)
 		self._remotes.OpenCrafting:FireClient(player, recipes)
 	end)
 
+	return model
+end
+
+-- R15 replacement for the previous torso-and-head-only crafting NPC.
+function CraftingService:CreateNPC(cframe)
+	local model, root, head = R15NPCUtil.Build(cframe, Color3.fromRGB(200, 160, 120), Color3.fromRGB(100, 80, 140), Color3.fromRGB(65, 50, 90))
+	model.Name = "Crafting Master"
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 140, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = root
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = "Crafting Master"
+	label.TextColor3 = Color3.fromRGB(180, 140, 255)
+	label.TextStrokeTransparency = 0.3
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 16
+	label.Parent = billboard
+
+	local npcsFolder = workspace:FindFirstChild("NPCs") or Instance.new("Folder")
+	npcsFolder.Name = "NPCs"
+	npcsFolder.Parent = workspace
+	model.Parent = npcsFolder
+
+	local recipes = self:BuildRecipePayload()
+	R15NPCUtil.AddInteraction(head, "Craft", "Crafting Master", function(player)
+		self._remotes.OpenCrafting:FireClient(player, recipes)
+	end)
 	return model
 end
 
