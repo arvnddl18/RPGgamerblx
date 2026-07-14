@@ -125,6 +125,11 @@ local function registerSequence(name, keyframes, isLooping)
 		return persisted
 	end
 
+	if RunService:IsServer() then
+		cachedIds[name] = "rbxassetid://507777826"
+		return "rbxassetid://507777826"
+	end
+
 	local ok, animId = pcall(function()
 		local keyframeSequence = Instance.new("KeyframeSequence")
 		keyframeSequence.Name = name
@@ -146,8 +151,8 @@ local function registerSequence(name, keyframes, isLooping)
 		warnedMissing[name] = true
 		warn("[LocalAnimationBuilder] Animation not registered:", name)
 	end
-	cachedIds[name] = ""
-	return ""
+	cachedIds[name] = "rbxassetid://507777826"
+	return "rbxassetid://507777826"
 end
 
 function AnimationBuilder.GetAnimId(methodName)

@@ -720,6 +720,30 @@ local Items = {
 }
 
 local EquipmentSlots = require(script.Parent.EquipmentSlots)
+local EnhancementConfig = require(script.Parent.EnhancementConfig)
+
+-- Every player/enhancement level has a focused shop-only scroll. They are generated
+-- here so the item catalog and shop cannot drift out of sync.
+local scrollColors = {
+	Fighter = Color3.fromRGB(210, 95, 75), Mage = Color3.fromRGB(100, 130, 255),
+	Healer = Color3.fromRGB(100, 220, 160), Lucky = Color3.fromRGB(245, 200, 75),
+	Guardian = Color3.fromRGB(130, 185, 205),
+	Rogue = Color3.fromRGB(155, 95, 210), Hybrid = Color3.fromRGB(220, 130, 175),
+}
+for category, profile in pairs(EnhancementConfig.ScrollCategories) do
+	for level = 1, EnhancementConfig.MAX_ENHANCE_LEVEL do
+		local id = string.format("EnhanceScroll_%s_%d", category, level)
+		local scaledBonuses = EnhancementConfig.GetScrollBonuses(category, level)
+		Items[id] = {
+			id = id,
+			name = string.format("%s Enhancement Scroll (Lv. %d)", profile.label, level),
+			description = string.format("Requires player level %d. Enhances gear from +%d to +%d. %s", level, level - 1, level, profile.description),
+			type = "scroll", category = "scrolls", enhancementCategory = category,
+			enhancementBonuses = scaledBonuses, scrollTier = level, requiredLevel = level,
+			usable = false, stackable = true, maxStack = 20, color = scrollColors[category],
+		}
+	end
+end
 
 for _, item in pairs(Items) do
 	if item.slot and EquipmentSlots.DEFAULT_VISUAL_MODE[item.slot] then

@@ -19,9 +19,9 @@ function ShopService:Init()
 	Framework:GetRemote("SellItem")
 end
 
-function ShopService:BuildShopPayload()
+function ShopService:BuildShopPayload(shopType)
 	local shopItems = {}
-	for _, entry in Shop.items do
+	for _, entry in Shop.GetItems(shopType) do
 		local item = Items[entry.itemId]
 		if item then
 			table.insert(shopItems, {
@@ -38,9 +38,11 @@ function ShopService:BuildShopPayload()
 	return shopItems
 end
 
-function ShopService:CreateNPC(cframe)
+function ShopService:CreateNPC(cframe, shopType)
 	local model = Instance.new("Model")
-	model.Name = "Shop Keeper"
+	local isEnhancementShop = shopType == "enhancement"
+	local merchantName = isEnhancementShop and "Enhancement Scribe" or "Equipment Merchant"
+	model.Name = merchantName
 
 	local skinColor = Color3.fromRGB(200, 160, 120)
 	local shirtColor = Color3.fromRGB(180, 140, 60)
@@ -308,7 +310,7 @@ function ShopService:CreateNPC(cframe)
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
-	label.Text = "Scroll Merchant"
+	label.Text = merchantName
 	label.TextColor3 = Color3.fromRGB(255, 210, 80)
 	label.TextStrokeTransparency = 0.3
 	label.Font = Enum.Font.GothamBold
@@ -317,7 +319,7 @@ function ShopService:CreateNPC(cframe)
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Shop"
-	prompt.ObjectText = "Scroll Merchant"
+	prompt.ObjectText = merchantName
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 10
 	prompt.Parent = root
@@ -331,10 +333,10 @@ function ShopService:CreateNPC(cframe)
 	end
 	model.Parent = npcsFolder
 
-	local shopItems = self:BuildShopPayload()
+	local shopItems = self:BuildShopPayload(shopType)
 
 	prompt.Triggered:Connect(function(player)
-		self._remotes.OpenShop:FireClient(player, shopItems)
+		self._remotes.OpenShop:FireClient(player, shopItems, shopType)
 	end)
 
 	return model
@@ -424,8 +426,10 @@ function ShopService:Sell(player, itemId, count)
 end
 
 function ShopService:Start()
-	local cframe = self._mapGenerator:GetMarketplaceShopCFrame()
-	self:CreateNPC(cframe)
+	local equipmentCFrame = self._mapGenerator:GetMarketplaceNpcCFrame("EquipmentShop")
+	local enhancementCFrame = self._mapGenerator:GetMarketplaceNpcCFrame("EnhancementShop")
+	if equipmentCFrame then self:CreateNPC(equipmentCFrame, "equipment") end
+	if enhancementCFrame then self:CreateNPC(enhancementCFrame, "enhancement") end
 
 	self._remotes.PurchaseItem.OnServerEvent:Connect(function(player, itemId, quantity)
 		local success, message = self:Purchase(player, itemId, quantity)

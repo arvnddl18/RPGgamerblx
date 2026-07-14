@@ -112,7 +112,7 @@ end
 
 -- Create core remotes BEFORE map generation so clients can connect immediately
 local coreRemotes = {
-	"Attack", "CastSkill", "SkillCooldownUpdated", "RequestDash", "DashCooldownUpdated", "PlaySkillVfx",
+	"Attack", "CastSkill", "SkillCooldownUpdated", "RequestDash", "DashCooldownUpdated", "PlaySkillVfx", "ChestOpened",
 	"StatsUpdated", "InventoryUpdated", "RequestInventory", "UseItem", "DropItem",
 	"SelectClass", "ClassSelected", "EquipItem", "UnequipItem",
 	"OpenQuest", "AcceptQuest", "QuestUpdated", "OpenQuestLog",

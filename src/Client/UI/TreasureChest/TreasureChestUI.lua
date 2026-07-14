@@ -249,7 +249,7 @@ function TreasureChestUI:Hide()
 end
 
 function TreasureChestUI:Start()
-	self._remotes.ChestOpened.OnClientEvent:Connect(function(chestData)
+	self._remotes:WaitForChild("ChestOpened").OnClientEvent:Connect(function(chestData)
 		self:Show(chestData)
 	end)
 end

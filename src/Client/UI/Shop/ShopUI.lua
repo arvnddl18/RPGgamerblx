@@ -31,7 +31,7 @@ local COLORS = {
 	locked = Color3.fromRGB(80, 80, 80),
 }
 
-local MAX_SHOP_SLOTS = 50
+local MAX_SHOP_SLOTS = 100
 local SLOT_SIZE = 54
 local SLOT_PAD = 4
 
@@ -47,9 +47,32 @@ local CATEGORY_FILTERS = {
 	{ id = "boots", label = "Boots", slot = "boots" },
 	{ id = "materials", label = "Materials", category = "materials" },
 	{ id = "consumables", label = "Consumables", consumable = true },
+	{ id = "Fighter", label = "Fighter", enhancementCategory = "Fighter" },
+	{ id = "Mage", label = "Mage", enhancementCategory = "Mage" },
+	{ id = "Healer", label = "Healer", enhancementCategory = "Healer" },
+	{ id = "Lucky", label = "Lucky", enhancementCategory = "Lucky" },
+	{ id = "Guardian", label = "Guardian", enhancementCategory = "Guardian" },
+	{ id = "Rogue", label = "Rogue", enhancementCategory = "Rogue" },
+	{ id = "Hybrid", label = "Hybrid", enhancementCategory = "Hybrid" },
 }
 
 local RARITY_OPTIONS = { "All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" }
+
+local STAT_DISPLAY_NAMES = {
+	physicalAttack = "Physical Attack", magicAttack = "Magic Attack", maxHp = "Max HP", maxMana = "Max Mana",
+	defense = "Defense", magicalResistance = "Magic Resistance", movementSpeed = "Move Speed",
+	critChance = "Critical Chance", critDamage = "Critical Damage", critReduction = "Critical Reduction",
+	accuracy = "Accuracy", evasion = "Evasion", healPower = "Heal Power", hpRegen = "HP Regen", manaRegen = "Mana Regen",
+}
+local PERCENT_STATS = { critChance = true, critDamage = true, critReduction = true, accuracy = true, evasion = true, healPower = true }
+
+local function formatStatBonus(statName, value)
+	local label = STAT_DISPLAY_NAMES[statName] or statName:gsub("(%u)", " %1"):gsub("^%s+", "")
+	if PERCENT_STATS[statName] then
+		return string.format("+%.3f%% %s", value * 100, label)
+	end
+	return string.format("+%g %s", value, label)
+end
 
 -- ─── Helpers ────────────────────────────────────────────────────────────────
 local function addCorner(parent, radius)
@@ -87,6 +110,9 @@ local function matchesCategoryFilter(item, filterId)
 					or item.category == "potions"
 					or item.type == "consumable"
 			end
+			if filter.enhancementCategory then
+				return item.enhancementCategory == filter.enhancementCategory
+			end
 			return false
 		end
 	end
@@ -114,6 +140,7 @@ function ShopUI.new(playerGui)
 
 	self._playerGui = playerGui
 	self._shopItems = {}
+	self._shopType = "equipment"
 	self._playerLevel = 1
 	self._categoryFilter = "all"
 	self._rarityFilter = "all"
@@ -193,6 +220,7 @@ function ShopUI.new(playerGui)
 	invTitle.TextSize = 18
 	invTitle.TextXAlignment = Enum.TextXAlignment.Left
 	invTitle.Parent = self._inventoryPanel
+	self._shopTitle = invTitle
 
 	-- ── Rarity Dropdown ──
 	self._rarityDropdown = Instance.new("Frame")
@@ -326,7 +354,7 @@ function ShopUI.new(playerGui)
 		self._gridFrame.CanvasSize = UDim2.new(0, 0, 0, gridLayout.AbsoluteContentSize.Y + 8)
 	end)
 
-	-- Create 50 slots
+	-- Create enough slots for every rank in a focused enhancement category.
 	self._shopSlots = {}
 	for idx = 1, MAX_SHOP_SLOTS do
 		local slot = self:_createSlot(self._gridFrame, idx)
@@ -949,13 +977,39 @@ function ShopUI:_refreshDetails()
 		local tierLabel = Instance.new("TextLabel")
 		tierLabel.Size = UDim2.new(1, 0, 0, 16)
 		tierLabel.BackgroundTransparency = 1
-		tierLabel.Text = "  Enhances gear up to +" .. item.scrollTier
+		tierLabel.Text = "  Enhances gear from +" .. (item.scrollTier - 1) .. " to +" .. item.scrollTier
 		tierLabel.TextColor3 = Color3.fromRGB(140, 170, 255)
 		tierLabel.Font = Enum.Font.Gotham
 		tierLabel.TextSize = 12
 		tierLabel.TextXAlignment = Enum.TextXAlignment.Left
 		tierLabel.LayoutOrder = nextOrder()
 		tierLabel.Parent = self._detailScroll
+	end
+
+	if item.enhancementBonuses then
+		addSeparator()
+		local bonusHeader = Instance.new("TextLabel")
+		bonusHeader.Size = UDim2.new(1, 0, 0, 20)
+		bonusHeader.BackgroundTransparency = 1
+		bonusHeader.Text = string.upper(item.enhancementCategory or "FOCUSED") .. " BONUS ON SUCCESS"
+		bonusHeader.TextColor3 = COLORS.accent
+		bonusHeader.Font = Enum.Font.GothamBold
+		bonusHeader.TextSize = 11
+		bonusHeader.TextXAlignment = Enum.TextXAlignment.Left
+		bonusHeader.LayoutOrder = nextOrder()
+		bonusHeader.Parent = self._detailScroll
+		for statName, statValue in pairs(item.enhancementBonuses) do
+			local statLabel = Instance.new("TextLabel")
+			statLabel.Size = UDim2.new(1, 0, 0, 16)
+			statLabel.BackgroundTransparency = 1
+			statLabel.Text = "  " .. formatStatBonus(statName, statValue)
+			statLabel.TextColor3 = COLORS.success
+			statLabel.Font = Enum.Font.Gotham
+			statLabel.TextSize = 12
+			statLabel.TextXAlignment = Enum.TextXAlignment.Left
+			statLabel.LayoutOrder = nextOrder()
+			statLabel.Parent = self._detailScroll
+		end
 	end
 
 	-- ── Class Restriction ──
@@ -1193,6 +1247,19 @@ function ShopUI:SetItems(items)
 	self._selectedIndex = nil
 	if self._visible then
 		self:Refresh()
+	end
+end
+
+function ShopUI:SetShopType(shopType)
+	self._shopType = shopType or "equipment"
+	self._categoryFilter = "all"
+	local enhancementFilters = { all = true, Fighter = true, Mage = true, Healer = true, Lucky = true, Guardian = true, Rogue = true, Hybrid = true }
+	for id, button in pairs(self._filterButtons) do
+		button.Visible = self._shopType ~= "enhancement" or enhancementFilters[id] == true
+		button.BackgroundColor3 = id == "all" and COLORS.accent or COLORS.slot
+	end
+	if self._shopTitle then
+		self._shopTitle.Text = self._shopType == "enhancement" and "ENHANCEMENT SCROLLS" or "EQUIPMENT SHOP"
 	end
 end
 

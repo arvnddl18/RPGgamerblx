@@ -200,13 +200,22 @@ local function sumEquipmentBonuses(equipped)
 			local itemId = equippedItem.id
 			local item = Items[itemId]
 			local multiplier = equippedItem.statMultiplier or 1.0
-			local enhanceLevel = equippedItem.enhanceLevel or 0
-			local flatPerLevel = enhConfig and enhConfig.STAT_BONUS_PER_LEVEL or 1
-			local flatBonus = enhanceLevel * flatPerLevel
-			
 			if item and item.statBonuses then
 				for stat, value in pairs(item.statBonuses) do
-					bonuses[stat] = (bonuses[stat] or 0) + (value * multiplier) + flatBonus
+					bonuses[stat] = (bonuses[stat] or 0) + (value * multiplier)
+				end
+			end
+			if equippedItem.enhancementBonuses then
+				for stat, value in pairs(equippedItem.enhancementBonuses) do
+					bonuses[stat] = (bonuses[stat] or 0) + value
+				end
+			elseif equippedItem.enhanceLevel and equippedItem.enhanceLevel > 0 then
+				-- Preserve bonuses on equipment enhanced before focused scrolls.
+				local flatBonus = equippedItem.enhanceLevel * (enhConfig and enhConfig.STAT_BONUS_PER_LEVEL or 1)
+				if item and item.statBonuses then
+					for stat in pairs(item.statBonuses) do
+						bonuses[stat] = (bonuses[stat] or 0) + flatBonus
+					end
 				end
 			end
 		elseif equippedItem and type(equippedItem) == "string" then
@@ -881,12 +890,14 @@ function PlayerDataService:GetWeaponDamage(player)
 	local weapon = weaponId and Items[weaponId]
 	local weaponDamage = weapon and weapon.damage or 0
 	local enhanceLevel = 0
+	local hasFocusedEnhancement = false
 	if type(data.equipped.weapon) == "table" then
 		enhanceLevel = data.equipped.weapon.enhanceLevel or 0
+		hasFocusedEnhancement = data.equipped.weapon.enhancementBonuses ~= nil
 	end
 	local enhConfig = getEnhancementConfig()
 	local flatPerLevel = enhConfig and enhConfig.STAT_BONUS_PER_LEVEL or 1
-	local enhanceBonus = enhanceLevel * flatPerLevel
+	local enhanceBonus = hasFocusedEnhancement and 0 or enhanceLevel * flatPerLevel
 	return math.max(1, data.combatStats.physicalAttack + weaponDamage + enhanceBonus)
 end
 
@@ -967,6 +978,8 @@ function PlayerDataService:EquipItem(player, itemId, uid)
 		rarity = itemEntry.rarity,
 		statMultiplier = itemEntry.statMultiplier,
 		enhanceLevel = itemEntry.enhanceLevel or 0,
+		enhancementBonuses = itemEntry.enhancementBonuses,
+		enhancementHistory = itemEntry.enhancementHistory,
 	}
 	data.equipped[slot] = equippedItem
 	

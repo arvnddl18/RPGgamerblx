@@ -1519,6 +1519,9 @@ function MapGeneratorService:GetPrimaryMarketplace()
 end
 
 local MARKETPLACE_NPC_SLOTS = {
+	EquipmentShop = { offsetX = -50, offsetZ = 10, yaw = math.pi / 2 },
+	EnhancementShop = { offsetX = -50, offsetZ = 30, yaw = math.pi / 2 },
+	-- Kept for older callers.
 	Shop = { offsetX = -50, offsetZ = 10, yaw = math.pi / 2 },
 	Crafting = { offsetX = 50, offsetZ = 10, yaw = -math.pi / 2 },
 	QuestGiver = { offsetX = -30, offsetZ = -20, yaw = math.pi * 0.75 },

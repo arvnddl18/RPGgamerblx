@@ -9,6 +9,30 @@ EnhancementService._playerData = nil
 EnhancementService._remotes = nil
 EnhancementService._rng = Random.new()
 
+local function copyBonuses(bonuses)
+	if not bonuses then
+		return nil
+	end
+	local copy = {}
+	for stat, value in pairs(bonuses) do
+		copy[stat] = value
+	end
+	return copy
+end
+
+-- An item has one active scroll imprint, not a stack of sequential upgrades.
+-- Replacing it must discard every prior bonus so, for example, a Mage Lv. 3
+-- scroll cleanly replaces a Fighter Lv. 3 scroll.
+local function setImprint(entry, scrollItem, level, bonuses)
+	entry.enhanceLevel = math.max(0, level)
+	entry.enhancementCategory = scrollItem.enhancementCategory
+	entry.enhancementHistory = {}
+	entry.enhancementBonuses = copyBonuses(bonuses)
+	if entry.enhancementBonuses then
+		table.insert(entry.enhancementHistory, copyBonuses(entry.enhancementBonuses))
+	end
+end
+
 function EnhancementService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
 	self._playerData = Framework:GetService("PlayerDataService")
@@ -69,14 +93,17 @@ function EnhancementService:ApplyEnhancement(player, scrollItemId, targetUid)
 
 	local scrollTier = scrollItem.scrollTier
 	local enhanceLevel = targetEntry.enhanceLevel or 0
-	if enhanceLevel >= scrollTier then
-		return false, { outcome = "error", message = "Scroll tier too low for this item." }
+	local data = self._playerData:GetData(player)
+	if scrollItem.requiredLevel and (not data or data.level < scrollItem.requiredLevel) then
+		return false, { outcome = "error", message = "Requires player level " .. scrollItem.requiredLevel .. "." }
 	end
-	if enhanceLevel >= EnhancementConfig.MAX_ENHANCE_LEVEL then
-		return false, { outcome = "error", message = "Item is already max enhancement." }
+	if not scrollTier or scrollTier < 1 then
+		return false, { outcome = "error", message = "Invalid enhancement scroll level." }
 	end
 
-	local tier = EnhancementConfig.GetTierForLevel(enhanceLevel + 1)
+	-- The selected scroll determines both the risk and the resulting imprint
+	-- level. It can be applied directly to an unenhanced or already-enhanced item.
+	local tier = EnhancementConfig.GetTierForLevel(scrollTier)
 	if not self._playerData:TakeCoins(player, tier.applyGoldCost) then
 		return false, { outcome = "error", message = "Not enough gold to apply scroll." }
 	end
@@ -95,10 +122,12 @@ function EnhancementService:ApplyEnhancement(player, scrollItemId, targetUid)
 	}
 
 	if outcome == "success" then
-		targetEntry.enhanceLevel = enhanceLevel + 1
+		setImprint(targetEntry, scrollItem, scrollTier, scrollItem.enhancementBonuses)
 		resultPayload.enhanceLevel = targetEntry.enhanceLevel
 	elseif outcome == "downgrade" then
-		targetEntry.enhanceLevel = math.max(0, enhanceLevel - 1)
+		local downgradedLevel = math.max(0, scrollTier - 1)
+		local bonuses = downgradedLevel > 0 and scrollItem.enhancementCategory and EnhancementConfig.GetScrollBonuses(scrollItem.enhancementCategory, downgradedLevel) or nil
+		setImprint(targetEntry, scrollItem, downgradedLevel, bonuses)
 		resultPayload.enhanceLevel = targetEntry.enhanceLevel
 	elseif outcome == "break" then
 		if equippedSlot then

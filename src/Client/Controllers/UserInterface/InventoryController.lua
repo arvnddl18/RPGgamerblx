@@ -19,6 +19,7 @@ local classId = nil
 local visible = false
 local hasSelectedClass = false
 local enhanceBusy = false
+local setVisible
 
 local ui = InventoryEquipmentUI.new(player:WaitForChild("PlayerGui"))
 
@@ -162,7 +163,12 @@ ui:OnEnhance(function(slotData)
 	if not targetUid then
 		return
 	end
-	ui:SetEnhanceMode(true, targetUid, nil)
+	local enhancementGui = player.PlayerGui:FindFirstChild("EnhancementUI")
+	local openEvent = enhancementGui and enhancementGui:FindFirstChild("OpenEnhancementUI")
+	if openEvent then
+		setVisible(false)
+		openEvent:Fire(targetUid)
+	end
 end)
 
 ui:OnCraft(function(slotData)
@@ -250,7 +256,7 @@ ui:OnDragDrop(function(sourceSlot, targetSlot)
 	end
 end)
 
-local function setVisible(value)
+setVisible = function(value)
 	if not hasSelectedClass then
 		return
 	end

@@ -61,6 +61,22 @@ local CATEGORY_FILTERS = {
 
 local RARITY_OPTIONS = { "All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" }
 
+local STAT_DISPLAY_NAMES = {
+	physicalAttack = "Physical Attack", magicAttack = "Magic Attack", maxHp = "Max HP", maxMana = "Max Mana",
+	defense = "Defense", magicalResistance = "Magic Resistance", movementSpeed = "Move Speed",
+	critChance = "Critical Chance", critDamage = "Critical Damage", critReduction = "Critical Reduction",
+	accuracy = "Accuracy", evasion = "Evasion", healPower = "Heal Power", hpRegen = "HP Regen", manaRegen = "Mana Regen",
+}
+local PERCENT_STATS = { critChance = true, critDamage = true, critReduction = true, accuracy = true, evasion = true, healPower = true }
+
+local function formatStatBonus(statName, value)
+	local label = STAT_DISPLAY_NAMES[statName] or statName:gsub("(%u)", " %1"):gsub("^%s+", "")
+	if PERCENT_STATS[statName] then
+		return string.format("+%.3f%% %s", value * 100, label)
+	end
+	return string.format("+%g %s", value, label)
+end
+
 local ACTION_CALLBACKS = {
 	use = "onUse",
 	equip = "onEquip",
@@ -786,8 +802,14 @@ function InventoryEquipmentUI:_buildTooltipText(slotData)
 	end
 	if entry.enhanceLevel and entry.enhanceLevel > 0 then
 		table.insert(lines, "Enhancement: +" .. entry.enhanceLevel)
-		local bonus = entry.enhanceLevel * EnhancementConfig.STAT_BONUS_PER_LEVEL
-		table.insert(lines, "Bonus: +" .. bonus .. " stats")
+		if entry.enhancementBonuses then
+			for stat, value in pairs(entry.enhancementBonuses) do
+				table.insert(lines, "Bonus: " .. formatStatBonus(stat, value))
+			end
+		else
+			local bonus = entry.enhanceLevel * EnhancementConfig.STAT_BONUS_PER_LEVEL
+			table.insert(lines, "Bonus: +" .. bonus .. " stats")
+		end
 	end
 	if item.damage then
 		table.insert(lines, "Damage: " .. item.damage)
