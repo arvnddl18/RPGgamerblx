@@ -27,6 +27,7 @@ local TreasureChestConfig = {
 	-- Mapping boss enemy IDs to the chest rarity they drop
 	BOSS_CHEST_MAPPINGS = {
 		Dragon = "Legendary",
+		Skorvath = "Legendary",
 		-- If Wyvern/Griffin should drop chests too, uncomment:
 		-- Wyvern = "Epic",
 		-- Griffin = "Epic",

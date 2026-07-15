@@ -135,6 +135,7 @@ local function createEmptyData()
 		skillLoadout = {},
 		inventory = {},
 		quests = {},
+		storyFlags = {},
 		pvpMode = "Peaceful",
 		lastCombatTime = nil,
 		karmaPoints = 0,
@@ -300,7 +301,8 @@ local function buildStatsPayload(player, data)
 		equippedWeapon = data.equippedWeapon,
 		equipped = data.equipped,
 		skillLoadout = data.skillLoadout,
-		quest = data.quest,
+		quests = data.quests,
+		storyFlags = data.storyFlags,
 		pvpMode = data.pvpMode or "Peaceful",
 		karmaPoints = data.karmaPoints or 0,
 		pkCount = data.pkCount or 0,
@@ -448,7 +450,8 @@ function PlayerDataService:GetSaveSnapshot(player)
 		equippedWeapon = data.equippedWeapon,
 		inventory = data.inventory,
 		skillLoadout = data.skillLoadout,
-		quest = data.quest,
+		quests = data.quests,
+		storyFlags = data.storyFlags,
 		pvpMode = data.pvpMode or "Peaceful",
 		karmaPoints = data.karmaPoints or 0,
 		pkCount = data.pkCount or 0,
@@ -498,7 +501,8 @@ function PlayerDataService:LoadFromSnapshot(player, snapshot)
 		data.equippedWeapon = data.equipped.weapon
 	end
 	data.skillLoadout = snapshot.skillLoadout or {}
-	data.quest = snapshot.quest or data.quest
+	data.quests = snapshot.quests or data.quests or {}
+	data.storyFlags = snapshot.storyFlags or data.storyFlags or {}
 	data.pvpMode = snapshot.pvpMode or data.pvpMode or "Peaceful"
 	data.karmaPoints = snapshot.karmaPoints or 0
 	data.pkCount = snapshot.pkCount or 0

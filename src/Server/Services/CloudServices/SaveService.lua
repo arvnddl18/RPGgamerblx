@@ -34,7 +34,7 @@ function SaveService:LoadPlayer(player)
 		return self._store:GetAsync(key)
 	end)
 
-	if ok and type(data) == "table" and (data.version == 1 or data.version == 2) then
+	if ok and type(data) == "table" and (data.version == 1 or data.version == 2 or data.version == 3) then
 		return data
 	end
 	return nil

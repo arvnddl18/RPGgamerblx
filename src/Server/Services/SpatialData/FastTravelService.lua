@@ -214,7 +214,7 @@ function FastTravelService:GetStateForPlayer(player)
 		unlocked = unlocked,
 		visited = snapshot.visited,
 		level = snapshot.level,
-		quest = snapshot.quest,
+		quests = snapshot.quests,
 	}
 end
 

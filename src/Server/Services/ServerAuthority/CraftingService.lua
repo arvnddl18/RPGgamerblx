@@ -101,6 +101,9 @@ function CraftingService:CraftItem(player, recipeId)
 	local resultId = recipe.resultItem
 	local itemConfig = Items[resultId]
 	if self._playerData:AddItem(player, resultId, recipe.resultAmount) then
+		local Framework = require(ReplicatedStorage.Shared.Framework)
+		local questService = Framework:GetService("QuestService")
+		if questService then questService:OnCrafted(player, recipeId) end
 		local payload = { outcome = "success", recipeId = recipeId, resultItem = resultId }
 		self._remotes.CraftResult:FireClient(player, payload)
 		self._remotes.Notification:FireClient(player, "Crafted " .. (recipe.resultAmount or 1) .. "x " .. itemConfig.name .. "!")
@@ -191,6 +194,11 @@ function CraftingService:UpgradeEquipment(player, recipeId, targetUid)
 		elseif targetIndex then
 			self._playerData:RemoveItemByUid(player, targetUid)
 		end
+	end
+	if outcome == "success" then
+		local Framework = require(ReplicatedStorage.Shared.Framework)
+		local questService = Framework:GetService("QuestService")
+		if questService then questService:OnEquipmentUpgraded(player) end
 	end
 
 	self._playerData:RecalculateStats(player)

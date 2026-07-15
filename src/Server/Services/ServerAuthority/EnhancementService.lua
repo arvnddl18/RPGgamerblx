@@ -123,6 +123,9 @@ function EnhancementService:ApplyEnhancement(player, scrollItemId, targetUid)
 	if outcome == "success" then
 		setImprint(targetEntry, scrollItem, scrollTier, scrollItem.enhancementBonuses)
 		resultPayload.enhanceLevel = targetEntry.enhanceLevel
+		local Framework = require(ReplicatedStorage.Shared.Framework)
+		local questService = Framework:GetService("QuestService")
+		if questService then questService:OnEquipmentEnhanced(player) end
 	elseif outcome == "downgrade" then
 		local downgradedLevel = math.max(0, scrollTier - 1)
 		local bonuses = downgradedLevel > 0 and scrollItem.enhancementCategory and EnhancementConfig.GetScrollBonuses(scrollItem.enhancementCategory, downgradedLevel) or nil

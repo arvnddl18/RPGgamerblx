@@ -143,7 +143,7 @@ local coreRemotes = {
 	"Attack", "CastSkill", "SkillCooldownUpdated", "RequestDash", "DashCooldownUpdated", "PlaySkillVfx", "ChestOpened",
 	"StatsUpdated", "InventoryUpdated", "RequestInventory", "UseItem", "DropItem",
 	"SelectClass", "ClassSelected", "EquipItem", "UnequipItem",
-	"OpenQuest", "AcceptQuest", "QuestUpdated", "OpenQuestLog",
+	"OpenQuest", "AcceptQuest", "QuestUpdated", "OpenQuestLog", "OpenComicScene", "CompleteComicScene",
 	"OpenShop", "PurchaseItem", "SellItem", "Notification", "LevelUp",
 	"OpenCrafting", "RequestCrafting", "CraftResult", "EnhancementResult",
 	"PartyInvite", "PartyInviteReceived", "PartyRespondInvite", "PartyLeave",

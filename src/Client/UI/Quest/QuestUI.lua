@@ -378,7 +378,9 @@ function QuestUI:Populate(mode, questList, npcName)
 		if q.status == "Locked" then
 			title.TextColor3 = COLORS.textDim
 			status.TextColor3 = COLORS.locked
-			status.Text = "Requires Level " .. (q.config.requiredLevel or 1)
+			local prerequisiteId = (q.config.prerequisites or {})[1]
+			local prerequisite = prerequisiteId and Quests[prerequisiteId]
+			status.Text = prerequisite and ("Complete: " .. prerequisite.name) or ("Requires Level " .. (q.config.requiredLevel or 1))
 			local lockIcon = Instance.new("TextLabel")
 			lockIcon.Size = UDim2.new(0, 30, 0, 30)
 			lockIcon.Position = UDim2.new(1, -40, 0.5, -15)
@@ -491,7 +493,9 @@ function QuestUI:_refreshDetails()
 	statusLabel.Parent = self._detailScroll
 	
 	if q.status == "Locked" then
-		statusLabel.Text = "🔒 Locked (Requires Level " .. (config.requiredLevel or 1) .. ")"
+		local prerequisiteId = (config.prerequisites or {})[1]
+		local prerequisite = prerequisiteId and Quests[prerequisiteId]
+		statusLabel.Text = prerequisite and ("🔒 Locked — Complete " .. prerequisite.name) or ("🔒 Locked (Requires Level " .. (config.requiredLevel or 1) .. ")")
 		statusLabel.TextColor3 = COLORS.locked
 	elseif q.status == "Available" then
 		statusLabel.Text = "⭐ Available"

@@ -45,6 +45,12 @@ function Controller:Start()
 		if config.requiredLevel and playerLevel < config.requiredLevel then
 			return "Locked"
 		end
+		for _, prerequisiteId in ipairs(config.prerequisites or {}) do
+			local prerequisite = questsData[prerequisiteId]
+			if not prerequisite or not prerequisite.completed then
+				return "Locked"
+			end
+		end
 		
 		return "Available"
 	end
@@ -58,8 +64,15 @@ function Controller:Start()
 				
 				local include = false
 				if mode == "npc" then
-					if config.npcName == npcName then
-						include = true
+					if config.npcName == npcName and status ~= "Completed" then
+						if status ~= "Locked" then
+							include = true
+						else
+							-- Show only the direct next locked step, never the whole future chain.
+							local prerequisiteId = (config.prerequisites or {})[1]
+							local prerequisite = prerequisiteId and questsData[prerequisiteId]
+							include = prerequisite ~= nil
+						end
 					end
 				else -- log
 					if status == "Accepted" or status == "Ready" then
@@ -79,6 +92,17 @@ function Controller:Start()
 						sortOrder = (status == "Ready" and 1) or (status == "Available" and 2) or (status == "Accepted" and 3) or (status == "Locked" and 4) or 5
 					})
 				end
+			end
+		end
+
+		if mode == "log" then
+			for _, futureChapter in ipairs(Quests.FutureChapters or {}) do
+				table.insert(list, {
+					config = { id = "FutureChapter" .. futureChapter.chapter, name = futureChapter.name, description = futureChapter.lockedReason, chapter = futureChapter.chapter },
+					status = "Locked",
+					progressText = "",
+					sortOrder = 99,
+				})
 			end
 		end
 		

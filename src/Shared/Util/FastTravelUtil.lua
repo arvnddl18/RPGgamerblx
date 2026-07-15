@@ -44,7 +44,7 @@ function FastTravelUtil.IsUnlocked(location, snapshot)
 
 	local visited = snapshot.visited or {}
 	local level = snapshot.level or 1
-	local quest = snapshot.quest or {}
+	local quests = snapshot.quests or {}
 
 	if reqType == "visit" then
 		return visited[location.id] == true
@@ -55,6 +55,7 @@ function FastTravelUtil.IsUnlocked(location, snapshot)
 	end
 
 	if reqType == "quest" then
+		local quest = quests[req.questId] or {}
 		if req.requireCompleted then
 			return quest.id == req.questId and quest.completed == true
 		end
@@ -130,13 +131,13 @@ end
 
 function FastTravelUtil.BuildSnapshotFromData(data)
 	if not data then
-		return { visited = {}, level = 1, quest = {} }
+		return { visited = {}, level = 1, quests = {} }
 	end
 
 	return {
 		visited = (data.fastTravel and data.fastTravel.visited) or {},
 		level = data.level or 1,
-		quest = data.quest or {},
+		quests = data.quests or {},
 		defeatedBosses = data.defeatedBosses or {},
 		discoveredRegions = data.discoveredRegions or {},
 	}

@@ -44,7 +44,9 @@ for cx = -GRID_SIZE/2, GRID_SIZE/2 do
 		local worldZ = cz * SCALE
 		
 		local dist = math.sqrt(worldX^2 + worldZ^2)
-		local craterDist = math.sqrt((worldX - 800)^2 + (worldZ + 600)^2)
+		-- This terrain only establishes the Chapter 1 horizon. Cinderscar and all
+		-- later chapters load as separate maps through their sealed Waygates.
+		local craterDist = math.sqrt((worldX - 800)^2 + (worldZ - 600)^2)
 		
 		-- Calculate Wilderness Height
 		local n1 = math.noise(worldX/500, worldZ/500, SEED) * 40
@@ -1538,6 +1540,12 @@ local MARKETPLACE_NPC_SLOTS = {
 	HerbMaster = { offsetX = -10, offsetZ = -20, yaw = math.pi * 0.5 },
 	VillageElder = { offsetX = 10, offsetZ = -20, yaw = math.pi * 0.25 },
 	Scout = { offsetX = 30, offsetZ = -20, yaw = 0 },
+	Magister = { offsetX = 10, offsetZ = 40, yaw = math.pi },
+	Blacksmith = { offsetX = 30, offsetZ = -20, yaw = math.pi },
+	Warden = { offsetX = 50, offsetZ = -20, yaw = math.pi },
+	EmberfangSentry = { offsetX = -30, offsetZ = 50, yaw = math.pi },
+	DuskrootSentry = { offsetX = -10, offsetZ = 50, yaw = math.pi },
+	StormpeakSentry = { offsetX = 30, offsetZ = 50, yaw = math.pi },
 }
 
 function MapGeneratorService:GetMarketplaceNpcCFrame(slotName)

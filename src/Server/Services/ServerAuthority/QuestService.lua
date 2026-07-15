@@ -17,6 +17,9 @@ function QuestService:Init()
 	self._remotes = Framework:GetRemotesFolder()
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
 	Framework:GetRemote("OpenQuestLog")
+	Framework:GetRemote("OpenComicScene")
+	Framework:GetRemote("CompleteComicScene")
+	self._activeScenes = {}
 end
 
 ---------------------------------------------------------------------------
@@ -231,6 +234,30 @@ function QuestService:GetQuestData(player, questId)
 	return data.quests[questId]
 end
 
+function QuestService:ArePrerequisitesComplete(player, config)
+	for _, prerequisiteId in ipairs(config.prerequisites or {}) do
+		local prerequisite = self:GetQuestData(player, prerequisiteId)
+		if not prerequisite or not prerequisite.completed then
+			return false, prerequisiteId
+		end
+	end
+	return true
+end
+
+function QuestService:GetQuestStatus(player, questId)
+	local config = Quests[questId]
+	if not config then return "Locked" end
+	local qData = self:GetQuestData(player, questId)
+	if qData then
+		if qData.completed and not config.repeatable then return "Completed" end
+		if qData.accepted then
+			return qData.progress >= Quests.GetRequired(config) and "Ready" or "Accepted"
+		end
+	end
+	local allowed = self:ArePrerequisitesComplete(player, config)
+	return allowed and "Available" or "Locked"
+end
+
 function QuestService:CompleteQuest(player, config)
 	local data = self._playerData:GetData(player)
 	local qData = self:GetQuestData(player, config.id)
@@ -261,6 +288,22 @@ function QuestService:CompleteQuest(player, config)
 	if self._karmaService then
 		self._karmaService:OnQuestCompleted(player)
 	end
+
+	if config.id == "FrostwingsDomain" and self._scenes then
+		local flags = data.storyFlags or {}
+		data.storyFlags = flags
+		if not flags.FrostwingEpilogue then
+			self._activeScenes[player] = { sceneId = "FrostwingEpilogue", epilogue = true }
+			self._remotes.OpenComicScene:FireClient(player, "FrostwingEpilogue", self._scenes.FrostwingEpilogue)
+		end
+	elseif config.id == "ReturnToValdris" and self._scenes then
+		local flags = data.storyFlags or {}
+		data.storyFlags = flags
+		if not flags.CrownLieEpilogue then
+			self._activeScenes[player] = { sceneId = "CrownLieEpilogue", epilogue = true }
+			self._remotes.OpenComicScene:FireClient(player, "CrownLieEpilogue", self._scenes.CrownLieEpilogue)
+		end
+	end
 end
 
 function QuestService:AdvanceQuestProgress(player, questId, amount)
@@ -274,7 +317,32 @@ function QuestService:AdvanceQuestProgress(player, questId, amount)
 		return
 	end
 
-	qData.progress += amount or 1
+	qData.progress = math.min(Quests.GetRequired(config), qData.progress + (amount or 1))
+	self:FireQuestUpdated(player, questId)
+end
+
+function QuestService:AdvanceTargetProgress(player, questId, targetType, targetName)
+	local qData = self:GetQuestData(player, questId)
+	local config = Quests[questId]
+	if not qData or not config or not qData.accepted or qData.completed then return end
+	local target = nil
+	for _, candidate in ipairs(config.targets or {}) do
+		if candidate.type == targetType and candidate.name == targetName then
+			target = candidate
+			break
+		end
+	end
+	if not target then return end
+	qData.targetProgress = qData.targetProgress or {}
+	local key = targetType .. ":" .. targetName
+	local current = qData.targetProgress[key] or 0
+	if current >= (target.quantity or 1) then return end
+	qData.targetProgress[key] = current + 1
+	local total = 0
+	for _, candidate in ipairs(config.targets or {}) do
+		total += qData.targetProgress[candidate.type .. ":" .. candidate.name] or 0
+	end
+	qData.progress = total
 	self:FireQuestUpdated(player, questId)
 end
 
@@ -284,11 +352,17 @@ function QuestService:AcceptQuest(player, questId)
 	if not config or not data then
 		return false
 	end
+	local prerequisitesComplete, missingQuestId = self:ArePrerequisitesComplete(player, config)
+	if not prerequisitesComplete then
+		self._remotes.Notification:FireClient(player, "Locked: complete " .. (Quests[missingQuestId].name or missingQuestId) .. " first.")
+		return false
+	end
 
 	if data.level and config.requiredLevel and data.level < config.requiredLevel then
 		return false
 	end
 
+	data.quests = data.quests or {}
 	local qData = data.quests[questId]
 	if qData and qData.completed and not config.repeatable then
 		return false
@@ -298,7 +372,12 @@ function QuestService:AcceptQuest(player, questId)
 		accepted = true,
 		completed = false,
 		progress = 0,
+		targetProgress = {},
 	}
+	-- A conversation quest is completed by accepting it from its named speaker.
+	if config.objectiveType == "talk" and config.targetNpc == config.questGiver then
+		self:AdvanceTargetProgress(player, questId, "npc", config.targetNpc)
+	end
 	self._playerData:FireStatsUpdated(player)
 	self:FireQuestUpdated(player, questId)
 	return true
@@ -321,8 +400,8 @@ function QuestService:OnEnemyKilled(player, enemyType)
 	if not data or not data.quests then return end
 	for qId, qData in pairs(data.quests) do
 		local config = Quests[qId]
-		if config and config.objectiveType == "kill" and config.targetEnemy == enemyType then
-			self:AdvanceQuestProgress(player, qId, 1)
+		if config and (config.objectiveType == "kill" or config.objectiveType == "killreach") and Quests.IsTarget(config, "enemy", enemyType) then
+			self:AdvanceTargetProgress(player, qId, "enemy", enemyType)
 		end
 	end
 end
@@ -332,9 +411,38 @@ function QuestService:OnItemCollected(player, itemId, count)
 	if not data or not data.quests then return end
 	for qId, qData in pairs(data.quests) do
 		local config = Quests[qId]
-		if config and config.objectiveType == "collect" and config.targetItem == itemId then
-			self:AdvanceQuestProgress(player, qId, count or 1)
+		if config and (config.objectiveType == "collect" or config.objectiveType == "collectcraft") and Quests.IsTarget(config, "item", itemId) then
+			for _ = 1, count or 1 do self:AdvanceTargetProgress(player, qId, "item", itemId) end
 		end
+	end
+end
+
+function QuestService:OnCrafted(player, recipeId)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quests then return end
+	for qId, qData in pairs(data.quests) do
+		local config = Quests[qId]
+		if config and config.objectiveType == "collectcraft" and Quests.IsTarget(config, "craft", recipeId) then
+			self:AdvanceTargetProgress(player, qId, "craft", recipeId)
+		end
+	end
+end
+
+function QuestService:OnEquipmentUpgraded(player)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quests then return end
+	for qId, qData in pairs(data.quests) do
+		local config = Quests[qId]
+		if config and config.objectiveType == "upgrade" and Quests.IsTarget(config, "upgrade", "equipment") then self:AdvanceTargetProgress(player, qId, "upgrade", "equipment") end
+	end
+end
+
+function QuestService:OnEquipmentEnhanced(player)
+	local data = self._playerData:GetData(player)
+	if not data or not data.quests then return end
+	for qId, qData in pairs(data.quests) do
+		local config = Quests[qId]
+		if config and config.objectiveType == "enhance" and Quests.IsTarget(config, "enhance", "equipment") then self:AdvanceTargetProgress(player, qId, "enhance", "equipment") end
 	end
 end
 
@@ -343,8 +451,8 @@ function QuestService:OnTalkToNPC(player, npcName)
 	if not data or not data.quests then return end
 	for qId, qData in pairs(data.quests) do
 		local config = Quests[qId]
-		if config and config.objectiveType == "talk" and config.targetNpc == npcName then
-			self:AdvanceQuestProgress(player, qId, 1)
+		if config and config.objectiveType == "talk" and Quests.IsTarget(config, "npc", npcName) then
+			self:AdvanceTargetProgress(player, qId, "npc", npcName)
 		end
 	end
 end
@@ -354,8 +462,8 @@ function QuestService:OnReachZone(player, zoneId)
 	if not data or not data.quests then return end
 	for qId, qData in pairs(data.quests) do
 		local config = Quests[qId]
-		if config and config.objectiveType == "reach" and config.targetZone == zoneId then
-			self:AdvanceQuestProgress(player, qId, 1)
+		if config and (config.objectiveType == "reach" or config.objectiveType == "killreach") and Quests.IsTarget(config, "zone", zoneId) then
+			self:AdvanceTargetProgress(player, qId, "zone", zoneId)
 		end
 	end
 end
@@ -375,10 +483,11 @@ function QuestService:FireQuestUpdated(player, questId)
 		completed = qData.completed,
 		progress = qData.progress,
 		required = Quests.GetRequired(config),
+		status = self:GetQuestStatus(player, questId),
 	})
 end
 
-function QuestService:CreateSimpleNPC(name, cframe, promptText, color)
+function QuestService:CreateSimpleNPC(name, cframe, promptText, color, onTriggered)
 	local npcColor = color or Color3.fromRGB(100, 120, 180)
 	local model, hrp, head = self:_BuildR15Rig(cframe, npcColor, npcColor)
 	model.Name = name
@@ -398,7 +507,7 @@ function QuestService:CreateSimpleNPC(name, cframe, promptText, color)
 	label.TextSize = 16
 	label.Parent = billboard
 
-	local prompt = R15NPCUtil.AddInteraction(head, promptText or "Talk", name, function() end)
+	local prompt = R15NPCUtil.AddInteraction(head, promptText or "Talk", name, onTriggered or function() end)
 
 	local npcsFolder = workspace:FindFirstChild("NPCs") or Instance.new("Folder")
 	npcsFolder.Name = "NPCs"
@@ -435,39 +544,128 @@ function QuestService:CreateReachZone(zoneId, position, size)
 end
 
 function QuestService:Start()
-	self:CreateNPC(self._mapGenerator:GetMarketplaceNpcCFrame("QuestGiver"))
+	local function worldCFrame(position, yaw)
+		local y = self._mapGenerator:GetGroundHeight(position.X, position.Z)
+		return CFrame.new(position.X, y, position.Z) * CFrame.Angles(0, yaw or 0, 0)
+	end
 
-	local _, herbPrompt = self:CreateSimpleNPC("Herb Master", self._mapGenerator:GetMarketplaceNpcCFrame("HerbMaster"), "Quest")
-	herbPrompt.Triggered:Connect(function(player)
+	local scenes = {
+		RhessaIntro = {
+			title = "A Vanguard at Dawn", panels = {
+				{ speaker = "Commander Rhessa Kael", color = Color3.fromRGB(173, 72, 62), text = "Valdris needs steady hands, recruit. Frosthorn's creatures are climbing toward its summit." },
+				{ speaker = "Commander Rhessa Kael", color = Color3.fromRGB(173, 72, 62), text = "Take the northern road. Reopen the Waygate, then report every sign of what drove them there." },
+			}
+		},
+		TovenIntro = {
+			title = "The Scholar in the Ruins", panels = {
+				{ speaker = "Magister Toven Ashe", color = Color3.fromRGB(90, 116, 178), text = "These stones are older than Valdris. The dead are not guarding treasure — they are guarding a memory." },
+				{ speaker = "Magister Toven Ashe", color = Color3.fromRGB(90, 116, 178), text = "Help me clear the courtyard. The sealed chamber may tell us why Frosthorn is afraid." },
+			}
+		},
+		FrostwingEpilogue = {
+			title = "The Frostwing's Hoard", panels = {
+				{ speaker = "Magister Toven Ashe", color = Color3.fromRGB(90, 116, 178), text = "Scorched Vanguard gear... decades old. This royal seal should never have been on Frosthorn." },
+				{ speaker = "Commander Rhessa Kael", color = Color3.fromRGB(173, 72, 62), text = "We are done here. Return to Valdris. Now." },
+			}
+		},
+		CrownLieEpilogue = {
+			title = "The Crown's Lie", panels = {
+				{ speaker = "Commander Rhessa Kael", color = Color3.fromRGB(173, 72, 62), text = "The Frostwing was not attacking Valdris. It was holding the old royal command beneath Frosthorn at bay." },
+				{ speaker = "Commander Rhessa Kael", color = Color3.fromRGB(173, 72, 62), text = "I served the Crown because I believed silence kept the kingdom safe. I was wrong." },
+				{ speaker = "Magister Toven Ashe", color = Color3.fromRGB(90, 116, 178), text = "Three Waygates remain sealed. Their maps hold the rest of the shattered history — and someone is already trying to open them." },
+			}
+		},
+	}
+	self._scenes = scenes
+
+	function self:OpenNpc(player, npcName, sceneId)
 		local data = self._playerData:GetData(player)
 		if not data then return end
-		self._remotes.OpenQuest:FireClient(player, "Herb Master")
-	end)
-
-	local _, elderPrompt = self:CreateSimpleNPC("Village Elder", self._mapGenerator:GetMarketplaceNpcCFrame("VillageElder"), "Talk")
-	elderPrompt.Triggered:Connect(function(player)
-		self:OnTalkToNPC(player, "Village Elder")
-		local data = self._playerData:GetData(player)
-		if data then
-			self._remotes.OpenQuest:FireClient(player, "Village Elder")
+		data.storyFlags = data.storyFlags or {}
+		if sceneId and not data.storyFlags[sceneId] and not self._activeScenes[player] then
+			self._activeScenes[player] = { npcName = npcName, sceneId = sceneId }
+			self._remotes.OpenComicScene:FireClient(player, sceneId, scenes[sceneId])
+			return
 		end
+		self:OnTalkToNPC(player, npcName)
+		self._remotes.OpenQuest:FireClient(player, npcName)
+	end
+
+	local _, rhessaPrompt = self:CreateSimpleNPC("Commander Rhessa Kael", self._mapGenerator:GetMarketplaceNpcCFrame("QuestGiver"), "Speak", Color3.fromRGB(173, 72, 62))
+	rhessaPrompt.Triggered:Connect(function(player) self:OpenNpc(player, "Commander Rhessa Kael", "RhessaIntro") end)
+
+	local _, tovenPrompt = self:CreateSimpleNPC("Magister Toven Ashe", self._mapGenerator:GetMarketplaceNpcCFrame("Magister"), "Speak", Color3.fromRGB(90, 116, 178))
+	tovenPrompt.Triggered:Connect(function(player)
+		if self:GetQuestStatus(player, "ScholarInRuins") == "Locked" then
+			self._remotes.Notification:FireClient(player, "Toven is studying alone. Complete Fleeing the Peak first.")
+			return
+		end
+		self:OpenNpc(player, "Magister Toven Ashe", "TovenIntro")
 	end)
 
-	local monumentPos = Vector3.new(0, 0, 300)
-	local monumentY = self._mapGenerator:GetGroundHeight(monumentPos.X, monumentPos.Z)
-	self:CreateReachZone("QuestMonumentZone", Vector3.new(monumentPos.X, monumentY + 4, monumentPos.Z), Vector3.new(24, 10, 24))
+	local function storyNpc(name, marketplaceSlot, color, requiredQuest)
+		local _, prompt = self:CreateSimpleNPC(name, self._mapGenerator:GetMarketplaceNpcCFrame(marketplaceSlot), "Speak", color)
+		prompt.Triggered:Connect(function(player)
+			if requiredQuest and self:GetQuestStatus(player, requiredQuest) == "Locked" then
+				self._remotes.Notification:FireClient(player, "This person is focused on the crisis ahead. Continue the Chapter 1 story.")
+				return
+			end
+			self:OpenNpc(player, name)
+		end)
+	end
+	storyNpc("Sister Amara", "HerbMaster", Color3.fromRGB(212, 180, 104), "VillageSupplyLine")
+	storyNpc("Scout Iven", "Scout", Color3.fromRGB(92, 160, 112), "NorthernWaygate")
+	storyNpc("Blacksmith Doran", "Blacksmith", Color3.fromRGB(178, 104, 62), "ForgeTheVanguard")
+	storyNpc("Warden Edda", "Warden", Color3.fromRGB(110, 135, 165), "WarbandsRefuge")
 
-	local _, scoutPrompt = self:CreateSimpleNPC("Scout", self._mapGenerator:GetMarketplaceNpcCFrame("Scout"), "Quest")
-	scoutPrompt.Triggered:Connect(function(player)
-		local data = self._playerData:GetData(player)
-		if not data then return end
-		self._remotes.OpenQuest:FireClient(player, "Scout")
-	end)
+	local waygatePosition = Vector3.new(0, 0, 920)
+	local waygate = self:CreateReachZone("FrosthornWaygate", Vector3.new(waygatePosition.X, self._mapGenerator:GetGroundHeight(waygatePosition.X, waygatePosition.Z) + 8, waygatePosition.Z), Vector3.new(36, 18, 16))
+	waygate.Name = "Northern Frosthorn Waygate"
+	waygate.Transparency = 0.35
+	waygate.Material = Enum.Material.Neon
+	waygate.Color = Color3.fromRGB(90, 190, 255)
+
+	local chamberPosition = Vector3.new(70, 0, 1500)
+	local chamber = self:CreateReachZone("SealedChamberDoor", Vector3.new(chamberPosition.X, self._mapGenerator:GetGroundHeight(chamberPosition.X, chamberPosition.Z) + 7, chamberPosition.Z), Vector3.new(30, 14, 4))
+	chamber.Name = "Sealed Royal Chamber"
+	chamber.Transparency = 0.2
+	chamber.Material = Enum.Material.Slate
+	chamber.Color = Color3.fromRGB(55, 60, 75)
+
+	self:CreateReachZone("WesternWatch", Vector3.new(-520, self._mapGenerator:GetGroundHeight(-520, 1390) + 7, 1390), Vector3.new(38, 14, 38)).Name = "Western Frosthorn Watch"
+	self:CreateReachZone("EasternWatch", Vector3.new(520, self._mapGenerator:GetGroundHeight(520, 1420) + 7, 1420), Vector3.new(38, 14, 38)).Name = "Eastern Frosthorn Watch"
+
+	for _, gate in ipairs({
+		{ name = "Emberfang Waygate", slot = "EmberfangSentry" },
+		{ name = "Duskroot Waygate", slot = "DuskrootSentry" },
+		{ name = "Stormpeak Waygate", slot = "StormpeakSentry" },
+	}) do
+		local _, prompt = self:CreateSimpleNPC(gate.name .. " Sentry", self._mapGenerator:GetMarketplaceNpcCFrame(gate.slot), "Inspect", Color3.fromRGB(85, 85, 105))
+		prompt.Triggered:Connect(function(player)
+			self._remotes.Notification:FireClient(player, "This Waygate is sealed. Its chapter is coming soon.")
+		end)
+	end
 
 	self._remotes.AcceptQuest.OnServerEvent:Connect(function(player, questId)
 		if self:AcceptQuest(player, questId) then
 			self._remotes.Notification:FireClient(player, "Quest accepted!")
 		end
+	end)
+
+	self._remotes.CompleteComicScene.OnServerEvent:Connect(function(player, sceneId)
+		local active = self._activeScenes[player]
+		if not active or active.sceneId ~= sceneId then return end
+		local data = self._playerData:GetData(player)
+		if data then
+			data.storyFlags = data.storyFlags or {}
+			data.storyFlags[sceneId] = true
+			self._playerData:FireStatsUpdated(player)
+			if not active.epilogue then
+				self:OnTalkToNPC(player, active.npcName)
+				self._remotes.OpenQuest:FireClient(player, active.npcName)
+			end
+		end
+		self._activeScenes[player] = nil
 	end)
 
 	if not self._remotes:FindFirstChild("TurnInQuest") then
