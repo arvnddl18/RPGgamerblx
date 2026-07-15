@@ -17,7 +17,19 @@ local Shop = {
 
 -- A rank is unlocked at its matching player level. Price growth follows the
 -- rising enhancement risk and keeps early experimentation affordable.
-local scrollPriceMultiplier = { Fighter = 1.0, Mage = 1.05, Healer = 1.1, Lucky = 1.15, Guardian = 1.0 }
+local scrollPriceMultiplier = {
+	Fighter = 1.0,
+	Mage = 1.05,
+	Healer = 1.1,
+	Lucky = 1.15,
+	Guardian = 1.0,
+	-- Rogue's crit/evasion/speed package has the same premium as Lucky's
+	-- crit-focused package. Hybrid gets a smaller premium because its value is
+	-- spread across offense, defense, and resource stats rather than optimized
+	-- around one combat role.
+	Rogue = 1.15,
+	Hybrid = 1.1,
+}
 for category, multiplier in pairs(scrollPriceMultiplier) do
 	for level = 1, EnhancementConfig.MAX_ENHANCE_LEVEL do
 		table.insert(Shop.scrollItems, {

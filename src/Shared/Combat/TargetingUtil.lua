@@ -62,6 +62,23 @@ function TargetingUtil.RaycastGround(origin, direction, maxRange, ignoreList)
 	return fallback, nil
 end
 
+-- Ground targeting must resolve against Terrain only. This keeps previews and
+-- casts off of tree canopies, buildings, characters, and other raised parts.
+function TargetingUtil.RaycastTerrainGround(origin, direction, maxRange)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Include
+	rayParams.FilterDescendantsInstances = { workspace.Terrain }
+
+	local unitDirection = direction.Magnitude > 0 and direction.Unit or Vector3.new(0, -1, 0)
+	local result = workspace:Raycast(origin, unitDirection * (maxRange or DEFAULT_RAY_LENGTH), rayParams)
+	if result then
+		return result.Position, result
+	end
+
+	local fallback = origin + unitDirection * (maxRange or DEFAULT_RAY_LENGTH)
+	return fallback, nil
+end
+
 function TargetingUtil.GetMouseGroundPosition(mouse, casterPos, maxRange, ignoreList)
 	if not mouse then
 		return casterPos
@@ -69,7 +86,7 @@ function TargetingUtil.GetMouseGroundPosition(mouse, casterPos, maxRange, ignore
 
 	local unitRay = mouse.UnitRay
 	local hitPos = casterPos + unitRay.Direction * (maxRange or DEFAULT_RAY_LENGTH)
-	local rayPos, _ = TargetingUtil.RaycastGround(unitRay.Origin, unitRay.Direction, maxRange or DEFAULT_RAY_LENGTH, ignoreList)
+	local rayPos, _ = TargetingUtil.RaycastTerrainGround(unitRay.Origin, unitRay.Direction, maxRange or DEFAULT_RAY_LENGTH)
 	if rayPos then
 		hitPos = rayPos
 	end

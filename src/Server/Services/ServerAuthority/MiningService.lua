@@ -63,10 +63,11 @@ local NODE_TYPES = {
 }
 
 local SPAWN_GROUPS = {
-	-- Near village outskirts
-	{ type = "RegularStone", count = 5, center = Vector3.new(0, 0, -600), radius = 150 },
-	{ type = "RegularStone", count = 5, center = Vector3.new(600, 0, 0), radius = 150 },
-	{ type = "RegularStone", count = 5, center = Vector3.new(-600, 0, 0), radius = 150 },
+	-- Outside the village walls (the village radius is 700 studs).
+	-- These groups stay at least 800 studs from the village center.
+	{ type = "RegularStone", count = 5, center = Vector3.new(0, 0, -900), radius = 100 },
+	{ type = "RegularStone", count = 5, center = Vector3.new(900, 0, 0), radius = 100 },
+	{ type = "RegularStone", count = 5, center = Vector3.new(-900, 0, 0), radius = 100 },
 	
 	-- Mid-range forests
 	{ type = "GlimmeringRock", count = 4, center = Vector3.new(700, 0, -900), radius = 100 },

@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Server = ServerScriptService:WaitForChild("Server")
 local Services = Server:WaitForChild("Services")
@@ -7,7 +8,34 @@ local Services = Server:WaitForChild("Services")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Framework = require(Shared:WaitForChild("Framework"))
 
+local function getOrCreateFolder(parent, name)
+	local folder = parent:FindFirstChild(name)
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = name
+		folder.Parent = parent
+	end
+	return folder
+end
+
+local function storeImportedWeaponSources()
+	local weaponSources = workspace:FindFirstChild("ImportedWeaponSources")
+	if not weaponSources then
+		return
+	end
+
+	local assetStorage = getOrCreateFolder(ServerStorage, "AssetStorage")
+	local weaponTemplates = getOrCreateFolder(assetStorage, "WeaponTemplates")
+
+	-- Source models are templates, not world objects. ServerStorage keeps them
+	-- out of the city, out of physics/raycasting, and out of client replication.
+	weaponSources.Parent = weaponTemplates
+end
+
 local function setupWorld()
+	-- Do this before map generation so imported models cannot affect terrain raycasts.
+	storeImportedWeaponSources()
+
 	-- Run massive map generator
 	local MapGeneratorService = require(Services.Workspace:WaitForChild("MapGeneratorService"))
 	MapGeneratorService:Generate()

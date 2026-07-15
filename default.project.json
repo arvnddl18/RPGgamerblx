@@ -20,6 +20,18 @@
         "$path": "src/Server"
       }
     },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "$ignoreUnknownInstances": true,
+      "AssetStorage": {
+        "$path": "src/ServerStorage/AssetStorage",
+        "$ignoreUnknownInstances": true,
+        "WeaponTemplates": {
+          "$path": "src/ServerStorage/AssetStorage/WeaponTemplates",
+          "$ignoreUnknownInstances": true
+        }
+      }
+    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "$ignoreUnknownInstances": true,

@@ -49,14 +49,18 @@ function FastTravelService:GetSpawnCFrame(location)
 	return CFrame.new(x, y, z)
 end
 
-function FastTravelService:GetPostPosition(location, groundY)
+function FastTravelService:GetPostPosition(location)
 	local pos = location.position
+	if location.postOffset then
+		return pos + Vector3.new(location.postOffset.X, 0, location.postOffset.Z)
+	end
+
 	local offset = location.spawnOffset or Vector3.zero
 	local flat = Vector3.new(offset.X, 0, offset.Z)
 	if flat.Magnitude > 0.1 then
 		pos = pos + flat.Unit * 12
 	end
-	return Vector3.new(pos.X, groundY, pos.Z)
+	return Vector3.new(pos.X, 0, pos.Z)
 end
 
 function FastTravelService:CreateTravelPost(location, groundY)
@@ -64,7 +68,7 @@ function FastTravelService:CreateTravelPost(location, groundY)
 	model.Name = location.id
 
 	local isGate = location.category == "Gates"
-	local postPos = self:GetPostPosition(location, groundY)
+	local postPos = self:GetPostPosition(location) + Vector3.new(0, groundY, 0)
 
 	local base = Instance.new("Part")
 	base.Name = "Base"
@@ -179,14 +183,11 @@ function FastTravelService:CreatePortals()
 	self._spawnCache = {}
 
 	for id, location in FastTravelUtil.GetEnabledLocations(FastTravelConfig) do
-		local pos = location.position
-		local groundY = self._mapGenerator:GetGroundHeight(pos.X, pos.Z)
+		local postPosition = self:GetPostPosition(location)
+		local groundY = self._mapGenerator:GetGroundHeight(postPosition.X, postPosition.Z)
 		self._spawnCache[id] = self:GetSpawnCFrame(location)
 
 		local portal = self:CreateTravelPost(location, groundY)
-		if portal.PrimaryPart then
-			portal:PivotTo(CFrame.new(self:GetPostPosition(location, groundY)))
-		end
 		portal.Parent = folder
 
 		local spawn = Instance.new("Part")

@@ -116,10 +116,10 @@ end
 
 local function getGroundY(x, z)
 	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	if mapFolder then
-		rayParams.FilterDescendantsInstances = {mapFolder}
-	end
+	-- Only terrain can define map elevation. Workspace template models must
+	-- never be able to lift generated structures above the village.
+	rayParams.FilterType = Enum.RaycastFilterType.Include
+	rayParams.FilterDescendantsInstances = {Terrain}
 	
 	local ray = workspace:Raycast(Vector3.new(x, 500, z), Vector3.new(0, -1000, 0), rayParams)
 	if ray then return ray.Position.Y, ray.Material end
@@ -583,8 +583,10 @@ local function spawnCastle(x, z)
 	local matWood     = Enum.Material.WoodPlanks
 
 	-- ===== RAISED STONE PLATFORM / FOUNDATION =====
-	createPart("CastlePlatform", castle, Vector3.new(250, 6, 250), Vector3.new(x, y + 3, z), stoneDark, matStone)
+	local castlePlatform = createPart("CastlePlatform", castle, Vector3.new(250, 6, 250), Vector3.new(x, y + 3, z), stoneDark, matStone)
 	createPart("PlatformTrim", castle, Vector3.new(254, 2, 254), Vector3.new(x, y + 1, z), stoneLight, matBrick)
+	castle.PrimaryPart = castlePlatform
+	castle:SetAttribute("LockedToVillage", true)
 
 	-- ===== OUTER CURTAIN WALLS =====
 	local wallH = 50
@@ -957,6 +959,14 @@ local function spawnCastle(x, z)
 				banZ = bz + side * (gateGap + 10)
 			end
 			createPart("Banner", castle, Vector3.new(bW, bH, bD), Vector3.new(banX, y + wallH - 2, banZ), bannerCol, Enum.Material.Fabric)
+		end
+	end
+
+	-- The castle is world geometry: keep every generated piece fixed even if
+	-- this builder is later expanded with additional parts.
+	for _, descendant in ipairs(castle:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
 		end
 	end
 end
@@ -1575,11 +1585,8 @@ end
 
 function MapGeneratorService:GetGroundHeight(x, z)
 	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	local mapFolder = workspace:FindFirstChild("RPG_World")
-	if mapFolder then
-		rayParams.FilterDescendantsInstances = { mapFolder }
-	end
+	rayParams.FilterType = Enum.RaycastFilterType.Include
+	rayParams.FilterDescendantsInstances = { Terrain }
 
 	local ray = workspace:Raycast(Vector3.new(x, 500, z), Vector3.new(0, -1000, 0), rayParams)
 	if ray then

@@ -84,7 +84,7 @@ end
 
 local function getGroundPoint(xzPosition, referenceY, ignoreList)
 	local origin = Vector3.new(xzPosition.X, referenceY + GROUND_RAY_HEIGHT, xzPosition.Z)
-	local hitPos = TargetingUtil.RaycastGround(origin, Vector3.new(0, -1, 0), GROUND_RAY_HEIGHT * 2, ignoreList)
+	local hitPos = TargetingUtil.RaycastTerrainGround(origin, Vector3.new(0, -1, 0), GROUND_RAY_HEIGHT * 2)
 	return hitPos + Vector3.new(0, GROUND_LIFT, 0)
 end
 
