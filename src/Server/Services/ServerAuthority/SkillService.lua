@@ -440,6 +440,46 @@ function SkillService:ResolveTargets(player, skill, targetData)
 	-- Auto-attacks resolve from the attack-start position and range, using the
 	-- attack-start facing direction so rear attacks cannot deal damage.
 	if skill.slotType == "autoAttack" then
+		-- Prefer the target snapshot captured by the attacking client. This
+		-- prevents a moving target's replicated position from lagging behind the
+		-- attack and making a valid live-speed hit miss.
+		local snapshotTarget = nil
+		if targetData and targetData.targetUserId then
+			snapshotTarget = Players:GetPlayerByUserId(targetData.targetUserId)
+		elseif targetData and targetData.targetInstance
+			and CollectionService:HasTag(targetData.targetInstance, "Enemy") then
+			snapshotTarget = targetData.targetInstance
+		end
+
+		if snapshotTarget and snapshotTarget.Parent then
+			local snapshotRoot
+			if snapshotTarget:IsA("Player") then
+				local snapshotCharacter = snapshotTarget.Character
+				snapshotRoot = snapshotCharacter and snapshotCharacter:FindFirstChild("HumanoidRootPart")
+			else
+				snapshotRoot = snapshotTarget:FindFirstChild("HumanoidRootPart") or snapshotTarget.PrimaryPart
+			end
+			local snapshotPosition = targetData.attackTargetPosition
+			local snapshotDistance = snapshotPosition and (snapshotPosition - attackOrigin).Magnitude
+			local currentDistance = snapshotRoot and (snapshotRoot.Position - attackOrigin).Magnitude
+			local validDistance = snapshotDistance and snapshotDistance <= range + 0.5
+			local stillReasonablyClose = currentDistance and currentDistance <= range + 8
+			local validFacing = snapshotPosition and TargetingUtil.IsInFront(attackOrigin, lookVector, snapshotPosition)
+
+			if snapshotRoot and validDistance and stillReasonablyClose and validFacing then
+				if snapshotTarget:IsA("Player") then
+					if self._combatService:CanDamagePlayer(player, snapshotTarget) then
+						playerTargets = { snapshotTarget }
+					end
+				else
+					if (snapshotTarget:GetAttribute("Health") or 0) > 0 then
+						enemyTargets = { snapshotTarget }
+					end
+				end
+			end
+			return enemyTargets, playerTargets
+		end
+
 		if targetType == SkillConfig.TargetTypes.Single then
 			local target = self:FindNearestDamageTarget(player, character, range, true, lookVector, attackOrigin)
 			if target then

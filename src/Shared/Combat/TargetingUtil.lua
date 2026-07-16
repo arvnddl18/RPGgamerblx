@@ -245,6 +245,12 @@ function TargetingUtil.SanitizeTargetData(targetData)
 	if typeof(targetData.attackOrigin) == "Vector3" then
 		sanitized.attackOrigin = targetData.attackOrigin
 	end
+	if typeof(targetData.attackTargetPosition) == "Vector3" then
+		sanitized.attackTargetPosition = targetData.attackTargetPosition
+	end
+	if typeof(targetData.targetInstance) == "Instance" then
+		sanitized.targetInstance = targetData.targetInstance
+	end
 	if typeof(targetData.targetUserId) == "number" then
 		sanitized.targetUserId = math.floor(targetData.targetUserId)
 	end

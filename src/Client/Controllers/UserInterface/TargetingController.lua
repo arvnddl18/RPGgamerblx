@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TargetingUtil = require(Shared.Combat.TargetingUtil)
@@ -54,6 +55,56 @@ function TargetingController:BuildTargetData(skill, character)
 		direction = root.CFrame.LookVector,
 		attackOrigin = root.Position,
 	}
+
+	if skill.slotType == "autoAttack" then
+		local nearestTarget = nil
+		local nearestDistance = range
+		local flatLook = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+		if flatLook.Magnitude > 0 then
+			flatLook = flatLook.Unit
+		end
+
+		local function considerTarget(target, targetRoot)
+			if not targetRoot then
+				return
+			end
+			local offset = targetRoot.Position - root.Position
+			local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+			local distance = flatOffset.Magnitude
+			if distance > nearestDistance then
+				return
+			end
+			if distance > 0 and flatLook.Magnitude > 0 and flatOffset.Unit:Dot(flatLook) < TargetingUtil.GetConeDotThreshold() then
+				return
+			end
+			nearestTarget = target
+			nearestDistance = distance
+		end
+
+		for _, enemy in CollectionService:GetTagged("Enemy") do
+			if enemy.Parent and (enemy:GetAttribute("Health") or 0) > 0 then
+				considerTarget(enemy, enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart)
+			end
+		end
+		for _, otherPlayer in Players:GetPlayers() do
+			if otherPlayer ~= self._player then
+				local otherCharacter = otherPlayer.Character
+				considerTarget(otherPlayer, otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart"))
+			end
+		end
+
+		if nearestTarget then
+			local targetRoot = nearestTarget:IsA("Player")
+				and nearestTarget.Character and nearestTarget.Character:FindFirstChild("HumanoidRootPart")
+				or nearestTarget:FindFirstChild("HumanoidRootPart") or nearestTarget.PrimaryPart
+			targetData.attackTargetPosition = targetRoot and targetRoot.Position
+			if nearestTarget:IsA("Player") then
+				targetData.targetUserId = nearestTarget.UserId
+			else
+				targetData.targetInstance = nearestTarget
+			end
+		end
+	end
 
 	if skill.targetType == SkillConfig.TargetTypes.Ground then
 		local groundPos = TargetingUtil.GetMouseGroundPosition(
