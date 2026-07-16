@@ -70,36 +70,6 @@ function EnemyService:PlayDeathCrumble(enemy)
 end
 
 local SPAWN_GROUPS = {
-	-- Chapter 1 outskirts: enemies surround Valdris outside every city wall.
-	-- The north road continues into the main Frosthorn campaign below.
-	{ type = "Slime", count = 5, center = Vector3.new(-70, 3, -900), radius = 60 },
-	{ type = "Goblin", count = 4, center = Vector3.new(100, 3, -940), radius = 60 },
-	{ type = "Slime", count = 5, center = Vector3.new(900, 3, -70), radius = 60 },
-	{ type = "Goblin", count = 4, center = Vector3.new(950, 3, 110), radius = 60 },
-	{ type = "Slime", count = 5, center = Vector3.new(-900, 3, 70), radius = 60 },
-	{ type = "Goblin", count = 4, center = Vector3.new(-950, 3, -110), radius = 60 },
-	{ type = "Slime", count = 5, center = Vector3.new(70, 3, 900), radius = 60 },
-	{ type = "Goblin", count = 4, center = Vector3.new(-120, 3, 950), radius = 60 },
-
-	-- Frosthorn Peak, north of the city: each band follows the campaign route.
-	{ type = "Slime", count = 6, center = Vector3.new(-70, 3, 1030), radius = 55 },
-	{ type = "Goblin", count = 6, center = Vector3.new(85, 3, 1080), radius = 55 },
-	{ type = "Spider", count = 8, center = Vector3.new(-130, 3, 1210), radius = 65 },
-	{ type = "DireWolf", count = 6, center = Vector3.new(110, 3, 1280), radius = 65 },
-	-- Optional Chapter 1 patrol routes spread the campaign across both Frosthorn ridges.
-	{ type = "DireWolf", count = 6, center = Vector3.new(-480, 3, 1390), radius = 75 },
-	{ type = "Spider", count = 5, center = Vector3.new(430, 3, 1330), radius = 70 },
-	{ type = "Skeleton", count = 10, center = Vector3.new(-70, 3, 1430), radius = 65 },
-	{ type = "SkeletonKnight", count = 3, center = Vector3.new(70, 3, 1500), radius = 40 },
-	{ type = "Orc", count = 12, center = Vector3.new(0, 3, 1580), radius = 80 },
-	{ type = "Wyvern", count = 2, center = Vector3.new(-130, 3, 1660), radius = 65 },
-	{ type = "Griffin", count = 2, center = Vector3.new(140, 3, 1670), radius = 65 },
-	{ type = "Wyvern", count = 3, center = Vector3.new(500, 3, 1450), radius = 70 },
-	{ type = "Skorvath", count = 1, center = Vector3.new(0, 3, 1720), radius = 24 },
-
-	-- Legacy overworld spawns remain disabled while Chapter 1 progression is
-	-- authoritative. Future chapters add their own gated spawn bands below.
-	--[[
 	---------------------------------------------------------------------------
 	-- ZONE 1: Village outskirts (just outside gates, dist ~750-900)
 	-- Low-level mobs for beginners leaving the village
@@ -196,7 +166,6 @@ local SPAWN_GROUPS = {
 	-- Minions guarding the crater rim
 	{ type = "SkeletonKnight", count = 2, center = Vector3.new(650, 3, -500), radius = 30 },
 	{ type = "Orc", count = 2, center = Vector3.new(950, 3, -700), radius = 30 },
-	]]
 }
 
 
@@ -476,15 +445,32 @@ function EnemyService:SpawnEnemies()
 		enemiesFolder.Parent = workspace
 	end
 
+	local spawnedByType = {}
 	for _, group in SPAWN_GROUPS do
 		for i = 1, group.count do
-			local offsetX = (math.random() - 0.5) * 2 * group.radius
-			local offsetZ = (math.random() - 0.5) * 2 * group.radius
-			local posX = group.center.X + offsetX
-			local posZ = group.center.Z + offsetZ
-			local y = self._mapGenerator:GetGroundHeight(posX, posZ)
-			self:CreateEnemy(group.type, Vector3.new(posX, y + 3, posZ), group.center, group.radius)
+			-- One malformed configuration must not prevent every later monster
+			-- group from spawning (for example, after the initial Slime groups).
+			local ok, enemyOrError = xpcall(function()
+				local offsetX = (math.random() - 0.5) * 2 * group.radius
+				local offsetZ = (math.random() - 0.5) * 2 * group.radius
+				local posX = group.center.X + offsetX
+				local posZ = group.center.Z + offsetZ
+				local y = self._mapGenerator:GetGroundHeight(posX, posZ)
+				return self:CreateEnemy(group.type, Vector3.new(posX, y + 3, posZ), group.center, group.radius)
+			end, debug.traceback)
+
+			if ok and enemyOrError then
+				spawnedByType[group.type] = (spawnedByType[group.type] or 0) + 1
+			elseif not ok then
+				warn(string.format("[EnemyService] Failed to spawn %s: %s", group.type, enemyOrError))
+			else
+				warn(string.format("[EnemyService] No MonsterConfig entry for spawn type %s", group.type))
+			end
 		end
+	end
+
+	for enemyType, count in pairs(spawnedByType) do
+		print(string.format("[EnemyService] Spawned %d %s", count, enemyType))
 	end
 end
 
