@@ -696,10 +696,8 @@ function EnemyService:RunAI()
 					self._playMonsterAnimRemote:FireAllClients(enemy, animKey)
 				end
 
-				-- Delay damage by attackHitTime so it syncs with the animation hit moment
-				local hitTime = enemyConfig.attackHitTime or 0.3
-				task.delay(hitTime, function()
-					-- Guard: enemy or target may have been removed during the delay
+				-- Apply damage as soon as the attack animation starts.
+				-- Guard: the enemy or target may have been removed before the hit resolves.
 					if not enemy.Parent or (enemy:GetAttribute("Health") or 0) <= 0 then return end
 					if not targetPlayer.Parent then return end
 					local targetData = self._playerData:GetData(targetPlayer)
@@ -765,7 +763,6 @@ function EnemyService:RunAI()
 							BuffService:ApplyEffect(targetPlayer, enemyConfig.statusEffect, 3, enemy, 1)
 						end
 					end
-				end)
 			end
 		end,
 	}

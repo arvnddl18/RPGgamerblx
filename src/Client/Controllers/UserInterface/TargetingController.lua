@@ -52,6 +52,7 @@ function TargetingController:BuildTargetData(skill, character)
 	local range = skill.range or 10
 	local targetData = {
 		direction = root.CFrame.LookVector,
+		attackOrigin = root.Position,
 	}
 
 	if skill.targetType == SkillConfig.TargetTypes.Ground then

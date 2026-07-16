@@ -103,7 +103,21 @@ function SkillService:ValidateTargetData(player, skill, targetData)
 		end
 		sanitized.groundPosition = TargetingUtil.ClampGroundPosition(root.Position, sanitized.groundPosition, range)
 	else
-		sanitized.direction = root.CFrame.LookVector
+		-- Preserve the direction captured when an auto-attack starts so moving
+		-- does not change a valid attack, while the target still must be ahead.
+		if skill.slotType ~= "autoAttack" or not sanitized.direction then
+			sanitized.direction = root.CFrame.LookVector
+		end
+		if skill.slotType == "autoAttack" and sanitized.attackOrigin then
+			-- A dash can move the client before that movement reaches the server.
+			-- Bound the accepted snapshot so it cannot be used as an arbitrary
+			-- remote attack position.
+			if (sanitized.attackOrigin - root.Position).Magnitude > 25 then
+				sanitized.attackOrigin = root.Position
+			end
+		else
+			sanitized.attackOrigin = root.Position
+		end
 	end
 
 	if sanitized.targetUserId then
@@ -156,13 +170,13 @@ function SkillService:FindFriendlyTargets(caster, range)
 	return targets
 end
 
-function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOnly, lookVector)
+function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOnly, lookVector, origin)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root or not self._combatService then
 		return {}
 	end
 
-	local origin = root.Position
+	origin = origin or root.Position
 	local look = lookVector or root.CFrame.LookVector
 	local flatLook = Vector3.new(look.X, 0, look.Z)
 	if flatLook.Magnitude > 0 then
@@ -191,13 +205,13 @@ function SkillService:FindPlayerDamageTargets(attacker, character, range, coneOn
 	return targets
 end
 
-function SkillService:FindMeleeTargets(character, range, coneOnly, lookVector)
+function SkillService:FindMeleeTargets(character, range, coneOnly, lookVector, origin)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then
 		return {}
 	end
 
-	local origin = root.Position
+	origin = origin or root.Position
 	local look = lookVector or root.CFrame.LookVector
 	local flatLook = Vector3.new(look.X, 0, look.Z)
 	if flatLook.Magnitude > 0 then
@@ -224,11 +238,13 @@ function SkillService:FindMeleeTargets(character, range, coneOnly, lookVector)
 	return targets
 end
 
-function SkillService:FindNearestDamageTarget(attacker, character, range)
+function SkillService:FindNearestDamageTarget(attacker, character, range, requireFront, lookVector, origin)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root then
 		return nil
 	end
+	lookVector = lookVector or root.CFrame.LookVector
+	origin = origin or root.Position
 
 	local nearest = nil
 	local nearestDist = range
@@ -237,10 +253,10 @@ function SkillService:FindNearestDamageTarget(attacker, character, range)
 		if enemy.Parent and (enemy:GetAttribute("Health") or 0) > 0 then
 			local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart
 			if enemyRoot then
-				local offset = enemyRoot.Position - root.Position
+				local offset = enemyRoot.Position - origin
 				local flatDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
 				if flatDistance <= nearestDist then
-					if TargetingUtil.IsInFront(root.Position, root.CFrame.LookVector, enemyRoot.Position) then
+					if requireFront == false or TargetingUtil.IsInFront(origin, lookVector, enemyRoot.Position) then
 						nearestDist = flatDistance
 						nearest = enemy
 					end
@@ -256,10 +272,10 @@ function SkillService:FindNearestDamageTarget(attacker, character, range)
 				local otherRoot = otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart")
 				local otherData = self._playerData:GetData(otherPlayer)
 				if otherRoot and otherData and otherData.hp > 0 then
-					local offset = otherRoot.Position - root.Position
+					local offset = otherRoot.Position - origin
 					local flatDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
 					if flatDistance <= nearestDist then
-						if TargetingUtil.IsInFront(root.Position, root.CFrame.LookVector, otherRoot.Position) then
+						if requireFront == false or TargetingUtil.IsInFront(origin, lookVector, otherRoot.Position) then
 							nearestDist = flatDistance
 							nearest = otherPlayer
 						end
@@ -419,6 +435,26 @@ function SkillService:ResolveTargets(player, skill, targetData)
 	local targetType = skill.targetType
 	local enemyTargets = {}
 	local playerTargets = {}
+	local attackOrigin = targetData and targetData.attackOrigin or root.Position
+
+	-- Auto-attacks resolve from the attack-start position and range, using the
+	-- attack-start facing direction so rear attacks cannot deal damage.
+	if skill.slotType == "autoAttack" then
+		if targetType == SkillConfig.TargetTypes.Single then
+			local target = self:FindNearestDamageTarget(player, character, range, true, lookVector, attackOrigin)
+			if target then
+				if typeof(target) == "Instance" and target:IsA("Player") then
+					playerTargets = { target }
+				else
+					enemyTargets = { target }
+				end
+			end
+		else
+			enemyTargets = self:FindMeleeTargets(character, range, true, lookVector, attackOrigin)
+			playerTargets = self:FindPlayerDamageTargets(player, character, range, true, lookVector, attackOrigin)
+		end
+		return enemyTargets, playerTargets
+	end
 
 	if targetType == SkillConfig.TargetTypes.Ground then
 		local groundPos = targetData and targetData.groundPosition or root.Position
@@ -568,7 +604,10 @@ function SkillService:HandleCastSkill(player, slotIndex, targetData)
 		self._remotes.PlaySkillVfx:FireAllClients(player, vfxKey)
 	end
 
-	local castTime = skill.castTime or 0
+	-- Auto-attacks should deal damage when their animation starts. The client
+	-- starts the animation before sending CastSkill, so do not wait for the
+	-- animation's duration here. Special skills keep their cast time.
+	local castTime = skill.slotType == "autoAttack" and 0 or (skill.castTime or 0)
 
 	if character then
 		character:SetAttribute("IsCasting", castTime > 0)
