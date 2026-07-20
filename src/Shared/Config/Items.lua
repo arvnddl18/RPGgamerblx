@@ -171,7 +171,10 @@ local Items = {
 		damage = 15,
 		statBonuses = { PhysicalDamage = 5, PhysicalResistance = 1 },
 		color = Color3.fromRGB(180, 60, 60),
-		weaponSkin = { style = "sword", toolHold = "Warrior" },
+		toolAssetId = 94311866468837,
+		toolAssetScale = 0.035,
+		toolAssetRotation = Vector3.new(90, 0, 90),
+		weaponSkin = { style = "axe", toolHold = "Warrior" },
 	},
 	WarriorHelm = {
 		id = "WarriorHelm",
@@ -353,6 +356,8 @@ local Items = {
 		damage = 12,
 		statBonuses = { PhysicalDamage = 4 },
 		color = Color3.fromRGB(60, 160, 80),
+		toolAssetId = 90241838495421,
+		toolAssetScale = 0.025,
 		weaponSkin = { style = "bow", toolHold = "Archer" },
 	},
 	ArcherCap = {

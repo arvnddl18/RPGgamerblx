@@ -1,6 +1,6 @@
 local WeaponGrips = {}
 
-WeaponGrips.GRIP_VERSION = 6
+WeaponGrips.GRIP_VERSION = 8
 
 -- Tip extends -Z from handle. Yaw -90 aligns -Z to character forward.
 local function fwd(y, pitch, yaw, roll)
@@ -14,6 +14,11 @@ WeaponGrips.Styles = {
 		attack = fwd(-0.2, -80, -90, 8),
 		handleSize = Vector3.new(0.25, 0.25, 0.5),
 	},
+	axe = {
+		idle = CFrame.new(0, -0.45, -0.15) * CFrame.Angles(math.rad(90), 0, math.rad(90)),
+		attack = fwd(-0.2, -80, -90, 8),
+		handleSize = Vector3.new(0.25, 0.25, 0.5),
+	},
 	staff = {
 		idle = fwd(-0.35, -70, -90, 0),
 		attack = fwd(-0.25, -55, -90, -10),
@@ -24,8 +29,10 @@ WeaponGrips.Styles = {
 		attack = CFrame.new(0, 0, 0),
 		handleSize = Vector3.new(0.2, 0.2, 0.4),
 		leftHandAttach = true,
-		leftC0 = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-90), 0, 0),
-		leftC1 = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(-90), 0),
+		leftC0 = CFrame.new(-0.08, -0.2, -0.25) * CFrame.Angles(math.rad(-90), 0, 0),
+		leftC1 = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(150), math.rad(-90), 0),
+		attackLeftC0 = CFrame.new(-0.08, -0.08, -0.35) * CFrame.Angles(math.rad(-90), 0, 0),
+		attackLeftC1 = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(15), math.rad(-90), 0),
 	},
 	mace = {
 		idle = fwd(-0.3, -95, -90, 5),

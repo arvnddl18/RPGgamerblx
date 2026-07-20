@@ -12,6 +12,7 @@ local LocalAnimationBuilder = require(Shared.Util.LocalAnimationBuilder)
 
 local TOOL_HOLD_ANIMS = {
 	sword = LocalAnimationBuilder.GetWarriorToolHold,
+	axe = LocalAnimationBuilder.GetWarriorToolHold,
 	staff = LocalAnimationBuilder.GetMageToolHold,
 	bow = LocalAnimationBuilder.GetArcherToolHold,
 	mace = LocalAnimationBuilder.GetPriestToolHold,
@@ -22,6 +23,20 @@ local player = Players.LocalPlayer
 local holdTrack = nil
 local currentTool = nil
 local currentStyle = nil
+local moveEffectConn = nil
+
+local function setNamedEffects(tool, effectNames, enabled)
+	if not tool then
+		return
+	end
+	for _, desc in tool:GetDescendants() do
+		if table.find(effectNames, desc.Name) then
+			if desc:IsA("Trail") or desc:IsA("ParticleEmitter") then
+				desc.Enabled = enabled
+			end
+		end
+	end
+end
 
 local function getWeaponTool(character)
 	for _, child in character:GetChildren() do
@@ -38,7 +53,10 @@ local function applyGrip(tool, grip)
 	end
 end
 
-local function attachBowToLeftHand(character, tool)
+local function attachBowToLeftHand(character, tool, c0, c1)
+	if not character then
+		return
+	end
 	local handle = tool:FindFirstChild("Handle")
 	local leftHand = character:FindFirstChild("LeftHand")
 	if not handle or not leftHand then
@@ -49,8 +67,8 @@ local function attachBowToLeftHand(character, tool)
 	for _, desc in character:GetDescendants() do
 		if desc:IsA("Motor6D") and desc.Part1 == handle then
 			desc.Part0 = leftHand
-			desc.C0 = cfg.leftC0
-			desc.C1 = cfg.leftC1
+			desc.C0 = c0 or cfg.leftC0
+			desc.C1 = c1 or cfg.leftC1
 			return
 		end
 	end
@@ -61,6 +79,24 @@ local function stopHoldTrack()
 		holdTrack:Stop(0.2)
 		holdTrack = nil
 	end
+end
+
+local function stopMoveEffects()
+	if moveEffectConn then
+		moveEffectConn:Disconnect()
+		moveEffectConn = nil
+	end
+	setNamedEffects(currentTool, { "CyanMoveTrail" }, false)
+end
+
+local function bindMoveEffects(humanoid, tool)
+	stopMoveEffects()
+	if not humanoid or not tool then
+		return
+	end
+	moveEffectConn = humanoid.Running:Connect(function(speed)
+		setNamedEffects(tool, { "CyanMoveTrail" }, speed > 0.5)
+	end)
 end
 
 local function playHoldAnim(humanoid, style)
@@ -92,6 +128,10 @@ local function onActionAnim(track)
 
 	local cfg = WeaponGrips.Styles[currentStyle]
 	applyGrip(currentTool, cfg.attack)
+	if cfg.leftHandAttach then
+		local character = player.Character
+		attachBowToLeftHand(character, currentTool, cfg.attackLeftC0 or cfg.leftC0, cfg.attackLeftC1 or cfg.leftC1)
+	end
 	stopHoldTrack()
 	SkinToolBuilder.BindAnimationEffects(currentTool, track)
 
@@ -99,8 +139,11 @@ local function onActionAnim(track)
 		if not currentTool or not currentStyle then
 			return
 		end
-		applyGrip(currentTool, cfg.idle)
 		local character = player.Character
+		applyGrip(currentTool, cfg.idle)
+		if cfg.leftHandAttach then
+			attachBowToLeftHand(character, currentTool, cfg.leftC0, cfg.leftC1)
+		end
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		if humanoid and character:GetAttribute("IsResting") ~= true then
 			playHoldAnim(humanoid, currentStyle)
@@ -129,7 +172,7 @@ local function setupWeapon(character, tool)
 
 	if cfg.leftHandAttach then
 		task.delay(0.25, function()
-			attachBowToLeftHand(character, tool)
+			attachBowToLeftHand(character, tool, cfg.leftC0, cfg.leftC1)
 			applyIdleGrip()
 		end)
 	end
@@ -138,10 +181,12 @@ local function setupWeapon(character, tool)
 	if humanoid and character:GetAttribute("IsResting") ~= true then
 		playHoldAnim(humanoid, currentStyle)
 	end
+	bindMoveEffects(humanoid, tool)
 end
 
 local function onCharacter(character)
 	stopHoldTrack()
+	stopMoveEffects()
 	currentTool = nil
 	currentStyle = nil
 
