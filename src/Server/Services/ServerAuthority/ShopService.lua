@@ -306,6 +306,7 @@ function ShopService:_CreateLegacyNPC(cframe, shopType)
 	billboard.Size = UDim2.new(0, 140, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
 	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 45
 	billboard.Parent = root
 
 	local label = Instance.new("TextLabel")
@@ -372,6 +373,7 @@ function ShopService:CreateNPC(cframe, shopType)
 	billboard.Size = UDim2.new(0, 170, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
 	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 45
 	billboard.Parent = root
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)

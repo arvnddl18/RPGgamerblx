@@ -31,10 +31,14 @@ function Controller:Start()
 	end)
 	remotes.EnhancementResult.OnClientEvent:Connect(function() busy = false end)
 
+	local MusicController = require(script.Parent.Parent.Effects.MusicController)
 	local openEvent = Instance.new("BindableEvent")
 	openEvent.Name = "OpenEnhancementUI"
 	openEvent.Parent = ui:GetScreenGui()
-	openEvent.Event:Connect(function(targetUid) ui:Open(targetUid) end)
+	openEvent.Event:Connect(function(targetUid) 
+		ui:Open(targetUid) 
+		MusicController:Play8DASMR("Open")
+	end)
 end
 
 return Controller

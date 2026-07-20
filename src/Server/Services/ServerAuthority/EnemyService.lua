@@ -160,9 +160,9 @@ local SPAWN_GROUPS = {
 
 	---------------------------------------------------------------------------
 	-- ZONE 6: Boss area — The Crater (centered at ~800, -600, radius 250)
-	-- The Dragon guards this ancient volcanic crater
+	-- Skorvath guards this ancient volcanic crater
 	---------------------------------------------------------------------------
-	{ type = "Dragon", count = 1, center = Vector3.new(800, 3, -600), radius = 40 },
+	{ type = "Skorvath", count = 1, center = Vector3.new(800, 3, -600), radius = 40 },
 	-- Minions guarding the crater rim
 	{ type = "SkeletonKnight", count = 2, center = Vector3.new(650, 3, -500), radius = 30 },
 	{ type = "Orc", count = 2, center = Vector3.new(950, 3, -700), radius = 30 },
@@ -435,6 +435,30 @@ function EnemyService:CreateEnemy(enemyId, position, spawnCenter, spawnRadius)
 	model.Parent = workspace:FindFirstChild("Enemies") or workspace
 	table.insert(self._enemies, model)
 	return model
+end
+
+function EnemyService:SpawnQuestBoss(enemyId, center, radius)
+	local config = MonsterConfig.Get(enemyId)
+	if not config then return nil end
+
+	for _, existing in ipairs(self._enemies) do
+		if existing.Parent and existing:GetAttribute("EnemyType") == enemyId and existing:GetAttribute("QuestBoss") == true then
+			return existing
+		end
+	end
+
+	local spawnCenter = center or Vector3.new()
+	local spawnRadius = radius or 20
+	local offsetX = (math.random() - 0.5) * 2 * spawnRadius
+	local offsetZ = (math.random() - 0.5) * 2 * spawnRadius
+	local posX = spawnCenter.X + offsetX
+	local posZ = spawnCenter.Z + offsetZ
+	local y = self._mapGenerator:GetGroundHeight(posX, posZ)
+	local enemy = self:CreateEnemy(enemyId, Vector3.new(posX, y + 3, posZ), spawnCenter, spawnRadius)
+	if enemy then
+		enemy:SetAttribute("QuestBoss", true)
+	end
+	return enemy
 end
 
 function EnemyService:SpawnEnemies()

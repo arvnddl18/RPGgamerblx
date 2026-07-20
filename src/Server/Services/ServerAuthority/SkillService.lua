@@ -20,6 +20,22 @@ SkillService._restService = nil
 SkillService._buffService = nil
 SkillService._cooldowns = {}
 SkillService._remotes = nil
+SkillService._autoFarm = {}
+SkillService._autoFarmGeneration = {}
+SkillService._autoFarmOrigin = {}
+SkillService._targetLocks = {}
+
+local AUTO_FARM_INTERVAL = 0.1
+local AUTO_FARM_PATROL_RADIUS = 14
+local AUTO_FARM_REACH_DISTANCE = 2.5
+local AUTO_FARM_PICKUP_RADIUS = 8
+local AUTO_FARM_PATROL_POINTS = {
+	Vector3.new(1, 0, 0),
+	Vector3.new(0, 0, 1),
+	Vector3.new(-1, 0, 0),
+	Vector3.new(0, 0, -1),
+}
+local TARGET_LOCK_MAX_DISTANCE = 100
 
 local POTION_SLOTS = {
 	[6] = "HealthPotion",
@@ -42,6 +58,71 @@ function SkillService:Init()
 
 	Framework:GetRemote("CastSkill")
 	Framework:GetRemote("SkillCooldownUpdated")
+	Framework:GetRemote("AutoFarmToggle")
+	Framework:GetRemote("AutoFarmState")
+	Framework:GetRemote("AutoAttackPerformed")
+	Framework:GetRemote("AutoFarmSkillPerformed")
+	Framework:GetRemote("TargetLockRequest")
+	Framework:GetRemote("TargetLockUpdated")
+end
+
+function SkillService:GetLockedTarget(player)
+	local target = self._targetLocks[player]
+	if not target or not target.Parent or not CollectionService:HasTag(target, "Enemy")
+		or (target:GetAttribute("Health") or 0) <= 0 then
+		if target then
+			self._targetLocks[player] = nil
+			self._remotes.TargetLockUpdated:FireClient(player, nil)
+		end
+		return nil
+	end
+
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local targetRoot = target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart
+	if not root or not targetRoot or (targetRoot.Position - root.Position).Magnitude > TARGET_LOCK_MAX_DISTANCE then
+		self._targetLocks[player] = nil
+		self._remotes.TargetLockUpdated:FireClient(player, nil)
+		return nil
+	end
+	return target
+end
+
+function SkillService:SetTargetLock(player, target)
+	if target == nil then
+		self._targetLocks[player] = nil
+		self._remotes.TargetLockUpdated:FireClient(player, nil)
+		return
+	end
+	if typeof(target) ~= "Instance" or not target:IsA("Model") or not target.Parent then
+		return
+	end
+
+	local isEnemy = CollectionService:HasTag(target, "Enemy")
+	local isPlayer = Players:GetPlayerFromCharacter(target) ~= nil
+	if not isEnemy and not (isPlayer and target ~= player.Character) then
+		return
+	end
+
+	local health = target:GetAttribute("Health")
+	if not health then
+		local humanoid = target:FindFirstChild("Humanoid")
+		if humanoid then
+			health = humanoid.Health
+		end
+	end
+	if (health or 0) <= 0 then
+		return
+	end
+
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local targetRoot = target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart
+	if not root or not targetRoot or (targetRoot.Position - root.Position).Magnitude > TARGET_LOCK_MAX_DISTANCE then
+		return
+	end
+	self._targetLocks[player] = target
+	self._remotes.TargetLockUpdated:FireClient(player, target)
 end
 
 function SkillService:GetSkill(skillId)
@@ -90,6 +171,21 @@ function SkillService:ValidateTargetData(player, skill, targetData)
 
 	local sanitized = TargetingUtil.SanitizeTargetData(targetData)
 	local range = skill.range or 10
+	local lockedTarget = self:GetLockedTarget(player)
+	local lockedRoot = lockedTarget and (lockedTarget:FindFirstChild("HumanoidRootPart") or lockedTarget.PrimaryPart)
+	if lockedRoot and skill.skillType ~= "heal" and skill.skillType ~= "buff" then
+		local lockedOffset = lockedRoot.Position - root.Position
+		if Vector3.new(lockedOffset.X, 0, lockedOffset.Z).Magnitude <= range + 0.5 then
+			sanitized.targetInstance = lockedTarget
+			sanitized.attackTargetPosition = lockedRoot.Position
+			if skill.targetType == SkillConfig.TargetTypes.Ground then
+				sanitized.groundPosition = lockedRoot.Position
+			end
+			if lockedOffset.Magnitude > 0.01 then
+				sanitized.direction = lockedOffset.Unit
+			end
+		end
+	end
 
 	if skill.targetType == SkillConfig.TargetTypes.Ground then
 		if not sanitized.groundPosition then
@@ -98,7 +194,8 @@ function SkillService:ValidateTargetData(player, skill, targetData)
 		if not TargetingUtil.IsValidTargetPosition(root.Position, sanitized.groundPosition, range) then
 			return nil
 		end
-		if not TargetingUtil.IsInFront(root.Position, root.CFrame.LookVector, sanitized.groundPosition) then
+		local validationLook = lockedTarget and sanitized.direction or root.CFrame.LookVector
+		if not TargetingUtil.IsInFront(root.Position, validationLook, sanitized.groundPosition) then
 			return nil
 		end
 		sanitized.groundPosition = TargetingUtil.ClampGroundPosition(root.Position, sanitized.groundPosition, range)
@@ -443,12 +540,23 @@ function SkillService:ResolveTargets(player, skill, targetData)
 		-- Prefer the target snapshot captured by the attacking client. This
 		-- prevents a moving target's replicated position from lagging behind the
 		-- attack and making a valid live-speed hit miss.
-		local snapshotTarget = nil
-		if targetData and targetData.targetUserId then
+		local lockedTarget = self:GetLockedTarget(player)
+		local lockedRoot = lockedTarget and (lockedTarget:FindFirstChild("HumanoidRootPart") or lockedTarget.PrimaryPart)
+		local lockedDistance = lockedRoot and (Vector3.new(
+			lockedRoot.Position.X - attackOrigin.X,
+			0,
+			lockedRoot.Position.Z - attackOrigin.Z
+		).Magnitude)
+		local snapshotTarget = lockedDistance and lockedDistance <= range + 0.5 and lockedTarget or nil
+		if not snapshotTarget and targetData and targetData.targetUserId then
 			snapshotTarget = Players:GetPlayerByUserId(targetData.targetUserId)
-		elseif targetData and targetData.targetInstance
+		elseif not snapshotTarget and targetData and targetData.targetInstance
 			and CollectionService:HasTag(targetData.targetInstance, "Enemy") then
-			snapshotTarget = targetData.targetInstance
+			local targetRoot = targetData.targetInstance:FindFirstChild("HumanoidRootPart") or targetData.targetInstance.PrimaryPart
+			local targetDistance = targetRoot and (targetRoot.Position - attackOrigin).Magnitude
+			if targetData.targetInstance ~= lockedTarget and targetDistance and targetDistance <= range + 0.5 then
+				snapshotTarget = targetData.targetInstance
+			end
 		end
 
 		if snapshotTarget and snapshotTarget.Parent then
@@ -477,7 +585,9 @@ function SkillService:ResolveTargets(player, skill, targetData)
 					end
 				end
 			end
-			return enemyTargets, playerTargets
+			if #enemyTargets > 0 or #playerTargets > 0 then
+				return enemyTargets, playerTargets
+			end
 		end
 
 		if targetType == SkillConfig.TargetTypes.Single then
@@ -497,7 +607,11 @@ function SkillService:ResolveTargets(player, skill, targetData)
 	end
 
 	if targetType == SkillConfig.TargetTypes.Ground then
-		local groundPos = targetData and targetData.groundPosition or root.Position
+		local lockedTarget = self:GetLockedTarget(player)
+		local lockedRoot = lockedTarget and (lockedTarget:FindFirstChild("HumanoidRootPart") or lockedTarget.PrimaryPart)
+		local lockedDistance = lockedRoot and (lockedRoot.Position - root.Position).Magnitude
+		local groundPos = lockedRoot and lockedDistance <= range + 0.5
+			and lockedRoot.Position or (targetData and targetData.groundPosition or root.Position)
 		local radius = skill.aoeRadius or range
 		enemyTargets = TargetingUtil.GetTargetsInRadius(groundPos, radius)
 		playerTargets = TargetingUtil.GetPlayersInRadius(groundPos, radius, function(otherPlayer)
@@ -505,8 +619,12 @@ function SkillService:ResolveTargets(player, skill, targetData)
 		end)
 	elseif targetType == SkillConfig.TargetTypes.Circle then
 		local radius = skill.aoeRadius or range
-		enemyTargets = TargetingUtil.GetTargetsInRadius(root.Position, radius)
-		playerTargets = TargetingUtil.GetPlayersInRadius(root.Position, radius, function(otherPlayer)
+		local lockedTarget = self:GetLockedTarget(player)
+		local lockedRoot = lockedTarget and (lockedTarget:FindFirstChild("HumanoidRootPart") or lockedTarget.PrimaryPart)
+		local lockedDistance = lockedRoot and (lockedRoot.Position - root.Position).Magnitude
+		local center = lockedRoot and lockedDistance <= range + 0.5 and lockedRoot.Position or root.Position
+		enemyTargets = TargetingUtil.GetTargetsInRadius(center, radius)
+		playerTargets = TargetingUtil.GetPlayersInRadius(center, radius, function(otherPlayer)
 			return otherPlayer ~= player and self._combatService:CanDamagePlayer(player, otherPlayer)
 		end)
 	elseif targetType == SkillConfig.TargetTypes.Cone or targetType == SkillConfig.TargetTypes.Directional then
@@ -517,13 +635,22 @@ function SkillService:ResolveTargets(player, skill, targetData)
 		end)
 	elseif targetType == SkillConfig.TargetTypes.Single then
 		local primaryTarget = nil
-		if targetData and targetData.targetUserId then
-			local targetPlayer = Players:GetPlayerByUserId(targetData.targetUserId)
-			if targetPlayer and self._combatService:CanDamagePlayer(player, targetPlayer) then
-				primaryTarget = targetPlayer
+		local lockedTarget = self:GetLockedTarget(player)
+		if lockedTarget then
+			local lockedRoot = lockedTarget:FindFirstChild("HumanoidRootPart") or lockedTarget.PrimaryPart
+			if lockedRoot and (lockedRoot.Position - root.Position).Magnitude <= range + 0.5 then
+				primaryTarget = lockedTarget
 			end
-		else
-			primaryTarget = self:FindNearestDamageTarget(player, character, range)
+		end
+		if not primaryTarget then
+			if targetData and targetData.targetUserId then
+				local targetPlayer = Players:GetPlayerByUserId(targetData.targetUserId)
+				if targetPlayer and self._combatService:CanDamagePlayer(player, targetPlayer) then
+					primaryTarget = targetPlayer
+				end
+			else
+				primaryTarget = self:FindNearestDamageTarget(player, character, range)
+			end
 		end
 
 		if primaryTarget then
@@ -574,7 +701,206 @@ function SkillService:ExecuteSkill(player, skill, slotIndex, targetData)
 	return true
 end
 
-function SkillService:HandleCastSkill(player, slotIndex, targetData)
+function SkillService:BuildAutoFarmTargetData(player, skill)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return nil
+	end
+
+	local target = TargetingUtil.GetNearestEnemy(root.Position, skill.range or 10)
+	local nearestDist = skill.range or 10
+	if target then
+		local enemyRoot = target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart
+		if enemyRoot then
+			nearestDist = (enemyRoot.Position - root.Position).Magnitude
+		end
+	end
+
+	local targetPlayer = TargetingUtil.GetNearestPlayer(root.Position, nearestDist, function(otherPlayer)
+		if otherPlayer == player then return false end
+		local c = otherPlayer.Character
+		if not c then return false end
+		local health = c:GetAttribute("Health")
+		if not health then
+			local hum = c:FindFirstChild("Humanoid")
+			if hum then health = hum.Health end
+		end
+		return (health or 0) > 0
+	end)
+
+	if targetPlayer and targetPlayer.Character then
+		target = targetPlayer.Character
+	end
+
+	local targetRoot = target and (target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart)
+	if not targetRoot then
+		return nil
+	end
+
+	local offset = targetRoot.Position - root.Position
+	local flatOffset = Vector3.new(offset.X, 0, offset.Z)
+	if flatOffset.Magnitude <= 0.01 then
+		return nil
+	end
+
+	-- Face the selected mob on the server so AFK attacks use the same validated
+	-- forward arc as normal attacks, without trusting a client-supplied target.
+	root.CFrame = CFrame.lookAt(root.Position, root.Position + flatOffset)
+	local targetData = {
+		direction = flatOffset.Unit,
+		attackOrigin = root.Position,
+		attackTargetPosition = targetRoot.Position,
+	}
+	
+	if targetPlayer and targetPlayer.Character == target then
+		targetData.targetUserId = targetPlayer.UserId
+	else
+		targetData.targetInstance = target
+	end
+
+	if skill.targetType == SkillConfig.TargetTypes.Ground then
+		targetData.groundPosition = targetRoot.Position
+	end
+	return targetData
+end
+
+function SkillService:TryAutoFarmSkill(player)
+	local data = self._playerData:GetData(player)
+	if not data then
+		return false
+	end
+
+	-- Slots 6 and 7 are reserved for potions. Combat skills in slots 2-5
+	-- are attempted in loadout order, with the normal server cooldown/mana
+	-- checks still deciding whether the cast is accepted.
+	for slotIndex = 2, 5 do
+		local skillId = self:GetSkillIdForSlot(player, slotIndex)
+		local skill = skillId and self:GetSkill(skillId)
+		if skill
+			and skill.slotType ~= "autoAttack"
+			and skill.skillType ~= "heal"
+			and skill.skillType ~= "buff"
+			and (data.classMasteryRank or 1) >= (skill.requiredMasteryRank or 1)
+			and not self:IsOnCooldown(player, skillId)
+			and (data.mana or 0) >= (skill.manaCost or 0) then
+			local targetData = self:BuildAutoFarmTargetData(player, skill)
+			if targetData then
+				self:HandleCastSkill(player, slotIndex, targetData, true)
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function SkillService:CollectNearbyAutoFarmPickups(player, origin)
+	if not self._inventoryService or not origin then
+		return
+	end
+
+	local pickupsFolder = workspace:FindFirstChild("Pickups")
+	if not pickupsFolder then
+		return
+	end
+
+	for _, pickup in pickupsFolder:GetChildren() do
+		if pickup:IsA("BasePart") and pickup:GetAttribute("ItemId")
+			and (pickup.Position - origin).Magnitude <= AUTO_FARM_PICKUP_RADIUS then
+			self._inventoryService:CollectPickup(player, pickup)
+		end
+	end
+end
+
+function SkillService:SetAutoFarm(player, enabled)
+	enabled = enabled == true
+	if enabled and not self._playerData:HasSelectedClass(player) then
+		enabled = false
+	end
+
+	local wasEnabled = self._autoFarm[player] == true
+	if wasEnabled == enabled then
+		self._remotes.AutoFarmState:FireClient(player, enabled)
+		return
+	end
+
+	self._autoFarm[player] = enabled
+	self._autoFarmGeneration[player] = (self._autoFarmGeneration[player] or 0) + 1
+	local generation = self._autoFarmGeneration[player]
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	self._autoFarmOrigin[player] = root and root.Position or nil
+	self._remotes.AutoFarmState:FireClient(player, enabled)
+
+	self._remotes.Notification:FireClient(player, enabled and "Auto-farm enabled (F to toggle)." or "Auto-farm disabled.")
+	if not enabled then
+		return
+	end
+
+	task.spawn(function()
+		local patrolIndex = 1
+		local returningToOrigin = false
+
+		while self._autoFarm[player] and self._autoFarmGeneration[player] == generation and player.Parent do
+			local character = player.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if not root or not humanoid or humanoid.Health <= 0 then
+				task.wait(0.5)
+				continue
+			end
+
+			-- A respawn or server teleport establishes a fresh farming origin.
+			if not self._autoFarmOrigin[player]
+				or (root.Position - self._autoFarmOrigin[player]).Magnitude > 40 then
+				self._autoFarmOrigin[player] = root.Position
+				patrolIndex = 1
+				returningToOrigin = false
+			end
+
+			self:CollectNearbyAutoFarmPickups(player, root.Position)
+
+			local skillId = self:GetSkillIdForSlot(player, 1)
+			local skill = skillId and self:GetSkill(skillId)
+			if skill and skill.slotType == "autoAttack" then
+				local castSkill = not character:GetAttribute("IsCasting") and self:TryAutoFarmSkill(player)
+				local targetData = not castSkill and self:BuildAutoFarmTargetData(player, skill) or nil
+				if targetData then
+					-- Hold the current patrol position while there is a mob in range.
+					humanoid:MoveTo(root.Position)
+					self:HandleCastSkill(player, 1, targetData, true)
+				else
+					local origin = self._autoFarmOrigin[player]
+					local destination
+					if returningToOrigin then
+						destination = origin
+					else
+						local offset = AUTO_FARM_PATROL_POINTS[patrolIndex] * AUTO_FARM_PATROL_RADIUS
+						destination = origin + offset
+					end
+
+					local flatDistance = (Vector3.new(destination.X, root.Position.Y, destination.Z) - root.Position).Magnitude
+					if flatDistance <= AUTO_FARM_REACH_DISTANCE then
+						if returningToOrigin then
+							returningToOrigin = false
+							patrolIndex = 1
+						else
+							patrolIndex += 1
+							if patrolIndex > #AUTO_FARM_PATROL_POINTS then
+								returningToOrigin = true
+							end
+						end
+					else
+						humanoid:MoveTo(Vector3.new(destination.X, root.Position.Y, destination.Z))
+					end
+				end
+			end
+			task.wait(AUTO_FARM_INTERVAL)
+		end
+	end)
+end
+
+function SkillService:HandleCastSkill(player, slotIndex, targetData, isAutoFarm)
 	if not self._playerData:HasSelectedClass(player) then
 		return
 	end
@@ -667,6 +993,9 @@ function SkillService:HandleCastSkill(player, slotIndex, targetData)
 		end
 
 		local success = self:ExecuteSkill(player, skill, slotIndex, validatedTargetData)
+		if success and isAutoFarm then
+			self._remotes.AutoFarmSkillPerformed:FireClient(player, skillId)
+		end
 		if not success and skill.manaCost and skill.manaCost > 0 then
 			self._playerData:RestoreMana(player, skill.manaCost)
 		end
@@ -687,9 +1016,23 @@ function SkillService:Start()
 	self._remotes.CastSkill.OnServerEvent:Connect(function(player, slotIndex, targetData)
 		self:HandleCastSkill(player, slotIndex, targetData)
 	end)
+	self._remotes.AutoFarmToggle.OnServerEvent:Connect(function(player, enabled)
+		self:SetAutoFarm(player, enabled)
+	end)
 
 	Players.PlayerRemoving:Connect(function(player)
 		self._cooldowns[player] = nil
+		self._autoFarm[player] = nil
+		self._autoFarmGeneration[player] = nil
+		self._autoFarmOrigin[player] = nil
+		self._targetLocks[player] = nil
+	end)
+	self._remotes.TargetLockRequest.OnServerEvent:Connect(function(player, target)
+		if target == self._targetLocks[player] then
+			self:SetTargetLock(player, nil)
+		else
+			self:SetTargetLock(player, target)
+		end
 	end)
 end
 

@@ -8,17 +8,20 @@ local QuestService = {}
 QuestService._playerData = nil
 QuestService._experienceService = nil
 QuestService._remotes = nil
+QuestService._teleportCooldown = {}
 
 function QuestService:Init()
 	local Framework = require(ReplicatedStorage.Shared.Framework)
 	self._playerData = Framework:GetService("PlayerDataService")
 	self._experienceService = Framework:GetService("ExperienceService")
 	self._karmaService = Framework:GetService("KarmaService")
+	self._enemyService = Framework:GetService("EnemyService")
 	self._remotes = Framework:GetRemotesFolder()
 	self._mapGenerator = Framework:GetService("MapGeneratorService")
 	Framework:GetRemote("OpenQuestLog")
 	Framework:GetRemote("OpenComicScene")
 	Framework:GetRemote("CompleteComicScene")
+	Framework:GetRemote("TeleportToQuestGiver")
 	self._activeScenes = {}
 end
 
@@ -164,7 +167,12 @@ function QuestService:_BuildR15Rig(cframe, skinColor, outfitColor, pantsColor)
 end
 
 function QuestService:CreateNPC(cframe)
-	local config = Quests.GoblinMenace
+	-- Legacy compatibility helper. The original GoblinMenace quest was
+	-- replaced by the Chapter 1 Vanguard chain, so never assume that old
+	-- configuration still exists if another service calls this method.
+	local config = Quests.VanguardAtDawn or {
+		npcName = "Commander Rhessa Kael",
+	}
 
 	local robeColor = Color3.fromRGB(50, 60, 140)
 	local skinColor = Color3.fromRGB(220, 180, 140)
@@ -198,6 +206,7 @@ function QuestService:CreateNPC(cframe)
 	billboard.Size = UDim2.new(0, 140, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
 	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 45
 	billboard.Parent = hrp
 
 	local label = Instance.new("TextLabel")
@@ -280,8 +289,31 @@ function QuestService:CompleteQuest(player, config)
 			self._playerData:AddItem(player, reward.itemId, reward.quantity or 1)
 		end
 	end
+	if self._remotes.QuestReward then
+		self._remotes.QuestReward:FireClient(player, {
+			name = config.name,
+			gold = rewards.gold or 0,
+			experience = rewards.experience or 0,
+			items = rewards.items or {},
+		})
+	end
 
 	self._remotes.Notification:FireClient(player, "Quest complete: " .. config.name)
+	local nextStoryQuest
+	for nextQuestId, nextConfig in pairs(Quests) do
+		if type(nextConfig) == "table" and nextConfig.id and nextConfig.isMainStory then
+			for _, prerequisiteId in ipairs(nextConfig.prerequisites or {}) do
+				if prerequisiteId == config.id and self:GetQuestStatus(player, nextQuestId) == "Available" then
+					nextStoryQuest = nextConfig
+					break
+				end
+			end
+		end
+		if nextStoryQuest then break end
+	end
+	if nextStoryQuest then
+		self._remotes.Notification:FireClient(player, "New story quest: " .. nextStoryQuest.name .. " — Talk to " .. (nextStoryQuest.questGiver or "the next guide") .. ".")
+	end
 	self:FireQuestUpdated(player, config.id)
 	self._playerData:FireStatsUpdated(player)
 
@@ -346,6 +378,40 @@ function QuestService:AdvanceTargetProgress(player, questId, targetType, targetN
 	self:FireQuestUpdated(player, questId)
 end
 
+-- Count materials the player already owns when an item quest is accepted.
+-- Progress is never reduced if the material is later used or dropped.
+function QuestService:SyncInventoryTargetProgress(player, questId)
+	local qData = self:GetQuestData(player, questId)
+	local config = Quests[questId]
+	local data = self._playerData:GetData(player)
+	if not qData or not config or not data or not qData.accepted or qData.completed then return false end
+	if config.objectiveType ~= "collect" and config.objectiveType ~= "collectcraft" then return false end
+	local counts = {}
+	for _, entry in ipairs(data.inventory or {}) do
+		if entry and entry.id then counts[entry.id] = (counts[entry.id] or 0) + (entry.count or 1) end
+	end
+	qData.targetProgress = qData.targetProgress or {}
+	local changed = false
+	for _, target in ipairs(config.targets or {}) do
+		if target.type == "item" then
+			local key = target.type .. ":" .. target.name
+			local owned = math.min(counts[target.name] or 0, target.quantity or 1)
+			if owned > (qData.targetProgress[key] or 0) then
+				qData.targetProgress[key] = owned
+				changed = true
+			end
+		end
+	end
+	if changed then
+		local total = 0
+		for _, target in ipairs(config.targets or {}) do
+			total += math.min(qData.targetProgress[target.type .. ":" .. target.name] or 0, target.quantity or 1)
+		end
+		qData.progress = total
+	end
+	return changed
+end
+
 function QuestService:AcceptQuest(player, questId)
 	local config = Quests[questId]
 	local data = self._playerData:GetData(player)
@@ -364,6 +430,9 @@ function QuestService:AcceptQuest(player, questId)
 
 	data.quests = data.quests or {}
 	local qData = data.quests[questId]
+	if qData and qData.accepted and not qData.completed then
+		return false
+	end
 	if qData and qData.completed and not config.repeatable then
 		return false
 	end
@@ -374,6 +443,11 @@ function QuestService:AcceptQuest(player, questId)
 		progress = 0,
 		targetProgress = {},
 	}
+	self:SyncInventoryTargetProgress(player, questId)
+	if questId == "CinderscarWarden" and self._enemyService then
+		self._enemyService:SpawnQuestBoss("Vaelithra", Vector3.new(800, 0, -600), 40)
+		self._remotes.Notification:FireClient(player, "The Cinderscar Crater is now active. Follow the eastern ridge.")
+	end
 	-- A conversation quest is completed by accepting it from its named speaker.
 	if config.objectiveType == "talk" and config.targetNpc == config.questGiver then
 		self:AdvanceTargetProgress(player, questId, "npc", config.targetNpc)
@@ -473,6 +547,7 @@ function QuestService:FireQuestUpdated(player, questId)
 	if not qData then return end
 	local config = Quests[questId]
 	if not config then return end
+	self:SyncInventoryTargetProgress(player, questId)
 
 	self._remotes.QuestUpdated:FireClient(player, {
 		id = questId,
@@ -482,20 +557,191 @@ function QuestService:FireQuestUpdated(player, questId)
 		accepted = qData.accepted,
 		completed = qData.completed,
 		progress = qData.progress,
+		targetProgress = qData.targetProgress or {},
 		required = Quests.GetRequired(config),
 		status = self:GetQuestStatus(player, questId),
 	})
 end
 
-function QuestService:CreateSimpleNPC(name, cframe, promptText, color, onTriggered)
+function QuestService:TeleportToQuestGiver(player, questId)
+	local now = os.clock()
+	if self._teleportCooldown[player] and now - self._teleportCooldown[player] < 1 then
+		return
+	end
+
+	local config = Quests[questId]
+	if not config or self:GetQuestStatus(player, questId) ~= "Ready" then
+		return
+	end
+
+	local npcsFolder = workspace:FindFirstChild("NPCs")
+	local npc = npcsFolder and npcsFolder:FindFirstChild(config.npcName)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not npc or not character or not humanoid or humanoid.Health <= 0 then
+		return
+	end
+
+	local npcPivot = npc:GetPivot()
+	local destination = npcPivot.Position + npcPivot.LookVector * 7
+	local target = Vector3.new(npcPivot.Position.X, destination.Y, npcPivot.Position.Z)
+	self._teleportCooldown[player] = now
+	character:PivotTo(CFrame.lookAt(destination, target))
+	self._remotes.Notification:FireClient(player, "Arrived at " .. (config.questGiver or config.npcName) .. ".")
+end
+
+-- Every non-repeatable story quest uses the same comic offer flow after its
+-- NPC's one-time introduction has been seen. This keeps the interaction
+-- consistent for the long Chapter 1 chain without requiring a hand-written
+-- scene table entry for every combat beat.
+function QuestService:GetNextQuestOffer(player, npcName)
+	local bestConfig = nil
+	for _, config in pairs(Quests) do
+		if type(config) == "table" and config.id and config.npcName == npcName and not config.repeatable then
+			if self:GetQuestStatus(player, config.id) == "Available" then
+				if not bestConfig
+					or (config.isMainStory and not bestConfig.isMainStory)
+					or (config.isMainStory == bestConfig.isMainStory and config.id < bestConfig.id) then
+					bestConfig = config
+				end
+			end
+		end
+	end
+	return bestConfig
+end
+
+function QuestService:GetReadyQuest(player, npcName)
+	local bestConfig = nil
+	for _, config in pairs(Quests) do
+		if type(config) == "table" and config.id and config.npcName == npcName then
+			if self:GetQuestStatus(player, config.id) == "Ready" then
+				if not bestConfig
+					or (config.isMainStory and not bestConfig.isMainStory)
+					or (config.isMainStory == bestConfig.isMainStory and config.id < bestConfig.id) then
+					bestConfig = config
+				end
+			end
+		end
+	end
+	return bestConfig
+end
+
+function QuestService:OpenQuestCompletion(player, npcName)
+	local config = self:GetReadyQuest(player, npcName)
+	if not config then
+		return false
+	end
+
+	local panels = {}
+	for _, line in ipairs(config.completionDialogue or {}) do
+		if type(line) == "table" and line.text then
+			table.insert(panels, {
+				speaker = line.speaker or npcName,
+				side = line.side or "left",
+				color = line.color or Color3.fromRGB(166, 119, 55),
+				text = line.text,
+			})
+		elseif type(line) == "string" then
+			table.insert(panels, {
+				speaker = npcName,
+				side = "left",
+				color = Color3.fromRGB(166, 119, 55),
+				text = line,
+			})
+		end
+	end
+	if #panels == 0 then
+		panels = {
+			{
+				speaker = npcName,
+				side = "left",
+				color = Color3.fromRGB(166, 119, 55),
+				text = "You completed the mission. Thank you for helping the people of Frosthorn.",
+			},
+		}
+	end
+	local sceneId = "QuestComplete_" .. config.id
+	self._activeScenes[player] = { npcName = npcName, sceneId = sceneId, turnInQuestId = config.id }
+	self._remotes.OpenComicScene:FireClient(player, sceneId, {
+		title = config.name,
+		npcName = npcName,
+		turnInQuestId = config.id,
+		panels = panels,
+	})
+	return true
+end
+
+function QuestService:OpenQuestOffer(player, npcName)
+	local config = self:GetNextQuestOffer(player, npcName)
+	if not config then
+		return false
+	end
+
+	local sceneId = "QuestOffer_" .. config.id
+	local panels = {}
+	for _, line in ipairs(config.dialogue or {}) do
+		if type(line) == "table" and line.text then
+			table.insert(panels, {
+				speaker = line.speaker or npcName,
+				side = line.side or "left",
+				color = line.color or Color3.fromRGB(166, 119, 55),
+				text = line.text,
+			})
+		elseif type(line) == "string" then
+			table.insert(panels, {
+				speaker = npcName,
+				side = "left",
+				color = Color3.fromRGB(166, 119, 55),
+				text = line,
+			})
+		end
+	end
+	if #panels == 0 then
+		panels = {
+			{
+				speaker = npcName,
+				side = "left",
+				color = Color3.fromRGB(166, 119, 55),
+				text = config.description or "Help us with the next step.",
+			},
+		}
+	end
+	local scene = { title = config.name, npcName = npcName, questId = config.id, panels = panels }
+	self._activeScenes[player] = { npcName = npcName, sceneId = sceneId }
+	self._remotes.OpenComicScene:FireClient(player, sceneId, scene)
+	return true
+end
+
+function QuestService:CreateSimpleNPC(name, cframe, promptText, color, onTriggered, showQuestMarker)
 	local npcColor = color or Color3.fromRGB(100, 120, 180)
 	local model, hrp, head = self:_BuildR15Rig(cframe, npcColor, npcColor)
 	model.Name = name
+
+	if showQuestMarker then
+		local questMarker = Instance.new("BillboardGui")
+		questMarker.Name = "QuestMarker"
+		questMarker.Size = UDim2.new(0, 42, 0, 48)
+		questMarker.StudsOffset = Vector3.new(0, 5.8, 0)
+		questMarker.AlwaysOnTop = true
+		questMarker.Parent = hrp
+
+		local markerLabel = Instance.new("TextLabel")
+		markerLabel.Size = UDim2.fromScale(1, 1)
+		markerLabel.BackgroundTransparency = 1
+		markerLabel.Text = "!"
+		markerLabel.TextColor3 = Color3.fromRGB(255, 220, 50)
+		markerLabel.TextStrokeColor3 = Color3.fromRGB(120, 75, 0)
+		markerLabel.TextStrokeTransparency = 0
+		markerLabel.Font = Enum.Font.GothamBlack
+		markerLabel.TextSize = 36
+		markerLabel.Parent = questMarker
+	end
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.new(0, 140, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4, 0)
 	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 45
 	billboard.Parent = hrp
 
 	local label = Instance.new("TextLabel")
@@ -544,6 +790,7 @@ function QuestService:CreateReachZone(zoneId, position, size)
 end
 
 function QuestService:Start()
+	local Players = game:GetService("Players")
 	local function worldCFrame(position, yaw)
 		local y = self._mapGenerator:GetGroundHeight(position.X, position.Z)
 		return CFrame.new(position.X, y, position.Z) * CFrame.Angles(0, yaw or 0, 0)
@@ -551,15 +798,39 @@ function QuestService:Start()
 
 	local scenes = {
 		RhessaIntro = {
-			title = "A Vanguard at Dawn", panels = {
+			title = "A Vanguard at Dawn", questId = "VanguardAtDawn", panels = {
 				{ speaker = "Commander Rhessa Kael", color = Color3.fromRGB(173, 72, 62), text = "Valdris needs steady hands, recruit. Frosthorn's creatures are climbing toward its summit." },
 				{ speaker = "Commander Rhessa Kael", color = Color3.fromRGB(173, 72, 62), text = "Take the northern road. Reopen the Waygate, then report every sign of what drove them there." },
 			}
 		},
 		TovenIntro = {
-			title = "The Scholar in the Ruins", panels = {
-				{ speaker = "Magister Toven Ashe", color = Color3.fromRGB(90, 116, 178), text = "These stones are older than Valdris. The dead are not guarding treasure — they are guarding a memory." },
+			title = "The Scholar in the Ruins", questId = "ScholarInRuins", panels = {
+				{ speaker = "Magister Toven Ashe", color = Color3.fromRGB(90, 116, 178), text = "These stones are older than Valdris. Their guardians are not protecting treasure — they are protecting a memory." },
 				{ speaker = "Magister Toven Ashe", color = Color3.fromRGB(90, 116, 178), text = "Help me clear the courtyard. The sealed chamber may tell us why Frosthorn is afraid." },
+			}
+		},
+		AmaraIntro = {
+			title = "A Village Worth Saving", questId = "VillageSupplyLine", panels = {
+				{ speaker = "Sister Amara", side = "left", color = Color3.fromRGB(212, 180, 104), text = "The refugees brought more than fear. Their wounds carry a strange mountain chill." },
+				{ speaker = "Sister Amara", side = "left", color = Color3.fromRGB(212, 180, 104), text = "Listen to their story, recruit. If we understand what drove the creatures uphill, we can protect Valdris." },
+			}
+		},
+		IvenIntro = {
+			title = "The Northern Road", questId = "NorthernWaygate", panels = {
+				{ speaker = "Scout Iven", side = "right", color = Color3.fromRGB(92, 160, 112), text = "The northern Waygate has gone quiet. Without it, supplies cannot reach the foothills." },
+				{ speaker = "Scout Iven", side = "right", color = Color3.fromRGB(92, 160, 112), text = "Reach the gate and wake its old crystal. Then we will know whether the road is safe." },
+			}
+		},
+		DoranIntro = {
+			title = "Forge the Vanguard", questId = "ForgeTheVanguard", panels = {
+				{ speaker = "Blacksmith Doran", side = "left", color = Color3.fromRGB(178, 104, 62), text = "This ore came from a warband carrying Valdris steel. Someone is reusing the Crown's old weapons." },
+				{ speaker = "Blacksmith Doran", side = "left", color = Color3.fromRGB(178, 104, 62), text = "Bring your equipment to the forge. A Vanguard cannot face Frosthorn with a rusty blade." },
+			}
+		},
+		EddaIntro = {
+			title = "The Warband's Refuge", questId = "WarbandsRefuge", panels = {
+				{ speaker = "Warden Edda", side = "right", color = Color3.fromRGB(110, 135, 165), text = "The Orcs have barricaded the upper slope, but their campfires point inward, not toward Valdris." },
+				{ speaker = "Warden Edda", side = "right", color = Color3.fromRGB(110, 135, 165), text = "Clear a path to their refuge. If they are hiding from the same danger as us, we may need answers more than trophies." },
 			}
 		},
 		FrostwingEpilogue = {
@@ -575,26 +846,48 @@ function QuestService:Start()
 				{ speaker = "Magister Toven Ashe", color = Color3.fromRGB(90, 116, 178), text = "Three Waygates remain sealed. Their maps hold the rest of the shattered history — and someone is already trying to open them." },
 			}
 		},
+		CinderscarIntro = {
+			title = "The Cinderwyrm Warden", questId = "CinderscarWarden", panels = {
+				{ speaker = "Commander Rhessa Kael", side = "left", color = Color3.fromRGB(173, 72, 62), text = "The Crown's secret did not end on Frosthorn. The eastern crater is waking, and its guardian remembers the old seal." },
+				{ speaker = "Commander Rhessa Kael", side = "left", color = Color3.fromRGB(173, 72, 62), text = "The crater is optional, recruit. Go only when you are ready, learn what you can, and return safely." },
+			}
+		},
 	}
 	self._scenes = scenes
+	Players.PlayerRemoving:Connect(function(player)
+		self._activeScenes[player] = nil
+	end)
 
 	function self:OpenNpc(player, npcName, sceneId)
 		local data = self._playerData:GetData(player)
 		if not data then return end
+		if self._activeScenes[player] then return end
 		data.storyFlags = data.storyFlags or {}
 		if sceneId and not data.storyFlags[sceneId] and not self._activeScenes[player] then
 			self._activeScenes[player] = { npcName = npcName, sceneId = sceneId }
 			self._remotes.OpenComicScene:FireClient(player, sceneId, scenes[sceneId])
 			return
 		end
+		if self:OpenQuestCompletion(player, npcName) then
+			return
+		end
+		if not self._activeScenes[player] and self:OpenQuestOffer(player, npcName) then
+			return
+		end
 		self:OnTalkToNPC(player, npcName)
 		self._remotes.OpenQuest:FireClient(player, npcName)
 	end
 
-	local _, rhessaPrompt = self:CreateSimpleNPC("Commander Rhessa Kael", self._mapGenerator:GetMarketplaceNpcCFrame("QuestGiver"), "Speak", Color3.fromRGB(173, 72, 62))
-	rhessaPrompt.Triggered:Connect(function(player) self:OpenNpc(player, "Commander Rhessa Kael", "RhessaIntro") end)
+	local _, rhessaPrompt = self:CreateSimpleNPC("Commander Rhessa Kael", self._mapGenerator:GetMarketplaceNpcCFrame("QuestGiver"), "Speak", Color3.fromRGB(173, 72, 62), nil, true)
+	rhessaPrompt.Triggered:Connect(function(player)
+		local sceneId = "RhessaIntro"
+		if self:GetQuestStatus(player, "CinderscarWarden") == "Available" then
+			sceneId = "CinderscarIntro"
+		end
+		self:OpenNpc(player, "Commander Rhessa Kael", sceneId)
+	end)
 
-	local _, tovenPrompt = self:CreateSimpleNPC("Magister Toven Ashe", self._mapGenerator:GetMarketplaceNpcCFrame("Magister"), "Speak", Color3.fromRGB(90, 116, 178))
+	local _, tovenPrompt = self:CreateSimpleNPC("Magister Toven Ashe", self._mapGenerator:GetMarketplaceNpcCFrame("Magister"), "Speak", Color3.fromRGB(90, 116, 178), nil, true)
 	tovenPrompt.Triggered:Connect(function(player)
 		if self:GetQuestStatus(player, "ScholarInRuins") == "Locked" then
 			self._remotes.Notification:FireClient(player, "Toven is studying alone. Complete Fleeing the Peak first.")
@@ -603,37 +896,66 @@ function QuestService:Start()
 		self:OpenNpc(player, "Magister Toven Ashe", "TovenIntro")
 	end)
 
-	local function storyNpc(name, marketplaceSlot, color, requiredQuest)
-		local _, prompt = self:CreateSimpleNPC(name, self._mapGenerator:GetMarketplaceNpcCFrame(marketplaceSlot), "Speak", color)
+	local function storyNpc(name, marketplaceSlot, color, requiredQuest, sceneId)
+		local _, prompt = self:CreateSimpleNPC(name, self._mapGenerator:GetMarketplaceNpcCFrame(marketplaceSlot), "Speak", color, nil, true)
 		prompt.Triggered:Connect(function(player)
 			if requiredQuest and self:GetQuestStatus(player, requiredQuest) == "Locked" then
 				self._remotes.Notification:FireClient(player, "This person is focused on the crisis ahead. Continue the Chapter 1 story.")
 				return
 			end
+			self:OpenNpc(player, name, sceneId)
+		end)
+	end
+	local function storyNpcAt(name, position, color, requiredQuest)
+		local _, prompt = self:CreateSimpleNPC(name, worldCFrame(position, 0), "Speak", color, nil, true)
+		prompt.Triggered:Connect(function(player)
+			if requiredQuest and self:GetQuestStatus(player, requiredQuest) == "Locked" then
+				self._remotes.Notification:FireClient(player, "Continue the story to find out how to help " .. name .. ".")
+				return
+			end
 			self:OpenNpc(player, name)
 		end)
 	end
-	storyNpc("Sister Amara", "HerbMaster", Color3.fromRGB(212, 180, 104), "VillageSupplyLine")
-	storyNpc("Scout Iven", "Scout", Color3.fromRGB(92, 160, 112), "NorthernWaygate")
-	storyNpc("Blacksmith Doran", "Blacksmith", Color3.fromRGB(178, 104, 62), "ForgeTheVanguard")
-	storyNpc("Warden Edda", "Warden", Color3.fromRGB(110, 135, 165), "WarbandsRefuge")
+	storyNpc("Sister Amara", "HerbMaster", Color3.fromRGB(212, 180, 104), "VillageSupplyLine", "AmaraIntro")
+	storyNpc("Scout Iven", "Scout", Color3.fromRGB(92, 160, 112), "NorthernWaygate", "IvenIntro")
+	storyNpc("Blacksmith Doran", "Blacksmith", Color3.fromRGB(178, 104, 62), "ForgeTheVanguard", "DoranIntro")
+	storyNpc("Warden Edda", "Warden", Color3.fromRGB(110, 135, 165), "WarbandsRefuge", "EddaIntro")
+	-- Current-map NPCs for the expanded Chapter 1 story. They use the same
+	-- comic offer flow as the original six quest givers and do not require
+	-- future-map assets.
+	storyNpcAt("Elder Mara", Vector3.new(-110, 0, -650), Color3.fromRGB(168, 120, 82), "NorthernWaygate")
+	storyNpcAt("Quartermaster Elian", Vector3.new(90, 0, -760), Color3.fromRGB(120, 145, 175), "B2GoblinQuickfingers")
+	storyNpcAt("Nib Quickfinger", Vector3.new(-90, 0, -800), Color3.fromRGB(130, 170, 105), "WebsOfWarning")
+	storyNpcAt("Healer Lysa", Vector3.new(120, 0, -1080), Color3.fromRGB(210, 150, 145), "B4RunningPack")
+	storyNpcAt("Hunter Corren", Vector3.new(-120, 0, -1220), Color3.fromRGB(112, 150, 105), "N4AntidoteForPatrol")
+	storyNpcAt("Smith Hadrik", Vector3.new(110, 0, -1450), Color3.fromRGB(176, 108, 68), "B6KnightsSealedDoor")
+	storyNpcAt("Scout Varok", Vector3.new(-120, 0, -1650), Color3.fromRGB(105, 138, 105), "B7AshenSpear")
+	storyNpcAt("Cook Branna", Vector3.new(350, 0, -1450), Color3.fromRGB(202, 146, 90), "N9FeathersForSignal")
+	storyNpcAt("Veteran Dain", Vector3.new(10, 0, -900), Color3.fromRGB(124, 124, 142), "FrostwingsDomain")
+	storyNpcAt("Priestess Selene", Vector3.new(0, 0, -1650), Color3.fromRGB(180, 155, 210), "N11OldSoldiersQuestion")
 
-	local waygatePosition = Vector3.new(0, 0, 920)
+	local waygatePosition = Vector3.new(0, 0, -920)
 	local waygate = self:CreateReachZone("FrosthornWaygate", Vector3.new(waygatePosition.X, self._mapGenerator:GetGroundHeight(waygatePosition.X, waygatePosition.Z) + 8, waygatePosition.Z), Vector3.new(36, 18, 16))
 	waygate.Name = "Northern Frosthorn Waygate"
 	waygate.Transparency = 0.35
 	waygate.Material = Enum.Material.Neon
 	waygate.Color = Color3.fromRGB(90, 190, 255)
 
-	local chamberPosition = Vector3.new(70, 0, 1500)
+	local chamberPosition = Vector3.new(70, 0, -1500)
 	local chamber = self:CreateReachZone("SealedChamberDoor", Vector3.new(chamberPosition.X, self._mapGenerator:GetGroundHeight(chamberPosition.X, chamberPosition.Z) + 7, chamberPosition.Z), Vector3.new(30, 14, 4))
 	chamber.Name = "Sealed Royal Chamber"
 	chamber.Transparency = 0.2
 	chamber.Material = Enum.Material.Slate
 	chamber.Color = Color3.fromRGB(55, 60, 75)
 
-	self:CreateReachZone("WesternWatch", Vector3.new(-520, self._mapGenerator:GetGroundHeight(-520, 1390) + 7, 1390), Vector3.new(38, 14, 38)).Name = "Western Frosthorn Watch"
-	self:CreateReachZone("EasternWatch", Vector3.new(520, self._mapGenerator:GetGroundHeight(520, 1420) + 7, 1420), Vector3.new(38, 14, 38)).Name = "Eastern Frosthorn Watch"
+	self:CreateReachZone("WesternWatch", Vector3.new(-520, self._mapGenerator:GetGroundHeight(-520, -1390) + 7, -1390), Vector3.new(38, 14, 38)).Name = "Western Frosthorn Watch"
+	self:CreateReachZone("EasternWatch", Vector3.new(520, self._mapGenerator:GetGroundHeight(520, -1420) + 7, -1420), Vector3.new(38, 14, 38)).Name = "Eastern Frosthorn Watch"
+	local memorialPosition = Vector3.new(0, 0, -1650)
+	local memorial = self:CreateReachZone("FrosthornMemorial", Vector3.new(memorialPosition.X, self._mapGenerator:GetGroundHeight(memorialPosition.X, memorialPosition.Z) + 7, memorialPosition.Z), Vector3.new(30, 14, 30))
+	memorial.Name = "Frosthorn Memorial Shrine"
+	memorial.Transparency = 0.35
+	memorial.Material = Enum.Material.Neon
+	memorial.Color = Color3.fromRGB(190, 160, 255)
 
 	for _, gate in ipairs({
 		{ name = "Emberfang Waygate", slot = "EmberfangSentry" },
@@ -652,17 +974,31 @@ function QuestService:Start()
 		end
 	end)
 
-	self._remotes.CompleteComicScene.OnServerEvent:Connect(function(player, sceneId)
+	self._remotes.TeleportToQuestGiver.OnServerEvent:Connect(function(player, questId)
+		self:TeleportToQuestGiver(player, questId)
+	end)
+
+	self._remotes.CompleteComicScene.OnServerEvent:Connect(function(player, sceneId, openQuestPanel)
 		local active = self._activeScenes[player]
 		if not active or active.sceneId ~= sceneId then return end
 		local data = self._playerData:GetData(player)
 		if data then
 			data.storyFlags = data.storyFlags or {}
-			data.storyFlags[sceneId] = true
+			local isQuestOffer = string.sub(sceneId, 1, 11) == "QuestOffer_"
+			local isQuestCompletion = string.sub(sceneId, 1, 14) == "QuestComplete_"
+			if not isQuestOffer and not isQuestCompletion then
+				data.storyFlags[sceneId] = true
+			end
 			self._playerData:FireStatsUpdated(player)
 			if not active.epilogue then
-				self:OnTalkToNPC(player, active.npcName)
-				self._remotes.OpenQuest:FireClient(player, active.npcName)
+				local completedFromScene = active.turnInQuestId ~= nil
+					and self:GetQuestStatus(player, active.turnInQuestId) == "Completed"
+				if not completedFromScene then
+					self:OnTalkToNPC(player, active.npcName)
+					if openQuestPanel ~= false then
+						self._remotes.OpenQuest:FireClient(player, active.npcName)
+					end
+				end
 			end
 		end
 		self._activeScenes[player] = nil

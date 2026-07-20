@@ -55,7 +55,7 @@ local LootTables = {
 	GriffinDrops = {
 		{ itemId = "PhoenixFeather", weight = 40 },
 		{ itemId = "MagicCore", weight = 30 },
-		{ itemId = "Hero's Feast", weight = 20 },
+		{ itemId = "HerosFeast", weight = 20 },
 		{ itemId = "Windpiercer", weight = 10 },
 	},
 }

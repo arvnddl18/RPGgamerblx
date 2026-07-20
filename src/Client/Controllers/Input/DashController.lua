@@ -35,6 +35,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			return
 		end
 		local direction = getMoveDirection()
+		
+		-- Play dash sound locally
+		local workspace = game:GetService("Workspace")
+		local audioFolder = workspace:FindFirstChild("Audio")
+		local dashSound = audioFolder and audioFolder:FindFirstChild("dash8")
+		if dashSound and dashSound:IsA("Sound") then
+			dashSound:Play()
+		end
+		
 		remotes.RequestDash:FireServer(direction)
 	end
 end)

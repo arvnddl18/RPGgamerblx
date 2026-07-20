@@ -12,16 +12,20 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local playerLevel = 1
 local shopUI = ShopUI.new(player:WaitForChild("PlayerGui"))
 
-shopUI:OnPurchase(function(itemId, quantity)
-	remotes.PurchaseItem:FireServer(itemId, quantity)
-end)
+	local MusicController = require(script.Parent.Parent.Effects.MusicController)
 
-remotes.OpenShop.OnClientEvent:Connect(function(items, shopType)
-	shopUI:SetPlayerLevel(playerLevel)
-	shopUI:SetShopType(shopType)
-	shopUI:SetItems(items)
-	shopUI:SetVisible(true)
-end)
+	shopUI:OnPurchase(function(itemId, quantity)
+		MusicController:Play8DASMR("PurchaseItem")
+		remotes.PurchaseItem:FireServer(itemId, quantity)
+	end)
+	
+	remotes.OpenShop.OnClientEvent:Connect(function(items, shopType)
+		shopUI:SetPlayerLevel(playerLevel)
+		shopUI:SetShopType(shopType)
+		shopUI:SetItems(items)
+		shopUI:SetVisible(true)
+		MusicController:Play8DASMR("Open")
+	end)
 
 remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	playerLevel = payload.level or 1

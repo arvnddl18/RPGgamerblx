@@ -6,12 +6,15 @@ local Items = require(Shared.Config.Items)
 
 local SkillBarUI = {}
 SkillBarUI.__index = SkillBarUI
+SkillBarUI.AutofarmToggleRequested = Instance.new("BindableEvent")
+SkillBarUI._active = nil
 
 local SLOT_LABELS = { "1", "2", "3", "4", "5", "6", "7" }
 local POTION_NAMES = { [6] = "HP Pot", [7] = "MP Pot" }
 
 function SkillBarUI.new(playerGui)
 	local self = setmetatable({}, SkillBarUI)
+	SkillBarUI._active = self
 	self._slots = {}
 	self._cooldownEnds = {}
 	self._mana = 0
@@ -34,6 +37,59 @@ function SkillBarUI.new(playerGui)
 	actionBar.Visible = false
 	actionBar.Parent = screenGui
 	self._actionBar = actionBar
+
+	local autofarmButton = Instance.new("TextButton")
+	autofarmButton.Name = "AutofarmButton"
+	autofarmButton.Size = UDim2.new(0, 46, 0, 46)
+	autofarmButton.Position = UDim2.new(0.5, -266, 1, -70)
+	autofarmButton.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+	autofarmButton.BackgroundTransparency = 0
+	autofarmButton.BorderSizePixel = 0
+	autofarmButton.AutoButtonColor = false
+	autofarmButton.Text = ""
+	autofarmButton.Visible = false
+	autofarmButton.ZIndex = 2
+	autofarmButton.Parent = screenGui
+
+	local autofarmCorner = Instance.new("UICorner")
+	autofarmCorner.CornerRadius = UDim.new(0, 6)
+	autofarmCorner.Parent = autofarmButton
+
+	local autofarmStroke = Instance.new("UIStroke")
+	autofarmStroke.Color = Color3.fromRGB(85, 85, 105)
+	autofarmStroke.Thickness = 1
+	autofarmStroke.Parent = autofarmButton
+
+	local autofarmLabel = Instance.new("TextLabel")
+	autofarmLabel.Name = "Label"
+	autofarmLabel.Size = UDim2.new(1, 0, 1, -14)
+	autofarmLabel.Position = UDim2.new(0, 0, 0, 0)
+	autofarmLabel.BackgroundTransparency = 1
+	autofarmLabel.Text = "AUTO"
+	autofarmLabel.TextColor3 = Color3.fromRGB(255, 220, 100)
+	autofarmLabel.Font = Enum.Font.GothamBold
+	autofarmLabel.TextSize = 11
+	autofarmLabel.ZIndex = 3
+	autofarmLabel.Parent = autofarmButton
+
+	local autofarmKeyLabel = Instance.new("TextLabel")
+	autofarmKeyLabel.Name = "KeyLabel"
+	autofarmKeyLabel.Size = UDim2.new(1, 0, 0, 14)
+	autofarmKeyLabel.Position = UDim2.new(0, 0, 1, -18)
+	autofarmKeyLabel.BackgroundTransparency = 1
+	autofarmKeyLabel.Text = "F"
+	autofarmKeyLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+	autofarmKeyLabel.Font = Enum.Font.GothamBold
+	autofarmKeyLabel.TextSize = 8
+	autofarmKeyLabel.ZIndex = 3
+	autofarmKeyLabel.Parent = autofarmButton
+
+	autofarmButton.Activated:Connect(function()
+		SkillBarUI.AutofarmToggleRequested:Fire()
+	end)
+
+	self._autofarmButton = autofarmButton
+	self._autofarmStroke = autofarmStroke
 
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
@@ -150,6 +206,20 @@ function SkillBarUI.new(playerGui)
 	return self
 end
 
+function SkillBarUI.SetAutofarmState(enabled)
+	local self = SkillBarUI._active
+	if not self or not self._autofarmButton then
+		return
+	end
+
+	self._autofarmButton.BackgroundColor3 = enabled
+		and Color3.fromRGB(70, 95, 55)
+		or Color3.fromRGB(40, 40, 55)
+	self._autofarmStroke.Color = enabled
+		and Color3.fromRGB(160, 210, 95)
+		or Color3.fromRGB(85, 85, 105)
+end
+
 function SkillBarUI:GetSkillMeta(skillId)
 	if skillId == "HealthPotion" then
 		local item = Items.HealthPotion
@@ -197,6 +267,7 @@ end
 function SkillBarUI:SetVisible(hasSelectedClass)
 	self._hasSelectedClass = hasSelectedClass
 	self._actionBar.Visible = hasSelectedClass
+	self._autofarmButton.Visible = hasSelectedClass
 end
 
 function SkillBarUI:RefreshAvailability()

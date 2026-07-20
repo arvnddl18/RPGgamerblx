@@ -1,10 +1,10 @@
 local NotificationUI = {}
 NotificationUI.__index = NotificationUI
 
-local MAX_TOASTS = 4
-local TOAST_DURATION = 4
-local TOAST_HEIGHT = 48
-local TOAST_PADDING = 6
+local MAX_TOASTS = 2
+local TOAST_DURATION = 3
+local TOAST_HEIGHT = 38
+local TOAST_PADDING = 4
 
 function NotificationUI.new(playerGui)
 	local self = setmetatable({}, NotificationUI)
@@ -23,8 +23,8 @@ function NotificationUI.new(playerGui)
 	local container = Instance.new("Frame")
 	container.Name = "ToastContainer"
 	container.AnchorPoint = Vector2.new(0.5, 0)
-	container.Size = UDim2.new(0.42, 0, 0, 280)
-	container.Position = UDim2.new(0.5, 0, 0, 18)
+	container.Size = UDim2.fromOffset(340, 90)
+	container.Position = UDim2.new(0.5, 0, 0, 12)
 	container.BackgroundTransparency = 1
 	container.Parent = screenGui
 	self._container = container
@@ -39,6 +39,12 @@ function NotificationUI.new(playerGui)
 end
 
 function NotificationUI:Show(message)
+	for _, entry in ipairs(self._toasts) do
+		if entry.message == message then
+			return
+		end
+	end
+
 	while #self._toasts >= MAX_TOASTS do
 		local oldest = table.remove(self._toasts, 1)
 		if oldest and oldest.frame then
@@ -69,9 +75,10 @@ function NotificationUI:Show(message)
 	label.BackgroundTransparency = 1
 	label.Text = message
 	label.TextColor3 = Color3.fromRGB(255, 250, 235)
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 14
-	label.TextWrapped = true
+	label.Font = Enum.Font.GothamMedium
+	label.TextSize = 12
+	label.TextWrapped = false
+	label.TextTruncate = Enum.TextTruncate.AtEnd
 	label.Parent = toast
 
 	local marker = Instance.new("TextLabel")
@@ -81,10 +88,10 @@ function NotificationUI:Show(message)
 	marker.Text = success and "+" or "!"
 	marker.TextColor3 = success and Color3.fromRGB(160, 255, 180) or Color3.fromRGB(255, 175, 140)
 	marker.Font = Enum.Font.GothamBold
-	marker.TextSize = 18
+	marker.TextSize = 14
 	marker.Parent = toast
 
-	table.insert(self._toasts, { frame = toast })
+	table.insert(self._toasts, { frame = toast, message = message })
 
 	task.delay(TOAST_DURATION, function()
 		for i, entry in ipairs(self._toasts) do

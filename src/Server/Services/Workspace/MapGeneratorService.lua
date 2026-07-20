@@ -22,7 +22,8 @@ local GRID_SIZE = 220
 local SCALE = 16
 local SEED = 42069 -- Static seed so the map does not change permanently
 local WATER_LEVEL = 18
-local VILLAGE_RADIUS = 700 
+local VILLAGE_RADIUS = 700
+local CRATER_POSITION = Vector2.new(800, -600) -- Northeast of Valdris (north is -Z).
 
 local function createPart(name, parent, size, position, color, material)
 	local part = Instance.new("Part")
@@ -46,7 +47,7 @@ for cx = -GRID_SIZE/2, GRID_SIZE/2 do
 		local dist = math.sqrt(worldX^2 + worldZ^2)
 		-- This terrain only establishes the Chapter 1 horizon. Cinderscar and all
 		-- later chapters load as separate maps through their sealed Waygates.
-		local craterDist = math.sqrt((worldX - 800)^2 + (worldZ - 600)^2)
+		local craterDist = math.sqrt((worldX - CRATER_POSITION.X)^2 + (worldZ - CRATER_POSITION.Y)^2)
 		
 		-- Calculate Wilderness Height
 		local n1 = math.noise(worldX/500, worldZ/500, SEED) * 40
@@ -156,8 +157,9 @@ local wallTorchGlow  = Color3.fromRGB(255, 160, 40)   -- Torch fire color
 local wallTorchPole  = Color3.fromRGB(50, 35, 20)     -- Dark wood torch pole
 local wallBannerRed  = Color3.fromRGB(140, 30, 30)    -- Banner / flag color
 
--- Gate angles (0 = East, pi/2 = North, pi = West, 3pi/2 = South)
-local gateAngles = {0, math.pi/2, math.pi, 3*math.pi/2}
+-- Gate angles (0 = East, 3pi/2 = North, pi = West, pi/2 = South).
+-- In this map north is -Z and south is +Z.
+local gateAngles = {0, 3*math.pi/2, math.pi, math.pi/2}
 
 -- Helper: Check if an angle is within a gate opening
 local function isInGateOpening(angle)
@@ -600,12 +602,12 @@ local function spawnCastle(x, z)
 	local gateGap = 10 -- half the gate opening
 	local segLen = outerHalf - gateGap -- length of each wall segment
 
-	-- North wall (+Z side) - two segments
-	createPart("WallN_L", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x - outerHalf + segLen/2, y + wallH/2 + 6, z + outerHalf), stoneMain, matBrick)
-	createPart("WallN_R", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x + outerHalf - segLen/2, y + wallH/2 + 6, z + outerHalf), stoneMain, matBrick)
-	-- South wall (-Z side)
-	createPart("WallS_L", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x - outerHalf + segLen/2, y + wallH/2 + 6, z - outerHalf), stoneMain, matBrick)
-	createPart("WallS_R", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x + outerHalf - segLen/2, y + wallH/2 + 6, z - outerHalf), stoneMain, matBrick)
+	-- North wall (-Z side) - two segments
+	createPart("WallN_L", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x - outerHalf + segLen/2, y + wallH/2 + 6, z - outerHalf), stoneMain, matBrick)
+	createPart("WallN_R", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x + outerHalf - segLen/2, y + wallH/2 + 6, z - outerHalf), stoneMain, matBrick)
+	-- South wall (+Z side)
+	createPart("WallS_L", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x - outerHalf + segLen/2, y + wallH/2 + 6, z + outerHalf), stoneMain, matBrick)
+	createPart("WallS_R", castle, Vector3.new(segLen, wallH, wallThick), Vector3.new(x + outerHalf - segLen/2, y + wallH/2 + 6, z + outerHalf), stoneMain, matBrick)
 	-- East wall (+X side)
 	createPart("WallE_L", castle, Vector3.new(wallThick, wallH, segLen), Vector3.new(x + outerHalf, y + wallH/2 + 6, z - outerHalf + segLen/2), stoneMain, matBrick)
 	createPart("WallE_R", castle, Vector3.new(wallThick, wallH, segLen), Vector3.new(x + outerHalf, y + wallH/2 + 6, z + outerHalf - segLen/2), stoneMain, matBrick)
@@ -633,10 +635,10 @@ local function spawnCastle(x, z)
 
 			for pos = segStart + merlonW/2, segEnd - merlonW/2, merlonSpacing do
 				local mx, mz
-				if side == 1 then     -- North
-					mx = x + pos; mz = z + outerHalf
-				elseif side == 2 then -- South
+				if side == 1 then     -- North (-Z)
 					mx = x + pos; mz = z - outerHalf
+				elseif side == 2 then -- South (+Z)
+					mx = x + pos; mz = z + outerHalf
 				elseif side == 3 then -- East
 					mx = x + outerHalf; mz = z + pos
 				else                  -- West
@@ -1211,9 +1213,9 @@ for bx = -800, 800, 160 do
 				spawnRomanMarketplace(bx + 80, bz + 80)
 			else
 				local step = 32
-				-- South border of the block (Facing -Z / South)
+				-- South border of the block (Facing -Z / North)
 				spawnHouseLine(minX + 20, minZ + 20, maxX - 20, minZ + 20, step, math.pi)
-				-- North border of the block (Facing +Z / North)
+				-- North border of the block (Facing +Z / South)
 				spawnHouseLine(minX + 20, maxZ - 20, maxX - 20, maxZ - 20, step, 0)
 				-- West border of the block (Facing -X / West)
 				spawnHouseLine(minX + 20, minZ + 52, minX + 20, maxZ - 52, step, -math.pi/2)

@@ -256,6 +256,7 @@ ui:OnDragDrop(function(sourceSlot, targetSlot)
 	end
 end)
 
+local MusicController = require(script.Parent.Parent.Effects.MusicController)
 setVisible = function(value)
 	if not hasSelectedClass then
 		return
@@ -263,6 +264,7 @@ setVisible = function(value)
 	visible = value
 	ui:SetVisible(visible)
 	if visible then
+		MusicController:Play8DASMR("Open")
 		remotes.RequestInventory:FireServer()
 	else
 		ui:SetEnhanceMode(false)

@@ -25,9 +25,16 @@ local function updateOverhead(overhead, targetPlayer)
 	local character = targetPlayer.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local fill = overhead:FindFirstChild("HpFill", true)
-	if fill and humanoid and humanoid.MaxHealth > 0 then
-		local ratio = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-		fill.Size = UDim2.new(ratio, 0, 1, 0)
+	if fill then
+		if karmaState == "Chaotic" or pvpMode == "Hostile" then
+			fill.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+		else
+			fill.BackgroundColor3 = Color3.fromRGB(50, 220, 50)
+		end
+		if humanoid and humanoid.MaxHealth > 0 then
+			local ratio = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+			fill.Size = UDim2.new(ratio, 0, 1, 0)
+		end
 	end
 end
 
@@ -35,6 +42,11 @@ local function createOverhead(targetPlayer, character)
 	local attachPart = getAttachPart(character)
 	if not attachPart then
 		return nil
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	end
 
 	local existing = attachPart:FindFirstChild("PlayerOverhead")

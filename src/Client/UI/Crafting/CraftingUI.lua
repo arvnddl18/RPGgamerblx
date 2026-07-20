@@ -878,8 +878,8 @@ function CraftingUI:_updatePreview()
 				table.insert(reqMats, { itemId = req.itemId, amount = attempt.materialAmount, minRarity = attempt.materialMinRarity })
 			end
 			self:_renderMaterials(reqMats, attempt.goldCost)
-			self._statsLabel.Text = string.format("Success: %d%% | Fail: %d%% | Destroy: %d%%",
-				attempt.success * 100, attempt.fail * 100, attempt.destroy * 100)
+			self._statsLabel.Text = string.format("Success: %d%% | Destroy: %d%% (materials only)",
+				attempt.success * 100, attempt.destroy * 100)
 			self._confirmBtn.BackgroundColor3 = COLORS.success
 			self._confirmBtn.Text = "Upgrade to " .. targetRarity
 		end

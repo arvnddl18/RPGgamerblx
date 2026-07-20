@@ -118,10 +118,29 @@ function TargetHUDUI:SetTarget(target)
 	
 	-- Determine name
 	local name = target.Name
+	local isEnemy = false
 	if target:GetAttribute("EnemyType") then
 		local lvl = target:GetAttribute("Level") or 1
 		name = "Lv." .. tostring(lvl) .. " " .. name
+		isEnemy = true
+	else
+		local player = Players:GetPlayerFromCharacter(target)
+		if player then
+			name = player.DisplayName
+			local karmaState = player:GetAttribute("KarmaState") or "Innocent"
+			local pvpMode = player:GetAttribute("PvpMode") or "Peaceful"
+			if karmaState == "Chaotic" or pvpMode == "Hostile" then
+				isEnemy = true
+			end
+		end
 	end
+	
+	if isEnemy then
+		hpFill.BackgroundColor3 = Color3.fromRGB(210, 50, 50)
+	else
+		hpFill.BackgroundColor3 = Color3.fromRGB(50, 220, 50)
+	end
+
 	nameLabel.Text = name
 	
 	table.insert(self._targets, {

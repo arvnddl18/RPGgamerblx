@@ -71,11 +71,13 @@ partyUI:OnDeclineInvite(function(fromUserId)
 	remotes.PartyRespondInvite:FireServer(fromUserId, false)
 end)
 
+local MusicController = require(script.Parent.Parent.Effects.MusicController)
 player:WaitForChild("PlayerGui"):WaitForChild("HUDAction").Event:Connect(function(actionId)
 	if actionId == "Party" and hasSelectedClass then
 		partyVisible = not partyVisible
 		partyUI:SetVisible(partyVisible)
 		if partyVisible then
+			MusicController:Play8DASMR("Open")
 			refreshPlayerList()
 		end
 	end
@@ -89,6 +91,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 		partyVisible = not partyVisible
 		partyUI:SetVisible(partyVisible)
 		if partyVisible then
+			MusicController:Play8DASMR("Open")
 			refreshPlayerList()
 		end
 	end

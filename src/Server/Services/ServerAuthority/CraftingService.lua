@@ -62,13 +62,8 @@ end
 
 function CraftingService:_rollUpgradeOutcome(attemptConfig)
 	local roll = self._rng:NextNumber()
-	local cumulative = attemptConfig.success
-	if roll <= cumulative then
+	if roll <= attemptConfig.success then
 		return "success"
-	end
-	cumulative += attemptConfig.fail
-	if roll <= cumulative then
-		return "fail"
 	end
 	return "destroy"
 end
@@ -188,12 +183,6 @@ function CraftingService:UpgradeEquipment(player, recipeId, targetUid)
 		targetEntry.statMultiplier = RarityConfig.RollMultiplier(targetRarity)
 		payload.newRarity = targetRarity
 		payload.statMultiplier = targetEntry.statMultiplier
-	elseif outcome == "destroy" then
-		if equippedSlot then
-			data.equipped[equippedSlot] = nil
-		elseif targetIndex then
-			self._playerData:RemoveItemByUid(player, targetUid)
-		end
 	end
 	if outcome == "success" then
 		local Framework = require(ReplicatedStorage.Shared.Framework)
@@ -205,19 +194,10 @@ function CraftingService:UpgradeEquipment(player, recipeId, targetUid)
 	self._remotes.InventoryUpdated:FireClient(player, data.inventory)
 	self._playerData:FireStatsUpdated(player)
 
-	if outcome == "destroy" and equippedSlot then
-		local Framework = require(ReplicatedStorage.Shared.Framework)
-		local equipmentService = Framework:GetService("EquipmentService")
-		if equipmentService then
-			equipmentService:ApplyEquipmentChange(player)
-		end
-	end
-
 	self._remotes.CraftResult:FireClient(player, payload)
 	local outcomeMsg = {
 		success = "Upgrade success!",
-		fail = "Upgrade failed.",
-		destroy = "Item destroyed!",
+		destroy = "Upgrade materials destroyed; equipment preserved.",
 	}
 	if outcomeMsg[payload.outcome] then
 		self._remotes.Notification:FireClient(player, outcomeMsg[payload.outcome])
@@ -273,6 +253,7 @@ function CraftingService:_CreateLegacyNPC(cframe)
 	billboard.Size = UDim2.new(0, 140, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
 	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 45
 	billboard.Parent = root
 
 	local label = Instance.new("TextLabel")
@@ -318,6 +299,7 @@ function CraftingService:CreateNPC(cframe)
 	billboard.Size = UDim2.new(0, 140, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
 	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 45
 	billboard.Parent = root
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)

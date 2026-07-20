@@ -585,6 +585,46 @@ function QuestUI:_refreshDetails()
 	descTxt.TextWrapped = true
 	descTxt.LayoutOrder = nextOrder()
 	descTxt.Parent = self._detailScroll
+
+	local guideTxt = Instance.new("TextLabel")
+	guideTxt.Size = UDim2.new(1, 0, 0, 0)
+	guideTxt.AutomaticSize = Enum.AutomaticSize.Y
+	guideTxt.BackgroundTransparency = 1
+	guideTxt.Text = Quests.GetRequirementText(config)
+	guideTxt.TextColor3 = COLORS.text
+	guideTxt.Font = FONTS.Body
+	guideTxt.TextSize = 15
+	guideTxt.TextXAlignment = Enum.TextXAlignment.Left
+	guideTxt.TextWrapped = true
+	guideTxt.LayoutOrder = nextOrder()
+	guideTxt.Parent = self._detailScroll
+
+	local objectiveTxt = Instance.new("TextLabel")
+	objectiveTxt.Size = UDim2.new(1, 0, 0, 0)
+	objectiveTxt.AutomaticSize = Enum.AutomaticSize.Y
+	objectiveTxt.BackgroundTransparency = 1
+	local lines = {}
+	local MonsterConfig = require(Shared.Config.MonsterConfig)
+	local ItemsConfig = require(Shared.Config.Items)
+	for _, target in ipairs(config.targets or {}) do
+		local label = target.name
+		if target.type == "enemy" and MonsterConfig[target.name] then
+			label = MonsterConfig[target.name].name
+		elseif (target.type == "item" or target.type == "craft") and ItemsConfig[target.name] then
+			label = (target.type == "craft" and "Craft " or "") .. ItemsConfig[target.name].name
+		end
+		local key = target.type .. ":" .. target.name
+		local current = (q.targetProgress and q.targetProgress[key]) or 0
+		table.insert(lines, "• " .. label .. ": " .. tostring(math.min(current, target.quantity or 1)) .. "/" .. tostring(target.quantity or 1))
+	end
+	objectiveTxt.Text = #lines > 0 and table.concat(lines, "\n") or (config.objective or "Continue the story.")
+	objectiveTxt.TextColor3 = COLORS.accent
+	objectiveTxt.Font = FONTS.Bold
+	objectiveTxt.TextSize = 16
+	objectiveTxt.TextXAlignment = Enum.TextXAlignment.Left
+	objectiveTxt.TextWrapped = true
+	objectiveTxt.LayoutOrder = nextOrder()
+	objectiveTxt.Parent = self._detailScroll
 	
 	local pad2 = Instance.new("Frame")
 	pad2.Size = UDim2.new(1, 0, 0, 10)

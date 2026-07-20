@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TargetingUtil = require(Shared.Combat.TargetingUtil)
@@ -15,6 +16,8 @@ TargetingController._indicator = nil
 TargetingController._activePreview = nil
 TargetingController._renderConnection = nil
 TargetingController._initialized = false
+TargetingController._lockedTarget = nil
+TargetingController._lockHighlight = nil
 
 function TargetingController:Init()
 	if self._initialized then
@@ -24,10 +27,121 @@ function TargetingController:Init()
 
 	self._mouse = self._player:GetMouse()
 	self._indicator = TargetingIndicator.new(workspace)
+	local remotes = ReplicatedStorage:WaitForChild("Remotes")
+	remotes:WaitForChild("TargetLockUpdated").OnClientEvent:Connect(function(target)
+		self:SetLockedTarget(target)
+	end)
+
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
+		if input.UserInputType == Enum.UserInputType.MouseButton2 then
+			local target = self:GetEnemyFromInstance(self._mouse.Target)
+			if target then
+				self:RequestTargetLock(target == self._lockedTarget and nil or target)
+			end
+		elseif input.KeyCode == Enum.KeyCode.Tab then
+			self:CycleTarget()
+		end
+	end)
+
+	RunService.Heartbeat:Connect(function()
+		local target = self._lockedTarget
+		if target then
+			local health = target:GetAttribute("Health")
+			if not health then
+				local humanoid = target:FindFirstChild("Humanoid")
+				if humanoid then
+					health = humanoid.Health
+				end
+			end
+			if not target.Parent or (health or 0) <= 0 then
+				self:SetLockedTarget(nil)
+				self:RequestTargetLock(nil)
+			end
+		end
+	end)
 
 	self._player.CharacterRemoving:Connect(function()
 		self:EndPreview()
 	end)
+end
+
+function TargetingController:GetEnemyFromInstance(instance)
+	while instance and instance ~= workspace do
+		if instance:IsA("Model") then
+			if CollectionService:HasTag(instance, "Enemy") then
+				return instance
+			end
+			local player = Players:GetPlayerFromCharacter(instance)
+			if player and player ~= self._player then
+				return instance
+			end
+		end
+		instance = instance.Parent
+	end
+	return nil
+end
+
+function TargetingController:SetLockedTarget(target)
+	if self._lockHighlight then
+		self._lockHighlight:Destroy()
+		self._lockHighlight = nil
+	end
+	self._lockedTarget = target and self:GetEnemyFromInstance(target) or nil
+	if self._lockedTarget then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "TargetLockHighlight"
+		highlight.FillColor = Color3.fromRGB(255, 70, 70)
+		highlight.OutlineColor = Color3.fromRGB(255, 220, 80)
+		highlight.FillTransparency = 0.75
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.Adornee = self._lockedTarget
+		highlight.Parent = self._lockedTarget
+		self._lockHighlight = highlight
+	end
+end
+
+function TargetingController:RequestTargetLock(target)
+	local remotes = ReplicatedStorage:WaitForChild("Remotes")
+	remotes:WaitForChild("TargetLockRequest"):FireServer(target)
+end
+
+function TargetingController:CycleTarget()
+	local character = self._player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	local nearest, nearestDistance
+
+	local function checkTarget(targetModel)
+		local targetRoot = targetModel.Parent and (targetModel:FindFirstChild("HumanoidRootPart") or targetModel.PrimaryPart)
+		if not targetRoot then return end
+		local health = targetModel:GetAttribute("Health")
+		if not health then
+			local humanoid = targetModel:FindFirstChild("Humanoid")
+			if humanoid then
+				health = humanoid.Health
+			end
+		end
+		if (health or 0) > 0 then
+			local distance = (targetRoot.Position - root.Position).Magnitude
+			if distance <= 100 and (not nearestDistance or distance < nearestDistance) then
+				nearest, nearestDistance = targetModel, distance
+			end
+		end
+	end
+
+	for _, enemy in CollectionService:GetTagged("Enemy") do
+		checkTarget(enemy)
+	end
+	for _, otherPlayer in Players:GetPlayers() do
+		if otherPlayer ~= self._player and otherPlayer.Character then
+			checkTarget(otherPlayer.Character)
+		end
+	end
+
+	if nearest then
+		self:RequestTargetLock(nearest == self._lockedTarget and nil or nearest)
+	end
 end
 
 function TargetingController:GetIgnoreList()
@@ -56,8 +170,35 @@ function TargetingController:BuildTargetData(skill, character)
 		attackOrigin = root.Position,
 	}
 
+	local lockedTarget = self._lockedTarget
+	local lockedRoot = lockedTarget and (lockedTarget:FindFirstChild("HumanoidRootPart") or lockedTarget.PrimaryPart)
+	local lockedTargetInRange = false
+	if lockedRoot and lockedTarget.Parent then
+		local health = lockedTarget:GetAttribute("Health")
+		if not health then
+			local humanoid = lockedTarget:FindFirstChild("Humanoid")
+			if humanoid then
+				health = humanoid.Health
+			end
+		end
+		if (health or 0) > 0 then
+			local offset = lockedRoot.Position - root.Position
+			lockedTargetInRange = Vector3.new(offset.X, 0, offset.Z).Magnitude <= range + 0.5
+			if lockedTargetInRange then
+				targetData.targetInstance = lockedTarget
+				targetData.attackTargetPosition = lockedRoot.Position
+				if offset.Magnitude > 0.01 then
+					targetData.direction = offset.Unit
+				end
+				if skill.targetType == SkillConfig.TargetTypes.Ground then
+					targetData.groundPosition = lockedRoot.Position
+				end
+			end
+		end
+	end
+
 	if skill.slotType == "autoAttack" then
-		local nearestTarget = nil
+		local nearestTarget = lockedTargetInRange and lockedTarget or nil
 		local nearestDistance = range
 		local flatLook = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
 		if flatLook.Magnitude > 0 then
@@ -81,15 +222,17 @@ function TargetingController:BuildTargetData(skill, character)
 			nearestDistance = distance
 		end
 
-		for _, enemy in CollectionService:GetTagged("Enemy") do
-			if enemy.Parent and (enemy:GetAttribute("Health") or 0) > 0 then
-				considerTarget(enemy, enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart)
+		if not nearestTarget then
+			for _, enemy in CollectionService:GetTagged("Enemy") do
+				if enemy.Parent and (enemy:GetAttribute("Health") or 0) > 0 then
+					considerTarget(enemy, enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart)
+				end
 			end
-		end
-		for _, otherPlayer in Players:GetPlayers() do
-			if otherPlayer ~= self._player then
-				local otherCharacter = otherPlayer.Character
-				considerTarget(otherPlayer, otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart"))
+			for _, otherPlayer in Players:GetPlayers() do
+				if otherPlayer ~= self._player then
+					local otherCharacter = otherPlayer.Character
+					considerTarget(otherPlayer, otherCharacter and otherCharacter:FindFirstChild("HumanoidRootPart"))
+				end
 			end
 		end
 
@@ -216,6 +359,79 @@ function TargetingController:GetTargetDataForCast(skill)
 		return {}
 	end
 	return self:BuildTargetData(skill, character) or {}
+end
+
+-- Returns true if there is at least one live enemy mob or hostile player
+-- within the skill's range. Used to block attack casts with no valid target.
+function TargetingController:HasTargetInRange(skill)
+	local character = self._player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then return false end
+
+	local range = (skill.range or 10) + 0.5
+
+	-- Check a locked target first (it is guaranteed to be an enemy/player)
+	local lockedTarget = self._lockedTarget
+	if lockedTarget and lockedTarget.Parent then
+		local lockedRoot = lockedTarget:FindFirstChild("HumanoidRootPart") or lockedTarget.PrimaryPart
+		if lockedRoot then
+			local health = lockedTarget:GetAttribute("Health")
+			if not health then
+				local hum = lockedTarget:FindFirstChild("Humanoid")
+				if hum then health = hum.Health end
+			end
+			local dist = Vector3.new(
+				lockedRoot.Position.X - root.Position.X,
+				0,
+				lockedRoot.Position.Z - root.Position.Z
+			).Magnitude
+			if (health or 0) > 0 then
+				return dist <= range
+			end
+		end
+	end
+
+	-- Check tagged enemy mobs
+	for _, enemy in CollectionService:GetTagged("Enemy") do
+		if enemy.Parent and (enemy:GetAttribute("Health") or 0) > 0 then
+			local enemyRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart
+			if enemyRoot then
+				local dist = Vector3.new(
+					enemyRoot.Position.X - root.Position.X,
+					0,
+					enemyRoot.Position.Z - root.Position.Z
+				).Magnitude
+				if dist <= range then
+					return true
+				end
+			end
+		end
+	end
+
+	-- Check other players
+	for _, otherPlayer in Players:GetPlayers() do
+		if otherPlayer ~= self._player then
+			local c = otherPlayer.Character
+			local otherRoot = c and c:FindFirstChild("HumanoidRootPart")
+			if otherRoot then
+				local health = c:GetAttribute("Health")
+				if not health then
+					local hum = c:FindFirstChild("Humanoid")
+					if hum then health = hum.Health end
+				end
+				local dist = Vector3.new(
+					otherRoot.Position.X - root.Position.X,
+					0,
+					otherRoot.Position.Z - root.Position.Z
+				).Magnitude
+				if (health or 0) > 0 and dist <= range then
+					return true
+				end
+			end
+		end
+	end
+
+	return false
 end
 
 return TargetingController

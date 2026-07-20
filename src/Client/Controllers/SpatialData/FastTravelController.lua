@@ -213,6 +213,8 @@ ensureWorldMapWired = function()
 		end
 	end)
 	worldMapUI:OnClose(function()
+		local MusicController = require(script.Parent.Parent.Effects.MusicController)
+		MusicController:Play8DASMR("MapOpen")
 		worldMapUI:SetVisible(false)
 	end)
 	return worldMapUI
@@ -247,6 +249,8 @@ openWorldMap = function()
 	currentPortalId = getNearestPortalId()
 	syncUIState()
 	local worldMapUI = ensureWorldMapWired()
+	local MusicController = require(script.Parent.Parent.Effects.MusicController)
+	MusicController:Play8DASMR("MapOpen")
 	worldMapUI:SetVisible(true)
 	if currentPortalId then
 		worldMapUI:SelectLocation(currentPortalId)

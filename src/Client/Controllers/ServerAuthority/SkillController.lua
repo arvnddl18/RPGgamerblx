@@ -136,9 +136,58 @@ local function castSlot(slotIndex)
 	end
 
 	local targetData = TargetingController:GetTargetDataForCast(skillConfig)
+
+	-- Block attack skills when no valid target is in range
+	local skillType = skillConfig.skillType or ""
+	local targetType = skillConfig.targetType or ""
+	local isAttackSkill = skillType ~= "heal" and skillType ~= "buff"
+		and targetType ~= "self" and targetType ~= "party_circle"
+		and skillConfig.slotType ~= "autoAttack"
+	if isAttackSkill and not TargetingController:HasTargetInRange(skillConfig) then
+		return
+	end
+
 	TargetingController:BeginPreview(skillConfig, skillConfig.castTime or 0)
 
 	localCooldowns[skillId] = now + (skillConfig.cooldown or 0)
+	
+	local function play8DASMR(soundName)
+		local workspace = game:GetService("Workspace")
+		local audioFolder = workspace:FindFirstChild("Audio")
+		local originalSound = audioFolder and audioFolder:FindFirstChild(soundName)
+		if originalSound and originalSound:IsA("Sound") then
+			local orbitPart = workspace:FindFirstChild("MusicOrbitPart")
+			if orbitPart then
+				local s = originalSound:Clone()
+				s.Parent = orbitPart
+				s.RollOffMaxDistance = 150
+				s.RollOffMinDistance = 10
+				s.RollOffMode = Enum.RollOffMode.InverseTapered
+				
+				local soundGroup = game:GetService("SoundService"):FindFirstChild("ASMR8DGroup_SFX")
+				if soundGroup then
+					s.SoundGroup = soundGroup
+				end
+				
+				s:Play()
+				game:GetService("Debris"):AddItem(s, math.max(s.TimeLength, 2))
+			else
+				originalSound:Play()
+			end
+		end
+	end
+
+	-- Play sounds for normal attacks
+	if skillId == "Warrior_AutoAttack" or skillId == "Kavalier_AutoAttack" then
+		play8DASMR("swordswing")
+	elseif skillId == "Archer_AutoAttack" then
+		play8DASMR("Bow_shoot")
+	elseif skillId == "Mage_AutoAttack" then
+		play8DASMR("Magic (S)")
+	elseif skillId == "Priest_AutoAttack" then
+		play8DASMR("Regret Hammer Swing")
+	end
+
 	playSkillAnimation(slotIndex)
 	remotes.CastSkill:FireServer(slotIndex, targetData)
 end

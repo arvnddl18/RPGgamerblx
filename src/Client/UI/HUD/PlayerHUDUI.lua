@@ -153,7 +153,7 @@ function PlayerHUDUI.new(playerGui)
 
 	local actionBar = Instance.new("Frame")
 	actionBar.Name = "HUDActionBar"
-	actionBar.Size = UDim2.new(0, 350, 0, 46)
+	actionBar.Size = UDim2.new(0, 250, 0, 46)
 	actionBar.AnchorPoint = Vector2.new(1, 1)
 	actionBar.Position = UDim2.new(1, -16, 1, -16)
 	actionBar.BackgroundTransparency = 1
@@ -168,28 +168,47 @@ function PlayerHUDUI.new(playerGui)
 	actionLayout.Parent = actionBar
 
 	for _, action in {
-		{ id = "Inventory", label = "Inventory", key = "I" },
-		{ id = "Party", label = "Party", key = "P" },
-		{ id = "QuestLog", label = "Quest Log", key = "J" },
-		{ id = "Rest", label = "Rest", key = "M" },
-		{ id = "Stats", label = "Stats", key = "K" },
+		{ id = "Inventory", label = "INV", key = "I" },
+		{ id = "Party", label = "PARTY", key = "P" },
+		{ id = "QuestLog", label = "QUEST", key = "J" },
+		{ id = "Rest", label = "REST", key = "M" },
+		{ id = "Stats", label = "STATS", key = "K" },
 	} do
 		local button = Instance.new("TextButton")
 		button.Name = action.id .. "Button"
-		button.Size = UDim2.new(0, 66, 0, 46)
-		button.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-		button.BackgroundTransparency = 0.12
+		button.Size = UDim2.new(0, 46, 0, 46)
+		button.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+		button.BackgroundTransparency = 0
 		button.BorderSizePixel = 0
-		button.AutoButtonColor = true
-		button.Text = action.label .. "\n[" .. action.key .. "]"
-		button.TextColor3 = Color3.fromRGB(225, 225, 235)
-		button.Font = Enum.Font.GothamBold
-		button.TextSize = 10
+		button.AutoButtonColor = false
+		button.Text = ""
 		button.Parent = actionBar
 
 		local buttonCorner = Instance.new("UICorner")
 		buttonCorner.CornerRadius = UDim.new(0, 6)
 		buttonCorner.Parent = button
+
+		local label = Instance.new("TextLabel")
+		label.Name = "Label"
+		label.Size = UDim2.new(1, 0, 1, -14)
+		label.BackgroundTransparency = 1
+		label.Text = action.label
+		label.TextColor3 = Color3.fromRGB(255, 220, 80)
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = (action.id == "Party" or action.id == "QuestLog") and 8 or 10
+		label.TextScaled = false
+		label.Parent = button
+
+		local keyLabel = Instance.new("TextLabel")
+		keyLabel.Name = "KeyLabel"
+		keyLabel.Size = UDim2.new(1, 0, 0, 14)
+		keyLabel.Position = UDim2.new(0, 0, 1, -14)
+		keyLabel.BackgroundTransparency = 1
+		keyLabel.Text = action.key
+		keyLabel.TextColor3 = Color3.new(1, 1, 1)
+		keyLabel.Font = Enum.Font.GothamBold
+		keyLabel.TextSize = 8
+		keyLabel.Parent = button
 
 		button.Activated:Connect(function()
 			if self._onAction then

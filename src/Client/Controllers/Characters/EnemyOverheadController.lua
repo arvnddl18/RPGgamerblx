@@ -41,6 +41,11 @@ local function createOverhead(enemy)
 		return nil
 	end
 
+	local humanoid = enemy:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	end
+
 	local existing = attachPart:FindFirstChild("EnemyOverhead")
 	if existing then
 		existing:Destroy()

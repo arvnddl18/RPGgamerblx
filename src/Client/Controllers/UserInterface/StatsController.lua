@@ -13,8 +13,10 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local statsPanelUI = StatsPanelUI.new(player:WaitForChild("PlayerGui"))
 
+local MusicController = require(script.Parent.Parent.Effects.MusicController)
 player:WaitForChild("PlayerGui"):WaitForChild("HUDAction").Event:Connect(function(actionId)
 	if actionId == "Stats" then
+		MusicController:Play8DASMR("Open")
 		statsPanelUI:TogglePanel()
 	end
 end)
@@ -22,6 +24,7 @@ end)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.K then
+		MusicController:Play8DASMR("Open")
 		statsPanelUI:TogglePanel()
 	end
 end)

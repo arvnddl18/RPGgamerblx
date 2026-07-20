@@ -23,25 +23,35 @@ function InventoryService:SetupPickup(part)
 	end
 
 	prompt.Triggered:Connect(function(player)
-		local itemId = part:GetAttribute("ItemId")
-		if not itemId then
-			return
-		end
-
-		local itemConfig = Items[itemId]
-		local addData = itemId
-		if itemConfig and itemConfig.supportsRarity then
-			local rarity = part:GetAttribute("MaterialRarity") or "Common"
-			addData = { id = itemId, rarity = rarity }
-		end
-
-		if self._playerData:AddItem(player, addData, 1) then
-			if self._questService then
-				self._questService:OnItemCollected(player, itemId, 1)
-			end
-			part:Destroy()
-		end
+		self:CollectPickup(player, part)
 	end)
+end
+
+function InventoryService:CollectPickup(player, part)
+	if not player or not part or not part.Parent then
+		return false
+	end
+
+	local itemId = part:GetAttribute("ItemId")
+	if not itemId or part:GetAttribute("PickupClaimed") then
+		return false
+	end
+	part:SetAttribute("PickupClaimed", true)
+
+	local itemConfig = Items[itemId]
+	local addData = itemId
+	if itemConfig and itemConfig.supportsRarity then
+		local rarity = part:GetAttribute("MaterialRarity") or "Common"
+		addData = { id = itemId, rarity = rarity }
+	end
+
+	if not self._playerData:AddItem(player, addData, 1) then
+		part:SetAttribute("PickupClaimed", nil)
+		return false
+	end
+
+	part:Destroy()
+	return true
 end
 
 function InventoryService:WatchPickups()
