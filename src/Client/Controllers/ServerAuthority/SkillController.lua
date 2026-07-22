@@ -152,6 +152,21 @@ local function castSlot(slotIndex)
 
 	localCooldowns[skillId] = now + (skillConfig.cooldown or 0)
 	
+	-- Global Cooldown (GCD): Apply 1s cooldown to other main skills (slots 2-5)
+	if slotIndex >= 2 and slotIndex <= 5 then
+		for i = 2, 5 do
+			if i ~= slotIndex then
+				local otherSkillId = currentLoadout[i]
+				if otherSkillId then
+					local currentExpiration = localCooldowns[otherSkillId] or 0
+					if now + 1 > currentExpiration then
+						localCooldowns[otherSkillId] = now + 1
+					end
+				end
+			end
+		end
+	end
+
 	local function play8DASMR(soundName)
 		local workspace = game:GetService("Workspace")
 		local audioFolder = workspace:FindFirstChild("Audio")

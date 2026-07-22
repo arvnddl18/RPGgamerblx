@@ -1075,6 +1075,22 @@ function SkillService:HandleCastSkill(player, slotIndex, targetData, isAutoFarm)
 
 	self:SetCooldown(player, skillId, skill.cooldown or 1)
 
+	-- Global Cooldown (GCD): Apply 1s cooldown to other main skills (slots 2-5)
+	if slotIndex >= 2 and slotIndex <= 5 then
+		for i = 2, 5 do
+			if i ~= slotIndex then
+				local otherSkillId = self:GetSkillIdForSlot(player, i)
+				if otherSkillId then
+					local currentExpiration = (self._cooldowns[player] and self._cooldowns[player][otherSkillId]) or 0
+					local newExpiration = tick() + 1
+					if newExpiration > currentExpiration then
+						self:SetCooldown(player, otherSkillId, 1)
+					end
+				end
+			end
+		end
+	end
+
 	local vfxKey = SkillVfxConfig.GetForSkill(skillId)
 	if vfxKey then
 		self._remotes.PlaySkillVfx:FireAllClients(player, vfxKey)
