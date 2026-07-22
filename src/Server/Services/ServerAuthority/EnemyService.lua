@@ -430,6 +430,12 @@ function EnemyService:CreateEnemy(enemyId, position, spawnCenter, spawnRadius)
 	CollectionService:AddTag(model, "Enemy")
 	self:CreateHealthBar(model, maxHealth)
 
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.CollisionGroup = "Enemies"
+		end
+	end
+
 	EnemyStateMachine.InitEnemy(model, position, config)
 
 	model.Parent = workspace:FindFirstChild("Enemies") or workspace

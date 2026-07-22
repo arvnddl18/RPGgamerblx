@@ -97,15 +97,29 @@ function EnemyStateMachine.Tick(enemy, humanoid, root, config, context)
 				end
 			else
 				enemy:SetAttribute("AIState", STATES.Chase)
+				local direction = (targetRoot.Position - root.Position)
+				-- Flatten direction for ground calculation
+				local flatDirection = Vector3.new(direction.X, 0, direction.Z)
+				
+				if flatDirection.Magnitude > 0 then
+					flatDirection = flatDirection.Unit
+				else
+					flatDirection = Vector3.new(1, 0, 0)
+				end
+
+				-- Aim for a spot just inside the attack range so they don't get too close
+				local offsetDist = math.max(0, config.attackRange - 1.5)
+				local chaseTargetPos = targetRoot.Position - (flatDirection * offsetDist)
+
 				if config.isFlying then
 					local alignPos = root:FindFirstChild("FlyAlignPosition")
 					local alignOri = root:FindFirstChild("FlyAlignOrientation")
 					if alignPos and alignOri then
-						alignPos.Position = targetRoot.Position
+						alignPos.Position = chaseTargetPos
 						alignOri.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z))
 					end
 				else
-					humanoid:MoveTo(targetRoot.Position)
+					humanoid:MoveTo(chaseTargetPos)
 				end
 			end
 		end

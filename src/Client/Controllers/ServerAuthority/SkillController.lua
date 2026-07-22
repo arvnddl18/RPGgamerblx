@@ -9,6 +9,7 @@ local SkillBarUI = require(script.Parent.Parent.Parent.UI.SkillBar.SkillBarUI)
 local AnimationController = require(ReplicatedStorage.Shared.Util.AnimationController)
 local LocalAnimationBuilder = require(ReplicatedStorage.Shared.Util.LocalAnimationBuilder)
 local Skills = require(ReplicatedStorage.Shared.Config.Skills)
+local SkillVfxUtil = require(ReplicatedStorage.Shared.Util.SkillVfxUtil)
 local TargetingController = require(script.Parent.Parent.UserInterface.TargetingController)
 
 local player = Players.LocalPlayer
@@ -189,6 +190,17 @@ local function castSlot(slotIndex)
 	end
 
 	playSkillAnimation(slotIndex)
+
+	-- Play slash VFX locally for melee auto-attacks so it aligns with the
+	-- animation direction (no server round-trip delay).
+	if skillId == "Warrior_AutoAttack" or skillId == "Kavalier_AutoAttack" or skillId == "Priest_AutoAttack" then
+		local character = player.Character
+		if character then
+			local comboIndex = animCtrl and animCtrl:GetComboIndex() or 1
+			SkillVfxUtil.PlayForSkill(character, skillId, comboIndex)
+		end
+	end
+
 	remotes.CastSkill:FireServer(slotIndex, targetData)
 end
 
@@ -245,8 +257,8 @@ remotes.StatsUpdated.OnClientEvent:Connect(function(payload)
 	end
 end)
 
-remotes.SkillCooldownUpdated.OnClientEvent:Connect(function(skillId, duration)
-	skillBar:StartCooldown(skillId, duration)
+remotes.SkillCooldownUpdated.OnClientEvent:Connect(function(skillId, duration, serverTime)
+	skillBar:StartCooldown(skillId, duration, serverTime)
 end)
 
 end

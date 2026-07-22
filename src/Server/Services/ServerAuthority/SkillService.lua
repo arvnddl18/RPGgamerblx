@@ -18,6 +18,7 @@ SkillService._partyService = nil
 SkillService._pvpService = nil
 SkillService._restService = nil
 SkillService._buffService = nil
+SkillService._projectileService = nil
 SkillService._cooldowns = {}
 SkillService._remotes = nil
 SkillService._autoFarm = {}
@@ -54,6 +55,7 @@ function SkillService:Init()
 	self._pvpService = Framework:GetService("PvpService")
 	self._restService = Framework:GetService("RestService")
 	self._buffService = Framework:GetService("BuffService")
+	self._projectileService = Framework:GetService("ProjectileService")
 	self._remotes = Framework:GetRemotesFolder()
 
 	Framework:GetRemote("CastSkill")
@@ -150,8 +152,11 @@ function SkillService:SetCooldown(player, skillId, cooldown)
 	if not self._cooldowns[player] then
 		self._cooldowns[player] = {}
 	end
-	self._cooldowns[player][skillId] = tick() + cooldown
-	self._remotes.SkillCooldownUpdated:FireClient(player, skillId, cooldown)
+	local startTime = tick()
+	self._cooldowns[player][skillId] = startTime + cooldown
+	-- Send the server timestamp so the client can reconcile network latency
+	-- and keep the visual wipe perfectly synchronised with server state.
+	self._remotes.SkillCooldownUpdated:FireClient(player, skillId, cooldown, startTime)
 end
 
 function SkillService:GetAttackerStats(player)
@@ -585,8 +590,10 @@ function SkillService:ResolveTargets(player, skill, targetData)
 					end
 				end
 			end
-			if #enemyTargets > 0 or #playerTargets > 0 then
-				return enemyTargets, playerTargets
+			if targetType == SkillConfig.TargetTypes.Single then
+				if #enemyTargets > 0 or #playerTargets > 0 then
+					return enemyTargets, playerTargets
+				end
 			end
 		end
 
@@ -600,8 +607,18 @@ function SkillService:ResolveTargets(player, skill, targetData)
 				end
 			end
 		else
-			enemyTargets = self:FindMeleeTargets(character, range, true, lookVector, attackOrigin)
-			playerTargets = self:FindPlayerDamageTargets(player, character, range, true, lookVector, attackOrigin)
+			local extraEnemies = self:FindMeleeTargets(character, range, true, lookVector, attackOrigin)
+			for _, enemy in extraEnemies do
+				if not table.find(enemyTargets, enemy) then
+					table.insert(enemyTargets, enemy)
+				end
+			end
+			local extraPlayers = self:FindPlayerDamageTargets(player, character, range, true, lookVector, attackOrigin)
+			for _, p in extraPlayers do
+				if not table.find(playerTargets, p) then
+					table.insert(playerTargets, p)
+				end
+			end
 		end
 		return enemyTargets, playerTargets
 	end
@@ -680,6 +697,19 @@ function SkillService:ResolveTargets(player, skill, targetData)
 	return enemyTargets, playerTargets
 end
 
+function SkillService:ShouldUseProjectile(skill)
+	if not skill.projectileId then
+		return false
+	end
+	if skill.skillType ~= "ranged" then
+		return false
+	end
+	if skill.aoe then
+		return false
+	end
+	return true
+end
+
 function SkillService:ExecuteSkill(player, skill, slotIndex, targetData)
 	local character = player.Character
 	if not character then
@@ -690,6 +720,10 @@ function SkillService:ExecuteSkill(player, skill, slotIndex, targetData)
 		return self:ExecuteFriendlySkill(player, skill)
 	end
 
+	if self:ShouldUseProjectile(skill) then
+		return self:ExecuteProjectileSkill(player, skill, targetData)
+	end
+
 	local enemyTargets, playerTargets = self:ResolveTargets(player, skill, targetData)
 
 	local totalTargets = #enemyTargets + #playerTargets
@@ -698,6 +732,82 @@ function SkillService:ExecuteSkill(player, skill, slotIndex, targetData)
 	end
 
 	self:ApplySkillDamage(player, skill, enemyTargets, playerTargets)
+	return true
+end
+
+function SkillService:ExecuteProjectileSkill(player, skill, targetData)
+	local character = player.Character
+	if not character then
+		return false
+	end
+
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return false
+	end
+
+	local enemyTargets, playerTargets = self:ResolveTargets(player, skill, targetData)
+	local totalTargets = #enemyTargets + #playerTargets
+	if totalTargets == 0 and (skill.damage or 0) > 0 then
+		return false
+	end
+
+	self:ApplySkillDamage(player, skill, enemyTargets, playerTargets)
+
+	if not self._projectileService then
+		return true
+	end
+
+	local direction = targetData and targetData.direction or root.CFrame.LookVector
+	local rawOrigin = targetData and targetData.attackOrigin or root.Position
+	local origin = rawOrigin + Vector3.new(0, 1.5, 0)
+
+	local primaryTarget = enemyTargets[1]
+	if not primaryTarget and #playerTargets > 0 then
+		local tp = playerTargets[1]
+		primaryTarget = tp.Character or tp
+	end
+
+	local function getTargetDirection()
+		if primaryTarget then
+			local tRoot = primaryTarget:FindFirstChild("HumanoidRootPart") or primaryTarget.PrimaryPart
+			if tRoot then
+				local toTarget = tRoot.Position - origin
+				if toTarget.Magnitude > 0.01 then
+					return toTarget.Unit
+				end
+			end
+		end
+		local flatDir = Vector3.new(direction.X, 0, direction.Z)
+		if flatDir.Magnitude > 0.01 then
+			return flatDir.Unit
+		end
+		return direction
+	end
+
+	local function getYawSpreadBasis()
+		local dir3d = getTargetDirection()
+		local flat = Vector3.new(dir3d.X, 0, dir3d.Z)
+		if flat.Magnitude > 0.01 then
+			return flat.Unit
+		end
+		return Vector3.new(0, 0, -1)
+	end
+
+	if skill.id == "Archer_MultiShot" then
+		local yawBasis = getYawSpreadBasis()
+		local baseCF = CFrame.lookAt(Vector3.zero, yawBasis)
+		local spreadAngles = { -12, -4, 4, 12 }
+		for _, angleDeg in spreadAngles do
+			local spreadYaw = (baseCF * CFrame.Angles(0, math.rad(angleDeg), 0)).LookVector
+			local fullDir = (spreadYaw + Vector3.new(0, getTargetDirection().Y * 0.5, 0)).Unit
+			self._projectileService:FireProjectile(player, skill, origin, fullDir, targetData, true)
+		end
+		return true
+	end
+
+	local arrowDir = getTargetDirection()
+	self._projectileService:FireProjectile(player, skill, origin, arrowDir, targetData, true)
 	return true
 end
 

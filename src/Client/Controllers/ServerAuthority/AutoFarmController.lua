@@ -7,6 +7,7 @@ function Controller:Start()
 
 	local AnimationController = require(ReplicatedStorage.Shared.Util.AnimationController)
 	local Skills = require(ReplicatedStorage.Shared.Config.Skills)
+	local SkillVfxUtil = require(ReplicatedStorage.Shared.Util.SkillVfxUtil)
 	local SkillBarUI = require(script.Parent.Parent.Parent.UI.SkillBar.SkillBarUI)
 	local player = Players.LocalPlayer
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -142,6 +143,14 @@ function Controller:Start()
 			animCtrl:PlayAutoAttack(skill)
 		elseif skill then
 			animCtrl:PlaySkillCast(skill)
+		end
+
+		if skillId == "Warrior_AutoAttack" or skillId == "Kavalier_AutoAttack" or skillId == "Priest_AutoAttack" then
+			local character = player.Character
+			if character then
+				local comboIndex = animCtrl and animCtrl:GetComboIndex() or 1
+				SkillVfxUtil.PlayForSkill(character, skillId, comboIndex)
+			end
 		end
 	end)
 end

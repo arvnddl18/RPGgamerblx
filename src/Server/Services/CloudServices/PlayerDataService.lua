@@ -629,13 +629,25 @@ function PlayerDataService:SetupPlayer(player)
 		end
 	end
 
-	player.CharacterAdded:Connect(function()
+	player.CharacterAdded:Connect(function(character)
 		task.wait(0.1)
 		local data = self._data[player]
 		if data and data.hasSelectedClass and data.hp <= 0 then
 			data.hp = data.combatStats.maxHp
 			data.mana = data.combatStats.maxMana
 		end
+
+		for _, part in character:GetDescendants() do
+			if part:IsA("BasePart") then
+				part.CollisionGroup = "Characters"
+			end
+		end
+		character.DescendantAdded:Connect(function(descendant)
+			if descendant:IsA("BasePart") then
+				descendant.CollisionGroup = "Characters"
+			end
+		end)
+
 		syncHumanoid(player, data)
 		self:FireStatsUpdated(player)
 

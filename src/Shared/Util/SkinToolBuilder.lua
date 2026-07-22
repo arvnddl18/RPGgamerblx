@@ -93,7 +93,7 @@ end
 
 local function addSlashArc(parent, color)
 	local arc = Instance.new("Part")
-	arc.Name = "CyanSlashArc"
+	arc.Name = "WarriorSlashArc"
 	arc.Size = Vector3.new(3.8, 0.08, 2.2)
 	arc.Transparency = 1
 	arc.CanCollide = false
@@ -114,14 +114,14 @@ local function addSlashArc(parent, color)
 	a1.Parent = arc
 
 	local trail = Instance.new("Trail")
-	trail.Name = "CyanSlashTrail"
+	trail.Name = "WarriorSlashTrail"
 	trail.Enabled = false
 	trail.Attachment0 = a0
 	trail.Attachment1 = a1
 	trail.Lifetime = 0.28
 	trail.MinLength = 0.02
-	trail.LightEmission = 1
-	trail.Color = ColorSequence.new(color)
+	trail.LightEmission = 0.8
+	trail.Color = typeof(color) == "ColorSequence" and color or ColorSequence.new(color)
 	trail.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.05),
 		NumberSequenceKeypoint.new(0.65, 0.25),
@@ -133,7 +133,8 @@ local function addSlashArc(parent, color)
 	})
 	trail.Parent = arc
 
-	addEmitter(arc, "CyanSlashSpark", color, 75, 0.22)
+	local sparkColor = typeof(color) == "ColorSequence" and color.Keypoints[1].Value or color
+	addEmitter(arc, "WarriorSlashSpark", sparkColor, 75, 0.22)
 	return arc
 end
 
@@ -323,6 +324,8 @@ local function setEmitters(tool, enabled, names)
 	end
 end
 
+
+
 function SkinToolBuilder.PlayEffect(tool, style, phase)
 	if not tool then
 		return
@@ -331,10 +334,10 @@ function SkinToolBuilder.PlayEffect(tool, style, phase)
 	local names = nil
 	if style == "axe" then
 		names = phase == "swing"
-			and { "SlashTrail", "CyanSlashTrail" }
-			or { "SlashTrail", "SlashSpark", "ThrustSpark", "CyanSlashTrail", "CyanSlashSpark" }
+			and { "SlashTrail", "CyanSlashTrail", "WarriorSlashTrail" }
+			or { "SlashTrail", "SlashSpark", "ThrustSpark", "CyanSlashTrail", "CyanSlashSpark", "WarriorSlashTrail", "WarriorSlashSpark" }
 	elseif style == "sword" or style == "spear" then
-		names = phase == "swing" and { "SlashTrail" } or { "SlashTrail", "SlashSpark", "ThrustSpark" }
+		names = phase == "swing" and { "SlashTrail", "CyanSlashTrail", "WarriorSlashTrail" } or { "SlashTrail", "SlashSpark", "ThrustSpark", "CyanSlashTrail", "CyanSlashSpark", "WarriorSlashTrail", "WarriorSlashSpark" }
 	elseif style == "staff" then
 		names = { "ArcaneBurst", "CastMist", "CastLight" }
 	elseif style == "bow" then
@@ -342,6 +345,7 @@ function SkinToolBuilder.PlayEffect(tool, style, phase)
 	elseif style == "mace" then
 		names = { "HolyBurst", "HealGlow" }
 	end
+	
 	setEmitters(tool, true, names)
 	if phase == "hit" then
 		task.delay(0.35, function()
@@ -736,14 +740,19 @@ local function addCatalogWeaponEffects(tool, style)
 		return
 	end
 
-	local existing = tool:FindFirstChild("CyanSlashArc", true)
-	if existing then
-		return
+	-- Clean up old effects to ensure hot-reloads and existing tools get updated
+	for _, name in ipairs({ "CyanSlashArc", "WarriorSlashArc", "CyanMoveTrail", "WarriorMoveTrail", "MoveGlowA0", "MoveGlowA1" }) do
+		local old = tool:FindFirstChild(name, true)
+		if old then old:Destroy() end
 	end
+	
+	local moveGlowColor = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 40, 40)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0)),
+	})
 
-	local color = Color3.fromRGB(20, 230, 255)
-	local arc = addSlashArc(tool, color)
-	arc.CFrame = handle.CFrame * CFrame.new(0, 1.65, -0.35) * CFrame.Angles(0, 0, math.rad(25))
+	local arc = addSlashArc(tool, moveGlowColor)
+	arc.CFrame = handle.CFrame * CFrame.new(0, 0, -3.0)
 
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = handle
@@ -752,29 +761,29 @@ local function addCatalogWeaponEffects(tool, style)
 
 	local moveA0 = Instance.new("Attachment")
 	moveA0.Name = "MoveGlowA0"
-	moveA0.Position = Vector3.new(0, 1.1, 0)
+	moveA0.Position = Vector3.new(0, 0, -3.6)
 	moveA0.Parent = handle
 
 	local moveA1 = Instance.new("Attachment")
 	moveA1.Name = "MoveGlowA1"
-	moveA1.Position = Vector3.new(0, -1.1, 0)
+	moveA1.Position = Vector3.new(0, 0, -1.4)
 	moveA1.Parent = handle
 
 	local moveTrail = Instance.new("Trail")
-	moveTrail.Name = "CyanMoveTrail"
+	moveTrail.Name = "WarriorMoveTrail"
 	moveTrail.Enabled = false
 	moveTrail.Attachment0 = moveA0
 	moveTrail.Attachment1 = moveA1
-	moveTrail.Lifetime = 0.16
+	moveTrail.Lifetime = 0.2
 	moveTrail.MinLength = 0.04
 	moveTrail.LightEmission = 0.8
-	moveTrail.Color = ColorSequence.new(color)
+	moveTrail.Color = moveGlowColor
 	moveTrail.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(0, 0.2),
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	moveTrail.WidthScale = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(0, 0.4),
 		NumberSequenceKeypoint.new(1, 0),
 	})
 	moveTrail.Parent = handle

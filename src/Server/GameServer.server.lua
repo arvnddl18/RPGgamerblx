@@ -5,6 +5,15 @@ local ServerStorage = game:GetService("ServerStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Services = Server:WaitForChild("Services")
 
+local PhysicsService = game:GetService("PhysicsService")
+pcall(function()
+	PhysicsService:RegisterCollisionGroup("Characters")
+	PhysicsService:RegisterCollisionGroup("Enemies")
+	PhysicsService:CollisionGroupSetCollidable("Characters", "Enemies", false)
+	PhysicsService:CollisionGroupSetCollidable("Enemies", "Enemies", false)
+	PhysicsService:CollisionGroupSetCollidable("Characters", "Characters", false)
+end)
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Framework = require(Shared:WaitForChild("Framework"))
 
@@ -153,6 +162,7 @@ local coreRemotes = {
 	"SetResting",
 	"PlayMonsterAnimation",
 	"CombatEvents",
+	"SpawnProjectile", "DestroyProjectile",
 	"RequestFastTravel",
 	"TeleportToQuestGiver",
 	"FastTravelVisit",

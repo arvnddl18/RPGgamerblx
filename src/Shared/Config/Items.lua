@@ -357,7 +357,8 @@ local Items = {
 		statBonuses = { PhysicalDamage = 4 },
 		color = Color3.fromRGB(60, 160, 80),
 		toolAssetId = 90241838495421,
-		toolAssetScale = 0.025,
+		toolAssetScale = 0.015,
+		toolAssetRotation = Vector3.new(-90, 0, 0),
 		weaponSkin = { style = "bow", toolHold = "Archer" },
 	},
 	ArcherCap = {

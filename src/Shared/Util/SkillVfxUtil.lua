@@ -6,8 +6,7 @@ local SkillVfxConfig = require(script.Parent.Parent.Config.SkillVfxConfig)
 local SkillVfxUtil = {}
 
 local function getTemplatesFolder()
-	local assets = ReplicatedStorage:FindFirstChild("Assets")
-	return assets and assets:FindFirstChild("VFX")
+	return ReplicatedStorage:FindFirstChild("Effects")
 end
 
 function SkillVfxUtil.GetTemplate(vfxKey)
@@ -23,15 +22,48 @@ local function enableEffects(root, enabled)
 	end
 end
 
+local function emitEffects(root, count)
+	for _, desc in root:GetDescendants() do
+		if desc:IsA("ParticleEmitter") then
+			desc:Emit(count)
+		end
+	end
+end
+
+local function preparePart(part)
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Massless = true
+	part.Anchored = false
+end
+
 local function prepareVfxClone(root)
+	if root:IsA("BasePart") then
+		preparePart(root)
+	end
 	for _, desc in root:GetDescendants() do
 		if desc:IsA("BasePart") then
-			desc.CanCollide = false
-			desc.CanQuery = false
-			desc.CanTouch = false
-			desc.Massless = true
-			desc.Anchored = false
+			preparePart(desc)
 		end
+	end
+end
+
+local function applyColor(instance, color)
+	if instance:IsA("ParticleEmitter") or instance:IsA("Trail") or instance:IsA("Beam") then
+		instance.Color = ColorSequence.new(color)
+	elseif instance:IsA("BasePart") then
+		instance.Color = color
+	elseif instance:IsA("Light") then
+		instance.Color = color
+	end
+end
+
+local function applyColorOverride(root, color)
+	if not color then return end
+	applyColor(root, color)
+	for _, desc in root:GetDescendants() do
+		applyColor(desc, color)
 	end
 end
 
@@ -54,12 +86,14 @@ local function tryPlayRigAnimation(model)
 	end
 end
 
-function SkillVfxUtil.Play(character, vfxKey)
+function SkillVfxUtil.Play(character, vfxKey, comboIndex)
 	if not character or not vfxKey then
 		return nil
 	end
 
-	local template = SkillVfxUtil.GetTemplate(vfxKey)
+	local cfg = SkillVfxConfig.GetTemplateConfig(vfxKey) or { duration = 2, offset = CFrame.new() }
+
+	local template = SkillVfxUtil.GetTemplate(cfg.baseVfx or vfxKey)
 	if not template then
 		return nil
 	end
@@ -69,8 +103,10 @@ function SkillVfxUtil.Play(character, vfxKey)
 		return nil
 	end
 
-	local cfg = SkillVfxConfig.GetTemplateConfig(vfxKey) or { duration = 2, offset = CFrame.new() }
 	local clone = template:Clone()
+	if cfg.color then
+		applyColorOverride(clone, cfg.color)
+	end
 	clone.Name = vfxKey .. "_Active"
 	prepareVfxClone(clone)
 
@@ -81,7 +117,12 @@ function SkillVfxUtil.Play(character, vfxKey)
 		end
 	end
 
-	local pivot = root.CFrame * (cfg.offset or CFrame.new())
+	local angleOffset = CFrame.new()
+	if cfg.comboAngles and comboIndex and cfg.comboAngles[comboIndex] then
+		angleOffset = cfg.comboAngles[comboIndex]
+	end
+	
+	local pivot = root.CFrame * (cfg.offset or CFrame.new()) * angleOffset
 	local followConnection
 	if clone:IsA("Model") then
 		clone:PivotTo(pivot)
@@ -105,6 +146,9 @@ function SkillVfxUtil.Play(character, vfxKey)
 			end
 		end
 	elseif clone:IsA("BasePart") then
+		clone.Transparency = 1
+		clone.CanCollide = false
+		clone.Anchored = true
 		clone.CFrame = pivot
 		clone.Parent = cfg.followCharacter and character or workspace
 	else
@@ -125,7 +169,12 @@ function SkillVfxUtil.Play(character, vfxKey)
 		clone = anchor
 	end
 
-	enableEffects(clone, true)
+	if cfg.emitCount then
+		enableEffects(clone, false)
+		emitEffects(clone, cfg.emitCount)
+	else
+		enableEffects(clone, true)
+	end
 	tryPlayRigAnimation(clone)
 
 	task.delay(cfg.duration or 2, function()
@@ -140,10 +189,10 @@ function SkillVfxUtil.Play(character, vfxKey)
 	return clone
 end
 
-function SkillVfxUtil.PlayForSkill(character, skillId)
+function SkillVfxUtil.PlayForSkill(character, skillId, comboIndex)
 	local vfxKey = SkillVfxConfig.GetForSkill(skillId)
 	if vfxKey then
-		return SkillVfxUtil.Play(character, vfxKey)
+		return SkillVfxUtil.Play(character, vfxKey, comboIndex)
 	end
 	return nil
 end

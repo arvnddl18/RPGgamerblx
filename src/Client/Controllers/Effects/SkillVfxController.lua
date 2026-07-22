@@ -12,6 +12,9 @@ remotes.PlaySkillVfx.OnClientEvent:Connect(function(player, vfxKey)
 	if typeof(player) ~= "Instance" or not player:IsA("Player") then
 		return
 	end
+	if player == Players.LocalPlayer then
+		return
+	end
 	if typeof(vfxKey) ~= "string" then
 		return
 	end

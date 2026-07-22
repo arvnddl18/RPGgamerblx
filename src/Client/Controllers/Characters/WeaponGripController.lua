@@ -86,7 +86,7 @@ local function stopMoveEffects()
 		moveEffectConn:Disconnect()
 		moveEffectConn = nil
 	end
-	setNamedEffects(currentTool, { "CyanMoveTrail" }, false)
+	setNamedEffects(currentTool, { "WarriorMoveTrail", "CyanMoveTrail" }, false)
 end
 
 local function bindMoveEffects(humanoid, tool)
@@ -95,7 +95,7 @@ local function bindMoveEffects(humanoid, tool)
 		return
 	end
 	moveEffectConn = humanoid.Running:Connect(function(speed)
-		setNamedEffects(tool, { "CyanMoveTrail" }, speed > 0.5)
+		setNamedEffects(tool, { "WarriorMoveTrail", "CyanMoveTrail" }, speed > 0.5)
 	end)
 end
 
@@ -123,6 +123,10 @@ local function onActionAnim(track)
 		return
 	end
 	if track.Priority.Value < Enum.AnimationPriority.Action.Value then
+		return
+	end
+	local name = string.lower(track.Name)
+	if name:find("jump") or name:find("fall") or name:find("dash") or name:find("land") or name:find("walk") or name:find("run") or name:find("idle") or name:find("move") then
 		return
 	end
 

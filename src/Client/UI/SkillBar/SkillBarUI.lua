@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Skills = require(Shared.Config.Skills)
 local Items = require(Shared.Config.Items)
+local CooldownOverlay = require(script.Parent.CooldownOverlay)
 
 local SkillBarUI = {}
 SkillBarUI.__index = SkillBarUI
@@ -11,6 +12,17 @@ SkillBarUI._active = nil
 
 local SLOT_LABELS = { "1", "2", "3", "4", "5", "6", "7" }
 local POTION_NAMES = { [6] = "HP Pot", [7] = "MP Pot" }
+
+-- Desaturate a colour towards 60% gray to visually indicate "disabled" during cooldown.
+local function desaturateColor(color, factor)
+	factor = factor or 0.6
+	local gray = color.R * 0.299 + color.G * 0.587 + color.B * 0.114
+	return Color3.new(
+		color.R + (gray - color.R) * factor,
+		color.G + (gray - color.G) * factor,
+		color.B + (gray - color.B) * factor
+	)
+end
 
 function SkillBarUI.new(playerGui)
 	local self = setmetatable({}, SkillBarUI)
@@ -143,30 +155,10 @@ function SkillBarUI.new(playerGui)
 		nameLabel.TextSize = 8
 		nameLabel.Parent = slotFrame
 
-		local cooldownOverlay = Instance.new("Frame")
-		cooldownOverlay.Name = "Cooldown"
-		cooldownOverlay.Size = UDim2.new(1, 0, 1, 0)
-		cooldownOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		cooldownOverlay.BackgroundTransparency = 0.45
-		cooldownOverlay.BorderSizePixel = 0
-		cooldownOverlay.Visible = false
-		cooldownOverlay.ZIndex = 2
-		cooldownOverlay.Parent = slotFrame
+		-- Clock-wipe cooldown overlay (EditableImage-based pie wipe)
+		local overlay = CooldownOverlay.Create(slotFrame)
 
-		local cdCorner = Instance.new("UICorner")
-		cdCorner.CornerRadius = UDim.new(0, 6)
-		cdCorner.Parent = cooldownOverlay
-
-		local cdLabel = Instance.new("TextLabel")
-		cdLabel.Size = UDim2.new(1, 0, 1, 0)
-		cdLabel.BackgroundTransparency = 1
-		cdLabel.Text = ""
-		cdLabel.TextColor3 = Color3.new(1, 1, 1)
-		cdLabel.Font = Enum.Font.GothamBold
-		cdLabel.TextSize = 14
-		cdLabel.ZIndex = 3
-		cdLabel.Parent = cooldownOverlay
-
+		-- Gray overlay for mana-locked / mastery-locked state (NOT cooldown)
 		local grayOverlay = Instance.new("Frame")
 		grayOverlay.Name = "Unavailable"
 		grayOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -193,13 +185,13 @@ function SkillBarUI.new(playerGui)
 			frame = slotFrame,
 			icon = icon,
 			nameLabel = nameLabel,
-			cooldownOverlay = cooldownOverlay,
-			cdLabel = cdLabel,
+			cooldownOverlay = overlay,
 			grayOverlay = grayOverlay,
 			lockLabel = lockLabel,
 			skillId = nil,
 			manaCost = 0,
 			requiredMasteryRank = 1,
+			originalColor = icon.BackgroundColor3,
 		}
 	end
 
@@ -245,6 +237,7 @@ function SkillBarUI:UpdateLoadout(skillLoadout)
 			local name, color, manaCost = self:GetSkillMeta(skillId)
 			slot.nameLabel.Text = name
 			slot.icon.BackgroundColor3 = color
+			slot.originalColor = color
 			slot.manaCost = manaCost
 			-- Mastery, rather than character level, controls class skill availability.
 			local skillConfig = Skills[skillId]
@@ -288,22 +281,24 @@ function SkillBarUI:RefreshAvailability()
 	end
 end
 
-function SkillBarUI:StartCooldown(skillId, duration)
+function SkillBarUI:StartCooldown(skillId, duration, serverTime)
+	-- serverTime is the server's tick() when the cooldown started.
+	-- Used to reconcile network latency so the visual wipe stays accurate.
+	local startTime = serverTime or tick()
+
 	for i, slot in self._slots do
 		if slot.skillId == skillId then
-			self._cooldownEnds[skillId] = tick() + duration
-			slot.cooldownOverlay.Visible = true
-			slot.cdLabel.Text = tostring(math.ceil(duration))
+			-- Record cooldown end time for RefreshAvailability checks
+			self._cooldownEnds[skillId] = startTime + duration
 
-			task.spawn(function()
-				while slot.skillId == skillId and self._cooldownEnds[skillId] and tick() < self._cooldownEnds[skillId] do
-					local remaining = self._cooldownEnds[skillId] - tick()
-					slot.cdLabel.Text = tostring(math.max(0, math.ceil(remaining)))
-					task.wait(0.1)
-				end
-				slot.cooldownOverlay.Visible = false
-				slot.cdLabel.Text = ""
+			-- Desaturate the icon to indicate "disabled"
+			slot.icon.BackgroundColor3 = desaturateColor(slot.originalColor)
+
+			-- Start the clock-wipe overlay animation
+			CooldownOverlay.StartCooldown(slot.cooldownOverlay, startTime, duration, function()
+				-- Cooldown finished → restore icon and clear state
 				self._cooldownEnds[skillId] = nil
+				slot.icon.BackgroundColor3 = slot.originalColor
 				self:RefreshAvailability()
 			end)
 			break
